@@ -8,6 +8,15 @@ from pnlclaw_types.common import (
     Symbol,
     Timestamp,
 )
+from pnlclaw_types.trading import (
+    Fill,
+    Order,
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    PnLRecord,
+    Position,
+)
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Delta,
@@ -32,4 +41,12 @@ __all__ = [
     "PriceLevel",
     "TickerEvent",
     "TradeEvent",
+    # trading
+    "Fill",
+    "Order",
+    "OrderSide",
+    "OrderStatus",
+    "OrderType",
+    "PnLRecord",
+    "Position",
 ]
