@@ -1,5 +1,10 @@
 """pnlclaw_types — Unified data models for PnLClaw."""
 
+from pnlclaw_types.events import (
+    DiagnosticEvent,
+    DiagnosticLevel,
+    HookEvent,
+)
 from pnlclaw_types.errors import (
     ERROR_CODE_HTTP_STATUS,
     ErrorCode,
@@ -111,4 +116,8 @@ __all__ = [
     "RateLimitedError",
     "RiskDeniedError",
     "ValidationError",
+    # events
+    "DiagnosticEvent",
+    "DiagnosticLevel",
+    "HookEvent",
 ]
