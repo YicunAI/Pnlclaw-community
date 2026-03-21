@@ -8,6 +8,12 @@ from pnlclaw_types.common import (
     Symbol,
     Timestamp,
 )
+from pnlclaw_types.risk import (
+    RiskAlert,
+    RiskDecision,
+    RiskLevel,
+    RiskRule,
+)
 from pnlclaw_types.strategy import (
     BacktestMetrics,
     BacktestResult,
@@ -62,4 +68,9 @@ __all__ = [
     "Signal",
     "StrategyConfig",
     "StrategyType",
+    # risk
+    "RiskAlert",
+    "RiskDecision",
+    "RiskLevel",
+    "RiskRule",
 ]
