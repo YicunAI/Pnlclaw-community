@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pnlclaw-compat"
+version = "0.1.0"
+description = "Temporary compatibility layer for retained OpenClaw logic"
+readme = {text = "Transition layer for OpenClaw compatibility. No new business logic should be added here.", content-type = "text/plain"}
+license = "AGPL-3.0-only"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["pnlclaw_compat"]
