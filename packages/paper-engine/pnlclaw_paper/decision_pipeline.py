@@ -69,6 +69,8 @@ class PipelineConfig:
     default_quantity: float = 0.01
     # Default account ID for order placement
     default_account_id: str = ""
+    # Whether to enforce TradeIntent validation (price/stop_loss/direction)
+    enable_validation: bool = True
 
 
 # ---------------------------------------------------------------------------
@@ -178,12 +180,15 @@ class DecisionPipeline:
             self._audit_event(signal, result, "risk_blocked")
             return result
 
-        # Stage 6: TradeIntent validation
-        current_price = 0.0
-        if self._current_price_provider:
-            current_price = self._current_price_provider(signal.symbol)
-        validation = validate(intent, current_price)
-        if not validation.valid:
+        # Stage 6: TradeIntent validation (optional)
+        if self._config.enable_validation:
+            current_price = 0.0
+            if self._current_price_provider:
+                current_price = self._current_price_provider(signal.symbol)
+            validation = validate(intent, current_price)
+        else:
+            validation = None
+        if validation is not None and not validation.valid:
             result = PipelineResult(
                 action=PipelineAction.BLOCKED,
                 reason=f"Validation failed: {'; '.join(validation.errors)}",
