@@ -1,0 +1,44 @@
+# SMA Crossover Strategy
+# Buy when SMA(20) crosses above SMA(50), sell when it crosses below.
+
+id: template-sma-cross
+name: SMA Crossover
+type: sma_cross
+description: >
+  Classic dual moving average crossover strategy.
+  Goes long when the fast SMA (20) crosses above the slow SMA (50),
+  and closes the position when it crosses below.
+symbols:
+  - BTC/USDT
+interval: 1h
+parameters:
+  sma_short: 20
+  sma_long: 50
+
+entry_rules:
+  long:
+    - indicator: sma
+      params:
+        period: 20
+      operator: crosses_above
+      comparator:
+        indicator: sma
+        params:
+          period: 50
+
+exit_rules:
+  close_long:
+    - indicator: sma
+      params:
+        period: 20
+      operator: crosses_below
+      comparator:
+        indicator: sma
+        params:
+          period: 50
+
+risk_params:
+  stop_loss_pct: 0.03
+  take_profit_pct: 0.06
+  max_position_pct: 0.1
+  max_open_positions: 1

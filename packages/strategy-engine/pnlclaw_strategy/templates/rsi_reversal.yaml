@@ -1,0 +1,39 @@
+# RSI Reversal Strategy
+# Buy when RSI(14) drops below 30 (oversold), sell when it rises above 70 (overbought).
+
+id: template-rsi-reversal
+name: RSI Reversal
+type: rsi_reversal
+description: >
+  Mean-reversion strategy based on the Relative Strength Index.
+  Goes long when RSI(14) falls below 30 (oversold zone),
+  and closes the position when RSI rises above 70 (overbought zone).
+symbols:
+  - BTC/USDT
+interval: 1h
+parameters:
+  rsi_period: 14
+  oversold: 30
+  overbought: 70
+
+entry_rules:
+  long:
+    - indicator: rsi
+      params:
+        period: 14
+      operator: less_than
+      comparator: 30.0
+
+exit_rules:
+  close_long:
+    - indicator: rsi
+      params:
+        period: 14
+      operator: greater_than
+      comparator: 70.0
+
+risk_params:
+  stop_loss_pct: 0.02
+  take_profit_pct: 0.05
+  max_position_pct: 0.1
+  max_open_positions: 1
