@@ -5,22 +5,21 @@ build-backend = "hatchling.build"
 [project]
 name = "pnlclaw-core"
 version = "0.1.0"
-description = "Shared config, constants, exceptions, logging, utilities"
-readme = {text = "Shared config, constants, exceptions, logging, utilities", content-type = "text/plain"}
+description = "Shared config, constants, exceptions, logging, utilities for PnLClaw"
+readme = {text = "Core infrastructure: config, logging, resilience, plugins, diagnostics.", content-type = "text/plain"}
 license = "AGPL-3.0-only"
 requires-python = ">=3.11"
 dependencies = [
-    "pnlclaw-types",
-    "structlog>=24.4.0",
     "pydantic>=2.0,<3.0",
     "pydantic-settings>=2.4.0",
-    "python-dotenv>=1.0.1",
+    "structlog>=24.4.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
 ]
 
 [tool.hatch.build.targets.wheel]
