@@ -1,5 +1,16 @@
 """pnlclaw_types — Unified data models for PnLClaw."""
 
+from pnlclaw_types.errors import (
+    ERROR_CODE_HTTP_STATUS,
+    ErrorCode,
+    ExchangeError,
+    InternalError,
+    NotFoundError,
+    PnLClawError,
+    RateLimitedError,
+    RiskDeniedError,
+    ValidationError,
+)
 from pnlclaw_types.common import (
     APIResponse,
     ErrorInfo,
@@ -90,4 +101,14 @@ __all__ = [
     "MarketRegime",
     "MarketState",
     "TradeIntent",
+    # errors
+    "ERROR_CODE_HTTP_STATUS",
+    "ErrorCode",
+    "ExchangeError",
+    "InternalError",
+    "NotFoundError",
+    "PnLClawError",
+    "RateLimitedError",
+    "RiskDeniedError",
+    "ValidationError",
 ]
