@@ -8,6 +8,13 @@ from pnlclaw_types.common import (
     Symbol,
     Timestamp,
 )
+from pnlclaw_types.strategy import (
+    BacktestMetrics,
+    BacktestResult,
+    Signal,
+    StrategyConfig,
+    StrategyType,
+)
 from pnlclaw_types.trading import (
     Fill,
     Order,
@@ -49,4 +56,10 @@ __all__ = [
     "OrderType",
     "PnLRecord",
     "Position",
+    # strategy
+    "BacktestMetrics",
+    "BacktestResult",
+    "Signal",
+    "StrategyConfig",
+    "StrategyType",
 ]
