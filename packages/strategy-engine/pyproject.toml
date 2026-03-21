@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pnlclaw-strategy"
+version = "0.1.0"
+description = "Strategy configs, validation, indicators, runtime"
+readme = {text = "Strategy configs, validation, indicators, runtime", content-type = "text/plain"}
+license = "AGPL-3.0-only"
+requires-python = ">=3.11"
+dependencies = [
+    "pnlclaw-types",
+    "pnlclaw-core",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["pnlclaw_strategy"]
