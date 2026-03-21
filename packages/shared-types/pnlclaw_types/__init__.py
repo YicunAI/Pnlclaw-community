@@ -8,6 +8,15 @@ from pnlclaw_types.common import (
     Symbol,
     Timestamp,
 )
+from pnlclaw_types.agent import (
+    AgentRole,
+    AgentStreamEvent,
+    AgentStreamEventType,
+    ChatMessage,
+    MarketRegime,
+    MarketState,
+    TradeIntent,
+)
 from pnlclaw_types.risk import (
     RiskAlert,
     RiskDecision,
@@ -73,4 +82,12 @@ __all__ = [
     "RiskDecision",
     "RiskLevel",
     "RiskRule",
+    # agent
+    "AgentRole",
+    "AgentStreamEvent",
+    "AgentStreamEventType",
+    "ChatMessage",
+    "MarketRegime",
+    "MarketState",
+    "TradeIntent",
 ]
