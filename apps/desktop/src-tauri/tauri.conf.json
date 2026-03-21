@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicktrav/tauri/v2-schemas/core/tauri-config-schema/schema.json",
+  "productName": "PnLClaw",
+  "version": "0.1.0",
+  "identifier": "com.pnlclaw.community",
+  "build": {
+    "frontendDist": "../out",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "PnLClaw Community",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    }
+  }
+}
