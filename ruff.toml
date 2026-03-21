@@ -1,0 +1,24 @@
+# PnLClaw ruff configuration
+# Standalone file for editors/CI that don't read pyproject.toml
+
+line-length = 100
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[lint.isort]
+known-first-party = [
+  "pnlclaw_types",
+  "pnlclaw_core",
+  "pnlclaw_security",
+  "pnlclaw_exchange",
+  "pnlclaw_market",
+  "pnlclaw_strategy",
+  "pnlclaw_backtest",
+  "pnlclaw_paper",
+  "pnlclaw_risk",
+  "pnlclaw_agent",
+  "pnlclaw_llm",
+  "pnlclaw_storage",
+]

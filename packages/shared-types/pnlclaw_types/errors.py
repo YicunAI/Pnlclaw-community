@@ -8,7 +8,6 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # ErrorCode — each code maps to an HTTP status
 # ---------------------------------------------------------------------------

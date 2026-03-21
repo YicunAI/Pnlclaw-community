@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pnlclaw_types.common import Timestamp
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------

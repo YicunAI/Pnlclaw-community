@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from pnlclaw_types.common import Symbol, Timestamp
 from pnlclaw_types.trading import OrderSide, OrderType
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------

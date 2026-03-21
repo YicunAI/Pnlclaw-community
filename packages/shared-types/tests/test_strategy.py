@@ -1,7 +1,7 @@
 """Tests for pnlclaw_types.strategy — serialization/deserialization roundtrips."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pnlclaw_types.strategy import (
     BacktestMetrics,
@@ -91,8 +91,8 @@ class TestBacktestResult:
         r = BacktestResult(
             id="bt-001",
             strategy_id="strat-001",
-            start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2025, 3, 31, 23, 59, 59, tzinfo=timezone.utc),
+            start_date=datetime(2025, 1, 1, tzinfo=UTC),
+            end_date=datetime(2025, 3, 31, 23, 59, 59, tzinfo=UTC),
             metrics=BacktestMetrics(
                 total_return=0.15,
                 annual_return=0.45,

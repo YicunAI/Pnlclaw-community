@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pnlclaw_types.common import Symbol, Timestamp
 
-
 # ---------------------------------------------------------------------------
 # PriceLevel — helper for order book entries
 # ---------------------------------------------------------------------------
