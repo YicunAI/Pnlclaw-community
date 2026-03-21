@@ -5,14 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "pnlclaw-backtest"
 version = "0.1.0"
-description = "Backtesting engine"
-readme = {text = "Backtesting engine", content-type = "text/plain"}
+description = "Backtesting engine for PnLClaw — event-driven strategy backtesting with simulated execution"
+readme = {text = "Backtesting engine for PnLClaw.", content-type = "text/plain"}
 license = "AGPL-3.0-only"
 requires-python = ">=3.11"
 dependencies = [
     "pnlclaw-types",
-    "pnlclaw-core",
-    "pnlclaw-strategy",
     "pandas>=2.2.0",
     "numpy>=1.26.0",
 ]
@@ -20,7 +18,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
-    "pytest-asyncio>=0.21",
+    "pyarrow>=14.0",
 ]
 
 [tool.hatch.build.targets.wheel]
