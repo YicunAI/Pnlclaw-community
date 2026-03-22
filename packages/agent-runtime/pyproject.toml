@@ -12,8 +12,12 @@ requires-python = ">=3.11"
 dependencies = [
     "pnlclaw-types",
     "pnlclaw-core",
-    "pnlclaw-llm",
     "pnlclaw-security",
+    "pnlclaw-market",
+    "pnlclaw-strategy",
+    "pnlclaw-backtest",
+    "pnlclaw-paper",
+    "pnlclaw-risk",
 ]
 
 [project.optional-dependencies]
