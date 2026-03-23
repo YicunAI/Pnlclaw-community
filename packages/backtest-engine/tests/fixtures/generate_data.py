@@ -15,7 +15,7 @@ def generate_deterministic_btc_data(
     seed: int = 42,
     initial_price: float = 40_000.0,
     start_ts_ms: int = 1_704_067_200_000,  # 2024-01-01 00:00 UTC
-    interval_ms: int = 3_600_000,           # 1 hour
+    interval_ms: int = 3_600_000,  # 1 hour
 ) -> pd.DataFrame:
     """Generate deterministic OHLCV data using a seeded random walk.
 

@@ -9,7 +9,6 @@ from pnlclaw_agent.tools.risk_tools import RiskCheckTool, RiskReportTool
 from pnlclaw_types.agent import TradeIntent
 from pnlclaw_types.risk import RiskDecision, RiskLevel
 
-
 # ---------------------------------------------------------------------------
 # Mock rule and engine
 # ---------------------------------------------------------------------------

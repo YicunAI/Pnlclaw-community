@@ -44,6 +44,7 @@ class TestCircuitBreaker:
         with pytest.raises(RuntimeError):
             await cb.call(self._fail)
         import asyncio
+
         await asyncio.sleep(0.05)
         assert cb.state == CircuitState.HALF_OPEN
 
@@ -53,6 +54,7 @@ class TestCircuitBreaker:
         with pytest.raises(RuntimeError):
             await cb.call(self._fail)
         import asyncio
+
         await asyncio.sleep(0.05)
         result = await cb.call(self._ok)
         assert result == "ok"

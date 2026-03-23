@@ -1,6 +1,5 @@
 """Tests for pnlclaw_core.infra.atomic_write."""
 
-
 from pnlclaw_core.infra.atomic_write import atomic_write
 
 

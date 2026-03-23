@@ -17,10 +17,10 @@ from pnlclaw_llm.base import (
 )
 from pnlclaw_llm.ollama import OllamaProvider
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_ollama_response(content: str = "hello", done: bool = True) -> dict[str, Any]:
     return {"message": {"role": "assistant", "content": content}, "done": done}
@@ -119,10 +119,12 @@ class TestOllamaChat:
 class TestOllamaStream:
     @pytest.mark.asyncio
     async def test_stream_yields_chunks(self) -> None:
-        lines = "\n".join([
-            json.dumps({"message": {"content": "Hello"}, "done": False}),
-            json.dumps({"message": {"content": " World"}, "done": True}),
-        ])
+        lines = "\n".join(
+            [
+                json.dumps({"message": {"content": "Hello"}, "done": False}),
+                json.dumps({"message": {"content": " World"}, "done": True}),
+            ]
+        )
         mock_resp = httpx.Response(200, content=lines.encode())
         transport = httpx.MockTransport(lambda req: mock_resp)
         client = httpx.AsyncClient(transport=transport)

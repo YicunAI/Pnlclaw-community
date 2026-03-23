@@ -20,11 +20,7 @@ class PriceLevel(BaseModel):
     price: float = Field(..., gt=0, description="Price at this level")
     quantity: float = Field(..., ge=0, description="Quantity available at this price")
 
-    model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [{"price": 67000.0, "quantity": 1.5}]
-        }
-    )
+    model_config = ConfigDict(json_schema_extra={"examples": [{"price": 67000.0, "quantity": 1.5}]})
 
 
 # ---------------------------------------------------------------------------

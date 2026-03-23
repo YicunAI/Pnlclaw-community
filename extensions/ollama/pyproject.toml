@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pnlclaw-ext-ollama"
+version = "0.1.0"
+description = "PnLClaw extension: Ollama local LLM provider"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pnlclaw-core",
+    "pnlclaw-llm",
+]
+
+[tool.setuptools]
+package-dir = {"pnlclaw_ext_ollama" = "."}
+packages = ["pnlclaw_ext_ollama"]
+
+[tool.setuptools.package-data]
+pnlclaw_ext_ollama = ["manifest.json"]

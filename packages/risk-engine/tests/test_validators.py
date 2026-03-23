@@ -64,14 +64,16 @@ class TestValidateStopLoss:
 class TestValidateDirection:
     def test_valid_buy_direction(self) -> None:
         intent = _make_intent(
-            side=OrderSide.BUY, price=67000.0,
+            side=OrderSide.BUY,
+            price=67000.0,
             risk_params={"stop_loss": 65000.0, "take_profit": 70000.0},
         )
         assert validate_direction(intent) == []
 
     def test_invalid_buy_tp_below(self) -> None:
         intent = _make_intent(
-            side=OrderSide.BUY, price=67000.0,
+            side=OrderSide.BUY,
+            price=67000.0,
             risk_params={"stop_loss": 65000.0, "take_profit": 66000.0},
         )
         errors = validate_direction(intent)
@@ -80,14 +82,16 @@ class TestValidateDirection:
 
     def test_valid_sell_direction(self) -> None:
         intent = _make_intent(
-            side=OrderSide.SELL, price=67000.0,
+            side=OrderSide.SELL,
+            price=67000.0,
             risk_params={"stop_loss": 69000.0, "take_profit": 64000.0},
         )
         assert validate_direction(intent) == []
 
     def test_invalid_sell_tp_above(self) -> None:
         intent = _make_intent(
-            side=OrderSide.SELL, price=67000.0,
+            side=OrderSide.SELL,
+            price=67000.0,
             risk_params={"stop_loss": 69000.0, "take_profit": 70000.0},
         )
         errors = validate_direction(intent)
@@ -95,7 +99,8 @@ class TestValidateDirection:
 
     def test_invalid_buy_sl_above_entry(self) -> None:
         intent = _make_intent(
-            side=OrderSide.BUY, price=67000.0,
+            side=OrderSide.BUY,
+            price=67000.0,
             risk_params={"stop_loss": 68000.0, "take_profit": 70000.0},
         )
         errors = validate_direction(intent)

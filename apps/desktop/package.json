@@ -12,8 +12,16 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-toast": "^1.2.15",
     "@splinetool/react-spline": "^4.1.0",
     "@splinetool/runtime": "^1.12.69",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^0.577.0",
@@ -23,8 +31,8 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
     "@tailwindcss/postcss": "^4",
+    "@tauri-apps/cli": "^2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

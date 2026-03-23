@@ -116,10 +116,7 @@ class ContextManager:
 
     def _trim_if_needed(self) -> None:
         """Remove oldest non-system messages until within budget."""
-        while (
-            len(self._messages) > self._max_messages
-            or self.total_tokens() > self._max_tokens
-        ):
+        while len(self._messages) > self._max_messages or self.total_tokens() > self._max_tokens:
             # Find the first non-system message to remove
             removed = False
             for i, msg in enumerate(self._messages):

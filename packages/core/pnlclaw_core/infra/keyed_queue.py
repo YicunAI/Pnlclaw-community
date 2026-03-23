@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
@@ -16,10 +15,15 @@ class KeyedQueue:
     Operations with the same key are executed serially.
     Operations with different keys run in parallel.
     Useful for per-symbol order serialization.
+
+    Idle keys are automatically cleaned up after execution to prevent
+    unbounded growth of the internal lock dictionary.
     """
 
     def __init__(self) -> None:
-        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._ref_counts: dict[str, int] = {}
+        self._guard = asyncio.Lock()
 
     async def execute(self, key: str, fn: Callable[[], Awaitable[T]]) -> T:
         """Execute *fn* serially for the given *key*.
@@ -31,8 +35,21 @@ class KeyedQueue:
         Returns:
             Result of *fn*.
         """
-        async with self._locks[key]:
-            return await fn()
+        async with self._guard:
+            if key not in self._locks:
+                self._locks[key] = asyncio.Lock()
+                self._ref_counts[key] = 0
+            self._ref_counts[key] += 1
+
+        try:
+            async with self._locks[key]:
+                return await fn()
+        finally:
+            async with self._guard:
+                self._ref_counts[key] -= 1
+                if self._ref_counts[key] == 0 and not self._locks[key].locked():
+                    del self._locks[key]
+                    del self._ref_counts[key]
 
     @property
     def active_keys(self) -> list[str]:

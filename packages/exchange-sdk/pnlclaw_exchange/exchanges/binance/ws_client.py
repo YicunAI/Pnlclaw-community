@@ -15,6 +15,7 @@ from typing import Any
 import websockets
 import websockets.asyncio.client
 
+from pnlclaw_exchange.base.stall_watchdog import StallTimeoutMeta, StallWatchdog
 from pnlclaw_exchange.base.ws_client import BaseWSClient
 from pnlclaw_exchange.exchanges.binance.normalizer import (
     BinanceDepthDelta,
@@ -26,7 +27,7 @@ from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BINANCE_WS_URL = "wss://stream.binance.com:9443/ws"
+DEFAULT_BINANCE_WS_URL = "wss://data-stream.binance.vision/ws"
 
 
 class BinanceWSClient(BaseWSClient):
@@ -37,6 +38,7 @@ class BinanceWSClient(BaseWSClient):
         - Subscribes via JSON messages: ``{"method":"SUBSCRIBE", ...}``.
         - Supports ticker, kline, trade, and depth (L2) streams.
         - Delegates message parsing to :class:`BinanceNormalizer`.
+        - Integrates :class:`StallWatchdog` for data stall detection.
         - No API key required for public streams.
     """
 
@@ -45,10 +47,12 @@ class BinanceWSClient(BaseWSClient):
         *,
         url: str = DEFAULT_BINANCE_WS_URL,
         symbol_normalizer: SymbolNormalizer | None = None,
+        stall_timeout_s: float = 30.0,
         on_ticker: Callable[[TickerEvent], Any] | None = None,
         on_trade: Callable[[TradeEvent], Any] | None = None,
         on_kline: Callable[[KlineEvent], Any] | None = None,
         on_depth_update: Callable[[BinanceDepthDelta], Any] | None = None,
+        on_stall: Callable[[StallTimeoutMeta], Any] | None = None,
         **kwargs: Any,
     ) -> None:
         config = WSClientConfig(url=url, exchange="binance")
@@ -59,6 +63,12 @@ class BinanceWSClient(BaseWSClient):
         self._ws: websockets.asyncio.client.ClientConnection | None = None
         self._receive_task: asyncio.Task[None] | None = None
         self._request_id: int = 0
+
+        self._stall_watchdog = StallWatchdog(
+            timeout_s=stall_timeout_s,
+            on_timeout=on_stall or self._default_stall_handler,
+            label="binance-ws-stall",
+        )
 
         # Typed callbacks for normalized events.
         self.on_ticker = on_ticker
@@ -75,9 +85,9 @@ class BinanceWSClient(BaseWSClient):
         logger.info("Connecting to Binance WS: %s", self._config.url)
         self._ws = await websockets.asyncio.client.connect(self._config.url)
         await self._dispatch_connect()
-        self._receive_task = asyncio.create_task(
-            self._receive_loop(), name="binance-ws-recv"
-        )
+        await self._stall_watchdog.start()
+        self._stall_watchdog.arm()
+        self._receive_task = asyncio.create_task(self._receive_loop(), name="binance-ws-recv")
 
     async def subscribe(self, streams: list[str]) -> None:
         """Subscribe to Binance streams via JSON subscription message.
@@ -112,6 +122,8 @@ class BinanceWSClient(BaseWSClient):
 
     async def close(self) -> None:
         """Close the WebSocket connection and cancel the receive loop."""
+        self._stall_watchdog.stop()
+
         if self._receive_task is not None and not self._receive_task.done():
             self._receive_task.cancel()
             try:
@@ -171,9 +183,7 @@ class BinanceWSClient(BaseWSClient):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def stream_name(
-        symbol: str, channel: str, *, interval: str | None = None
-    ) -> str:
+    def stream_name(symbol: str, channel: str, *, interval: str | None = None) -> str:
         """Construct a Binance stream name.
 
         Examples::
@@ -219,6 +229,8 @@ class BinanceWSClient(BaseWSClient):
 
     async def _route_message(self, data: dict[str, Any]) -> None:
         """Route a parsed message to the appropriate callback."""
+        self._stall_watchdog.touch()
+
         # Handle combined stream format: {"stream": "...", "data": {...}}
         if "stream" in data and "data" in data:
             data = data["data"]
@@ -248,3 +260,15 @@ class BinanceWSClient(BaseWSClient):
         """Return an auto-incrementing request ID."""
         self._request_id += 1
         return self._request_id
+
+    async def _default_stall_handler(self, meta: StallTimeoutMeta) -> None:
+        """Default stall handler: log and force reconnect by closing WS."""
+        logger.warning(
+            "Binance WS stall detected (idle %.1fs). Closing for reconnect.",
+            meta.idle_s,
+        )
+        if self._ws is not None:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass

@@ -14,49 +14,51 @@ from pydantic import BaseModel, Field
 # Blocked keys — always stripped from environment
 # ---------------------------------------------------------------------------
 
-BLOCKED_KEYS: frozenset[str] = frozenset({
-    # Language runtime injection vectors
-    "NODE_OPTIONS",
-    "NODE_PATH",
-    "PYTHONHOME",
-    "PYTHONPATH",
-    "PYTHONBREAKPOINT",
-    "PYTHONSTARTUP",
-    "PERL5LIB",
-    "PERL5OPT",
-    "PERL5DB",
-    "PERL5DBCMD",
-    "RUBYLIB",
-    "RUBYOPT",
-    # Shell injection vectors
-    "BASH_ENV",
-    "ENV",
-    "SHELLOPTS",
-    "PS4",
-    "IFS",
-    "GCONV_PATH",
-    # Security-sensitive
-    "SSLKEYLOGFILE",
-    "OPENSSL_CONF",
-    "OPENSSL_ENGINES",
-    # Git execution vectors
-    "GIT_EXTERNAL_DIFF",
-    "GIT_EXEC_PATH",
-    # Java injection vectors
-    "JAVA_TOOL_OPTIONS",
-    "_JAVA_OPTIONS",
-    "JDK_JAVA_OPTIONS",
-    # .NET injection vectors
-    "DOTNET_STARTUP_HOOKS",
-    "DOTNET_ADDITIONAL_DEPS",
-    # System-level
-    "GLIBC_TUNABLES",
-    # Build tool injection vectors
-    "MAVEN_OPTS",
-    "SBT_OPTS",
-    "GRADLE_OPTS",
-    "ANT_OPTS",
-})
+BLOCKED_KEYS: frozenset[str] = frozenset(
+    {
+        # Language runtime injection vectors
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PYTHONBREAKPOINT",
+        "PYTHONSTARTUP",
+        "PERL5LIB",
+        "PERL5OPT",
+        "PERL5DB",
+        "PERL5DBCMD",
+        "RUBYLIB",
+        "RUBYOPT",
+        # Shell injection vectors
+        "BASH_ENV",
+        "ENV",
+        "SHELLOPTS",
+        "PS4",
+        "IFS",
+        "GCONV_PATH",
+        # Security-sensitive
+        "SSLKEYLOGFILE",
+        "OPENSSL_CONF",
+        "OPENSSL_ENGINES",
+        # Git execution vectors
+        "GIT_EXTERNAL_DIFF",
+        "GIT_EXEC_PATH",
+        # Java injection vectors
+        "JAVA_TOOL_OPTIONS",
+        "_JAVA_OPTIONS",
+        "JDK_JAVA_OPTIONS",
+        # .NET injection vectors
+        "DOTNET_STARTUP_HOOKS",
+        "DOTNET_ADDITIONAL_DEPS",
+        # System-level
+        "GLIBC_TUNABLES",
+        # Build tool injection vectors
+        "MAVEN_OPTS",
+        "SBT_OPTS",
+        "GRADLE_OPTS",
+        "ANT_OPTS",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # Blocked prefixes — any key starting with these is stripped
@@ -73,34 +75,36 @@ BLOCKED_PREFIXES: tuple[str, ...] = (
 # (e.g. user-provided env overrides, not the host environment)
 # ---------------------------------------------------------------------------
 
-BLOCKED_OVERRIDE_KEYS: frozenset[str] = frozenset({
-    "HOME",
-    "SHELL",
-    "ZDOTDIR",
-    "GRADLE_USER_HOME",
-    # Git command injection
-    "GIT_SSH_COMMAND",
-    "GIT_SSH",
-    "GIT_PROXY_COMMAND",
-    "GIT_ASKPASS",
-    "SSH_ASKPASS",
-    # Editor/pager execution
-    "EDITOR",
-    "VISUAL",
-    "FCEDIT",
-    "SUDO_EDITOR",
-    "PAGER",
-    "MANPAGER",
-    "GIT_PAGER",
-    "LESSOPEN",
-    "LESSCLOSE",
-    # Shell execution hooks
-    "PROMPT_COMMAND",
-    "HISTFILE",
-    # Network config
-    "WGETRC",
-    "CURL_HOME",
-})
+BLOCKED_OVERRIDE_KEYS: frozenset[str] = frozenset(
+    {
+        "HOME",
+        "SHELL",
+        "ZDOTDIR",
+        "GRADLE_USER_HOME",
+        # Git command injection
+        "GIT_SSH_COMMAND",
+        "GIT_SSH",
+        "GIT_PROXY_COMMAND",
+        "GIT_ASKPASS",
+        "SSH_ASKPASS",
+        # Editor/pager execution
+        "EDITOR",
+        "VISUAL",
+        "FCEDIT",
+        "SUDO_EDITOR",
+        "PAGER",
+        "MANPAGER",
+        "GIT_PAGER",
+        "LESSOPEN",
+        "LESSCLOSE",
+        # Shell execution hooks
+        "PROMPT_COMMAND",
+        "HISTFILE",
+        # Network config
+        "WGETRC",
+        "CURL_HOME",
+    }
+)
 
 BLOCKED_OVERRIDE_PREFIXES: tuple[str, ...] = (
     "GIT_CONFIG_",

@@ -16,7 +16,6 @@ from pnlclaw_types.market import (
     TickerEvent,
 )
 
-
 # ---------------------------------------------------------------------------
 # Mock MarketDataService
 # ---------------------------------------------------------------------------
@@ -171,7 +170,7 @@ class TestMarketOrderbookTool:
         result = tool.execute({"symbol": "BTC/USDT", "depth": 2})
         # With depth=2, should only show 2 levels each side
         assert result.error is None
-        bid_lines = [l for l in result.output.split("\n") if "66,997" in l]
+        bid_lines = [line for line in result.output.split("\n") if "66,997" in line]
         assert len(bid_lines) == 0  # 3rd bid level not shown
 
     def test_orderbook_not_found(self) -> None:

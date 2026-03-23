@@ -36,9 +36,7 @@ EXPECTED_TABLES = [
 
 @pytest.mark.asyncio
 async def test_all_tables_created(migrated_conn: aiosqlite.Connection):
-    cursor = await migrated_conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    )
+    cursor = await migrated_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     tables = {row[0] for row in await cursor.fetchall()}
     for table in EXPECTED_TABLES:
         assert table in tables, f"Table {table} not created"
@@ -79,8 +77,15 @@ async def test_audit_logs_columns(migrated_conn: aiosqlite.Connection):
     cursor = await migrated_conn.execute("PRAGMA table_info(audit_logs)")
     cols = {row[1] for row in await cursor.fetchall()}
     assert cols >= {
-        "id", "timestamp", "event_type", "severity",
-        "actor", "action", "resource", "outcome", "details_json",
+        "id",
+        "timestamp",
+        "event_type",
+        "severity",
+        "actor",
+        "action",
+        "resource",
+        "outcome",
+        "details_json",
     }
 
 
@@ -105,9 +110,7 @@ async def test_indexes_exist(migrated_conn: aiosqlite.Connection):
 async def test_v02_alter_table_add_column(migrated_conn: aiosqlite.Connection):
     """Verify that adding a tenant_id column works without table rebuild."""
     for table in EXPECTED_TABLES:
-        await migrated_conn.execute(
-            f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT"
-        )
+        await migrated_conn.execute(f"ALTER TABLE {table} ADD COLUMN tenant_id TEXT")
     await migrated_conn.commit()
 
     # Verify column was added

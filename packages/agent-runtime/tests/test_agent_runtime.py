@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -11,13 +9,12 @@ import pytest
 
 from pnlclaw_agent.context.manager import ContextManager
 from pnlclaw_agent.prompt_builder import AgentContext, build_system_prompt
-from pnlclaw_agent.runtime import AgentRuntime, AgentRuntimeError
+from pnlclaw_agent.runtime import AgentRuntime
 from pnlclaw_agent.team.roles import AGENT_ROLES, RoleDefinition, get_role
 from pnlclaw_agent.tool_catalog import ToolCatalog
 from pnlclaw_agent.tools.base import BaseTool, ToolResult
-from pnlclaw_types.agent import AgentRole, AgentStreamEventType, MarketState, MarketRegime
+from pnlclaw_types.agent import AgentRole, AgentStreamEventType, MarketRegime, MarketState
 from pnlclaw_types.risk import RiskLevel
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -86,11 +83,15 @@ class TestPromptBuilder:
     def test_with_tools(self) -> None:
         ctx = AgentContext(
             available_tools=[
-                {"name": "market_ticker", "description": "Get ticker", "parameters": {
-                    "type": "object",
-                    "properties": {"symbol": {"type": "string", "description": "Pair"}},
-                    "required": ["symbol"],
-                }},
+                {
+                    "name": "market_ticker",
+                    "description": "Get ticker",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"symbol": {"type": "string", "description": "Pair"}},
+                        "required": ["symbol"],
+                    },
+                },
             ]
         )
         prompt = build_system_prompt(ctx)
@@ -284,13 +285,15 @@ class TestAgentRuntime:
     async def test_tool_call_then_response(
         self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext
     ) -> None:
-        llm = MockLLM([
-            {
-                "response": "",
-                "tool_calls": [{"tool": "market_ticker", "arguments": {"symbol": "BTC/USDT"}}],
-            },
-            {"response": "BTC is at $67,000."},
-        ])
+        llm = MockLLM(
+            [
+                {
+                    "response": "",
+                    "tool_calls": [{"tool": "market_ticker", "arguments": {"symbol": "BTC/USDT"}}],
+                },
+                {"response": "BTC is at $67,000."},
+            ]
+        )
         runtime = AgentRuntime(llm, catalog, context, prompt_ctx)
 
         events = []
@@ -307,13 +310,15 @@ class TestAgentRuntime:
     async def test_unknown_tool(
         self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext
     ) -> None:
-        llm = MockLLM([
-            {
-                "response": "",
-                "tool_calls": [{"tool": "nonexistent", "arguments": {}}],
-            },
-            {"response": "Sorry, tool not found."},
-        ])
+        llm = MockLLM(
+            [
+                {
+                    "response": "",
+                    "tool_calls": [{"tool": "nonexistent", "arguments": {}}],
+                },
+                {"response": "Sorry, tool not found."},
+            ]
+        )
         runtime = AgentRuntime(llm, catalog, context, prompt_ctx)
 
         events = []
@@ -345,18 +350,19 @@ class TestAgentRuntime:
         assert any("maximum" in e.data.get("text", "").lower() for e in text_events)
 
     @pytest.mark.asyncio
-    async def test_blocked_tool(
-        self, context: ContextManager, prompt_ctx: AgentContext
-    ) -> None:
+    async def test_blocked_tool(self, context: ContextManager, prompt_ctx: AgentContext) -> None:
         from pnlclaw_security.tool_policy import ToolPolicy, ToolPolicyEngine
+
         policy = ToolPolicyEngine([ToolPolicy(deny=["market_ticker"])])
         catalog = ToolCatalog(policy_engine=policy)
         catalog.register(_make_tool("market_ticker"))
 
-        llm = MockLLM([
-            {"response": "", "tool_calls": [{"tool": "market_ticker", "arguments": {}}]},
-            {"response": "Tool was blocked."},
-        ])
+        llm = MockLLM(
+            [
+                {"response": "", "tool_calls": [{"tool": "market_ticker", "arguments": {}}]},
+                {"response": "Tool was blocked."},
+            ]
+        )
         runtime = AgentRuntime(llm, catalog, context, prompt_ctx)
 
         events = []

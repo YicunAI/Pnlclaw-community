@@ -123,7 +123,7 @@ class TestClassifiers:
         assert classify_volatility(0.0) == 0.0
         assert 0.0 < classify_volatility(0.01) < 0.5
         assert classify_volatility(0.05) == 1.0  # at HIGH threshold
-        assert classify_volatility(0.1) == 1.0   # clamped
+        assert classify_volatility(0.1) == 1.0  # clamped
 
 
 class TestMarketStateEngine:

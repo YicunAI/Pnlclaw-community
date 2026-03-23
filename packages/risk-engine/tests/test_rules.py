@@ -60,7 +60,8 @@ class TestMaxSingleRiskRule:
         rule = MaxSingleRiskRule(max_risk_pct=0.02)
         ctx = {"total_equity": 100_000.0}
         intent = _make_intent(
-            quantity=0.5, price=67000.0,
+            quantity=0.5,
+            price=67000.0,
             risk_params={"stop_loss": 66800.0, "take_profit": 68000.0},
         )
         # loss = |67000 - 66800| * 0.5 = 100 < 2000
@@ -71,7 +72,8 @@ class TestMaxSingleRiskRule:
         rule = MaxSingleRiskRule(max_risk_pct=0.02)
         ctx = {"total_equity": 100_000.0}
         intent = _make_intent(
-            quantity=2.0, price=67000.0,
+            quantity=2.0,
+            price=67000.0,
             risk_params={"stop_loss": 65000.0, "take_profit": 70000.0},
         )
         # loss = |67000 - 65000| * 2 = 4000 > 2000

@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Attribution result
@@ -114,22 +113,26 @@ class PnLAttributionEngine:
         by_event: list[dict[str, Any]] = []
         for t in top_wins:
             if t.get("pnl", 0.0) > 0:
-                by_event.append({
-                    "type": "win",
-                    "pnl": t.get("pnl", 0.0),
-                    "symbol": t.get("symbol", ""),
-                    "side": t.get("side", ""),
-                    "time": self._format_time(t.get("exit_time")),
-                })
+                by_event.append(
+                    {
+                        "type": "win",
+                        "pnl": t.get("pnl", 0.0),
+                        "symbol": t.get("symbol", ""),
+                        "side": t.get("side", ""),
+                        "time": self._format_time(t.get("exit_time")),
+                    }
+                )
         for t in top_losses:
             if t.get("pnl", 0.0) < 0:
-                by_event.append({
-                    "type": "loss",
-                    "pnl": t.get("pnl", 0.0),
-                    "symbol": t.get("symbol", ""),
-                    "side": t.get("side", ""),
-                    "time": self._format_time(t.get("exit_time")),
-                })
+                by_event.append(
+                    {
+                        "type": "loss",
+                        "pnl": t.get("pnl", 0.0),
+                        "symbol": t.get("symbol", ""),
+                        "side": t.get("side", ""),
+                        "time": self._format_time(t.get("exit_time")),
+                    }
+                )
 
         # 4. By cost
         total_commissions = sum(t.get("commission", 0.0) for t in filtered)
@@ -168,9 +171,7 @@ class PnLAttributionEngine:
 
         # Header
         if attribution.period_start and attribution.period_end:
-            lines.append(
-                f"PnL Report ({attribution.period_start} to {attribution.period_end})"
-            )
+            lines.append(f"PnL Report ({attribution.period_start} to {attribution.period_end})")
         else:
             lines.append("PnL Report")
         lines.append(f"Total PnL: {attribution.total_pnl:+,.2f}")
@@ -228,7 +229,7 @@ class PnLAttributionEngine:
             exit_time = t.get("exit_time")
             try:
                 if isinstance(exit_time, (int, float)):
-                    trade_dt = datetime.fromtimestamp(exit_time / 1000, tz=timezone.utc)
+                    trade_dt = datetime.fromtimestamp(exit_time / 1000, tz=UTC)
                 elif isinstance(exit_time, str):
                     trade_dt = datetime.fromisoformat(exit_time)
                 else:
@@ -237,11 +238,11 @@ class PnLAttributionEngine:
 
                 # Make comparison timezone-aware
                 if trade_dt.tzinfo is None:
-                    trade_dt = trade_dt.replace(tzinfo=timezone.utc)
+                    trade_dt = trade_dt.replace(tzinfo=UTC)
                 if start_dt.tzinfo is None:
-                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                    start_dt = start_dt.replace(tzinfo=UTC)
                 if end_dt.tzinfo is None:
-                    end_dt = end_dt.replace(tzinfo=timezone.utc)
+                    end_dt = end_dt.replace(tzinfo=UTC)
 
                 if start_dt <= trade_dt <= end_dt:
                     result.append(t)
@@ -272,8 +273,8 @@ class PnLAttributionEngine:
         if not times:
             return "", ""
 
-        min_t = datetime.fromtimestamp(min(times) / 1000, tz=timezone.utc)
-        max_t = datetime.fromtimestamp(max(times) / 1000, tz=timezone.utc)
+        min_t = datetime.fromtimestamp(min(times) / 1000, tz=UTC)
+        max_t = datetime.fromtimestamp(max(times) / 1000, tz=UTC)
         return min_t.strftime("%Y-%m-%d"), max_t.strftime("%Y-%m-%d")
 
     def _to_week_label(self, trade: dict[str, Any]) -> str:
@@ -281,7 +282,7 @@ class PnLAttributionEngine:
         exit_time = trade.get("exit_time")
         try:
             if isinstance(exit_time, (int, float)):
-                dt = datetime.fromtimestamp(exit_time / 1000, tz=timezone.utc)
+                dt = datetime.fromtimestamp(exit_time / 1000, tz=UTC)
             elif isinstance(exit_time, str):
                 dt = datetime.fromisoformat(exit_time)
             else:
@@ -295,7 +296,7 @@ class PnLAttributionEngine:
         """Format a timestamp for display."""
         try:
             if isinstance(val, (int, float)):
-                dt = datetime.fromtimestamp(val / 1000, tz=timezone.utc)
+                dt = datetime.fromtimestamp(val / 1000, tz=UTC)
                 return dt.strftime("%Y-%m-%d %H:%M")
             if isinstance(val, str):
                 return val[:16]

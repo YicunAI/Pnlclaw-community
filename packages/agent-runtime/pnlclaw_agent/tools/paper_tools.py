@@ -8,11 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from pnlclaw_agent.tools.base import BaseTool, ToolResult
 from pnlclaw_types.risk import RiskLevel
 from pnlclaw_types.trading import OrderSide, OrderType
-
-from pnlclaw_agent.tools.base import BaseTool, ToolResult
-
 
 # ---------------------------------------------------------------------------
 # Enum mapping helpers
@@ -113,10 +111,7 @@ class PaperPlaceOrderTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return (
-            "Place a simulated order (buy/sell, market/limit) on a paper "
-            "trading account."
-        )
+        return "Place a simulated order (buy/sell, market/limit) on a paper trading account."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -128,7 +123,10 @@ class PaperPlaceOrderTool(BaseTool):
                 "side": {"type": "string", "description": "'buy' or 'sell'"},
                 "order_type": {"type": "string", "description": "'market' or 'limit'"},
                 "quantity": {"type": "number", "description": "Order quantity in base currency"},
-                "price": {"type": "number", "description": "Limit price (required for limit orders)"},
+                "price": {
+                    "type": "number",
+                    "description": "Limit price (required for limit orders)",
+                },
                 "stop_price": {"type": "number", "description": "Stop trigger price (optional)"},
             },
             "required": ["account_id", "symbol", "side", "order_type", "quantity"],
@@ -301,6 +299,7 @@ class PaperPnlTool(BaseTool):
                     prices[pos.symbol] = ticker.last_price
 
         from pnlclaw_paper.pnl import calculate_account_pnl
+
         pnl_records = calculate_account_pnl(positions, prices)
 
         total_realized = sum(r.realized_pnl for r in pnl_records)

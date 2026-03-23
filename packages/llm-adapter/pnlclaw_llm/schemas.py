@@ -55,9 +55,7 @@ def extract_structured(raw_json: str, schema: type[T]) -> T:
     try:
         return schema.model_validate(data)
     except ValidationError as exc:
-        raise LLMError(
-            f"LLM output does not match {schema.__name__} schema: {exc}"
-        ) from exc
+        raise LLMError(f"LLM output does not match {schema.__name__} schema: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

@@ -111,6 +111,7 @@ class TestDecisionPipeline:
 
     def test_risk_blocked(self, tmp_path: Path) -> None:
         from pnlclaw_risk.rules import SymbolBlacklistRule
+
         rule = SymbolBlacklistRule(blacklist=["BTC/USDT"])
         pipeline = self._make_pipeline(tmp_path, rules=[rule])
         result = pipeline.process_signal(_make_signal())

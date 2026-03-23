@@ -7,17 +7,14 @@ LLM is injected via Protocol (no direct import of pnlclaw_llm).
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 
-from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
-
 from pnlclaw_agent.context.manager import ContextManager
 from pnlclaw_agent.prompt_builder import AgentContext, build_system_prompt
 from pnlclaw_agent.tool_catalog import ToolCatalog
-
+from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
 
 # ---------------------------------------------------------------------------
 # LLM Provider Protocol (structural typing — no import of pnlclaw_llm)
@@ -34,9 +31,7 @@ class LLMProviderProtocol(Protocol):
 
     async def chat(self, messages: list[Any], **kwargs: Any) -> str: ...
 
-    async def chat_stream(
-        self, messages: list[Any], **kwargs: Any
-    ) -> AsyncIterator[str]: ...
+    async def chat_stream(self, messages: list[Any], **kwargs: Any) -> AsyncIterator[str]: ...
 
     async def generate_structured(
         self, messages: list[Any], output_schema: dict[str, Any], **kwargs: Any
@@ -113,9 +108,7 @@ class AgentRuntime:
         self._prompt_context = prompt_context
         self._max_tool_rounds = max_tool_rounds
 
-    async def process_message(
-        self, user_message: str
-    ) -> AsyncIterator[AgentStreamEvent]:
+    async def process_message(self, user_message: str) -> AsyncIterator[AgentStreamEvent]:
         """Process a user message through the LLM with tool calling.
 
         Yields AgentStreamEvent objects:
@@ -130,12 +123,10 @@ class AgentRuntime:
         Yields:
             AgentStreamEvent instances.
         """
-        now_ms = int(time.time() * 1000)
-
         # Add user message to context
         self._context.add_message("user", user_message)
 
-        for round_num in range(self._max_tool_rounds):
+        for _round_num in range(self._max_tool_rounds):
             # Build system prompt
             system_prompt = build_system_prompt(self._prompt_context)
 
@@ -144,9 +135,7 @@ class AgentRuntime:
 
             # Call LLM for structured response
             try:
-                response = await self._llm.generate_structured(
-                    llm_messages, AGENT_RESPONSE_SCHEMA
-                )
+                response = await self._llm.generate_structured(llm_messages, AGENT_RESPONSE_SCHEMA)
             except Exception as exc:
                 yield _event(
                     AgentStreamEventType.TEXT_DELTA,
@@ -171,7 +160,6 @@ class AgentRuntime:
                 return
 
             # Process tool calls
-            has_results = False
             for tc in tool_calls:
                 tool_name = tc.get("tool", "")
                 tool_args = tc.get("arguments", {})
@@ -215,13 +203,14 @@ class AgentRuntime:
                     continue
 
                 # Add result to context
-                result_text = result.output if not result.error else f"Error: {result.error}\n{result.output}"
+                result_text = (
+                    result.output if not result.error else f"Error: {result.error}\n{result.output}"
+                )
                 self._context.add_message("tool", result_text, {"tool_name": tool_name})
                 yield _event(
                     AgentStreamEventType.TOOL_RESULT,
                     {"tool": tool_name, "output": result.output, "error": result.error},
                 )
-                has_results = True
 
             # Add assistant message noting tool calls were made
             call_summary = ", ".join(tc.get("tool", "") for tc in tool_calls)

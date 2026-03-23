@@ -66,11 +66,13 @@ class TestAuditLogger:
     def test_multiple_logs_append(self, tmp_path: Path) -> None:
         logger = AuditLogger(log_dir=tmp_path)
         for i in range(5):
-            logger.log(AuditEvent(
-                event_type=AuditEventType.TOOL_CALL,
-                actor="user",
-                action=f"action_{i}",
-            ))
+            logger.log(
+                AuditEvent(
+                    event_type=AuditEventType.TOOL_CALL,
+                    actor="user",
+                    action=f"action_{i}",
+                )
+            )
 
         files = list(tmp_path.glob("audit-*.jsonl"))
         assert len(files) == 1
@@ -126,11 +128,13 @@ class TestAuditRotation:
         # Set very small max file size to trigger rotation
         logger = AuditLogger(log_dir=tmp_path, max_file_size=500)
         for i in range(20):
-            logger.log(AuditEvent(
-                event_type=AuditEventType.TOOL_CALL,
-                actor="user",
-                action=f"action_{i}_with_some_padding_to_fill_space",
-            ))
+            logger.log(
+                AuditEvent(
+                    event_type=AuditEventType.TOOL_CALL,
+                    actor="user",
+                    action=f"action_{i}_with_some_padding_to_fill_space",
+                )
+            )
 
         files = list(tmp_path.glob("audit-*.jsonl"))
         assert len(files) >= 2
@@ -145,27 +149,33 @@ class TestAuditQuery:
     def test_query_all(self, tmp_path: Path) -> None:
         logger = AuditLogger(log_dir=tmp_path)
         for i in range(3):
-            logger.log(AuditEvent(
-                event_type=AuditEventType.TOOL_CALL,
-                actor="user",
-                action=f"action_{i}",
-            ))
+            logger.log(
+                AuditEvent(
+                    event_type=AuditEventType.TOOL_CALL,
+                    actor="user",
+                    action=f"action_{i}",
+                )
+            )
 
         events = logger.query()
         assert len(events) == 3
 
     def test_query_by_type(self, tmp_path: Path) -> None:
         logger = AuditLogger(log_dir=tmp_path)
-        logger.log(AuditEvent(
-            event_type=AuditEventType.TOOL_CALL,
-            actor="user",
-            action="allowed",
-        ))
-        logger.log(AuditEvent(
-            event_type=AuditEventType.TOOL_BLOCKED,
-            actor="agent",
-            action="blocked",
-        ))
+        logger.log(
+            AuditEvent(
+                event_type=AuditEventType.TOOL_CALL,
+                actor="user",
+                action="allowed",
+            )
+        )
+        logger.log(
+            AuditEvent(
+                event_type=AuditEventType.TOOL_BLOCKED,
+                actor="agent",
+                action="blocked",
+            )
+        )
 
         events = logger.query(event_type=AuditEventType.TOOL_BLOCKED)
         assert len(events) == 1
@@ -174,29 +184,35 @@ class TestAuditQuery:
     def test_query_with_limit(self, tmp_path: Path) -> None:
         logger = AuditLogger(log_dir=tmp_path)
         for i in range(10):
-            logger.log(AuditEvent(
-                event_type=AuditEventType.TOOL_CALL,
-                actor="user",
-                action=f"action_{i}",
-            ))
+            logger.log(
+                AuditEvent(
+                    event_type=AuditEventType.TOOL_CALL,
+                    actor="user",
+                    action=f"action_{i}",
+                )
+            )
 
         events = logger.query(limit=3)
         assert len(events) == 3
 
     def test_query_since(self, tmp_path: Path) -> None:
         logger = AuditLogger(log_dir=tmp_path)
-        logger.log(AuditEvent(
-            event_type=AuditEventType.TOOL_CALL,
-            actor="user",
-            action="old",
-            timestamp=1000.0,
-        ))
-        logger.log(AuditEvent(
-            event_type=AuditEventType.TOOL_CALL,
-            actor="user",
-            action="new",
-            timestamp=time.time(),
-        ))
+        logger.log(
+            AuditEvent(
+                event_type=AuditEventType.TOOL_CALL,
+                actor="user",
+                action="old",
+                timestamp=1000.0,
+            )
+        )
+        logger.log(
+            AuditEvent(
+                event_type=AuditEventType.TOOL_CALL,
+                actor="user",
+                action="new",
+                timestamp=time.time(),
+            )
+        )
 
         events = logger.query(since=time.time() - 60)
         assert len(events) == 1

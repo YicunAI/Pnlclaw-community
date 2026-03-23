@@ -1,6 +1,5 @@
 """Tests for pnlclaw_core.resilience.error_classifier."""
 
-
 from pnlclaw_core.resilience.error_classifier import ErrorCategory, classify_error
 
 

@@ -27,12 +27,12 @@ _MOMENTUM_PERIOD = 10
 
 # Regime thresholds
 _ADX_TRENDING_THRESHOLD = 25.0  # ADX above this → trending
-_ADX_STRONG_THRESHOLD = 40.0    # ADX above this → strong trend
+_ADX_STRONG_THRESHOLD = 40.0  # ADX above this → strong trend
 
 # Volatility thresholds (ATR as % of price)
-_VOL_LOW = 0.01       # < 1% → low
-_VOL_NORMAL = 0.025   # < 2.5% → normal
-_VOL_HIGH = 0.05      # < 5% → high, else extreme
+_VOL_LOW = 0.01  # < 1% → low
+_VOL_NORMAL = 0.025  # < 2.5% → normal
+_VOL_HIGH = 0.05  # < 5% → high, else extreme
 
 
 class InsufficientDataError(Exception):
@@ -257,9 +257,7 @@ class MarketStateEngine:
 
         min_bars = max(self._adx_period, self._atr_period, self._momentum_period) + 1
         if len(df) < min_bars:
-            raise InsufficientDataError(
-                f"Need at least {min_bars} bars, got {len(df)}"
-            )
+            raise InsufficientDataError(f"Need at least {min_bars} bars, got {len(df)}")
 
         # Compute indicators
         adx_series = compute_adx_proxy(df, self._adx_period)

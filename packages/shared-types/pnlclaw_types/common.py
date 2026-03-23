@@ -38,11 +38,7 @@ class Pagination(BaseModel):
     total: int = Field(0, ge=0, description="Total items available")
 
     model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [
-                {"offset": 0, "limit": 50, "total": 120}
-            ]
-        }
+        json_schema_extra={"examples": [{"offset": 0, "limit": 50, "total": 120}]}
     )
 
 
@@ -56,9 +52,7 @@ class ErrorInfo(BaseModel):
 
     code: str = Field(..., description="Machine-readable error code, e.g. 'VALIDATION_ERROR'")
     message: str = Field(..., description="Human-readable error message")
-    details: dict[str, Any] | None = Field(
-        None, description="Optional additional error context"
-    )
+    details: dict[str, Any] | None = Field(None, description="Optional additional error context")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -86,9 +80,7 @@ class ResponseMeta(BaseModel):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {"request_id": "550e8400-e29b-41d4-a716-446655440000", "pagination": None}
-            ]
+            "examples": [{"request_id": "550e8400-e29b-41d4-a716-446655440000", "pagination": None}]
         }
     )
 

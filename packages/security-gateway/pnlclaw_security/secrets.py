@@ -146,9 +146,7 @@ class SecretManager:
         """Resolve from environment variable."""
         value = os.environ.get(ref.id)
         if value is None:
-            raise SecretResolutionError(
-                f"Environment variable not found: {ref.id}"
-            )
+            raise SecretResolutionError(f"Environment variable not found: {ref.id}")
         return value
 
     def _resolve_file(self, ref: SecretRef) -> str:
@@ -178,9 +176,7 @@ class SecretManager:
         # Size check
         file_size = file_path.stat().st_size
         if file_size > _MAX_FILE_BYTES:
-            raise SecretResolutionError(
-                f"Secret file {file_path} exceeds {_MAX_FILE_BYTES} bytes"
-            )
+            raise SecretResolutionError(f"Secret file {file_path} exceeds {_MAX_FILE_BYTES} bytes")
 
         return file_path.read_text(encoding="utf-8").strip()
 
@@ -194,8 +190,7 @@ class SecretManager:
             import keyring  # type: ignore[import-untyped]
         except ImportError:
             raise SecretResolutionError(
-                "keyring library not installed. "
-                "Install with: pip install pnlclaw-security[keyring]"
+                "keyring library not installed. Install with: pip install pnlclaw-security[keyring]"
             ) from None
 
         service = ref.provider or "pnlclaw"

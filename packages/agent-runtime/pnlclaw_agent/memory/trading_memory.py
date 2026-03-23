@@ -15,7 +15,6 @@ from typing import Any
 
 from pnlclaw_types.agent import ChatMessage
 
-
 _DEFAULT_MEMORY_DIR = Path.home() / ".pnlclaw" / "memory"
 
 

@@ -10,10 +10,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pnlclaw_types.agent import ChatMessage
-
 from pnlclaw_agent.context.compaction import ContextCompactor
 from pnlclaw_agent.context.pruning import ContextPruner
+from pnlclaw_types.agent import ChatMessage
 
 
 class BudgetStatus(str, Enum):

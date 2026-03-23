@@ -9,12 +9,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from pnlclaw_llm.base import (
-    LLMAuthError,
-    LLMConfig,
     LLMError,
     LLMMessage,
     LLMProvider,
@@ -131,9 +129,7 @@ class LLMRouter:
         errors: list[tuple[str, Exception]] = []
         for entry in self._chain:
             try:
-                result = await entry.provider.generate_structured(
-                    messages, output_schema, **kwargs
-                )
+                result = await entry.provider.generate_structured(messages, output_schema, **kwargs)
                 return result
             except LLMError as exc:
                 errors.append((entry.name, exc))
@@ -160,9 +156,7 @@ class LLMRouter:
                 await entry.provider.chat(test_messages, max_tokens=1)
                 results.append(ProviderHealth(name=entry.name, available=True))
             except Exception as exc:
-                results.append(
-                    ProviderHealth(name=entry.name, available=False, error=str(exc))
-                )
+                results.append(ProviderHealth(name=entry.name, available=False, error=str(exc)))
         return results
 
     # ----- helpers -----

@@ -14,6 +14,8 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "pnlclaw-types",
     "pnlclaw-core",
+    "pnlclaw-exchange",
+    "pnlclaw-market",
 ]
 
 [project.optional-dependencies]

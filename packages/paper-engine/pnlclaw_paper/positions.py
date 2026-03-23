@@ -89,9 +89,8 @@ class PositionManager:
             realized = 0.0
             new_qty = existing.quantity + fill.quantity
             new_avg = (
-                (existing.avg_entry_price * existing.quantity + fill.price * fill.quantity)
-                / new_qty
-            )
+                existing.avg_entry_price * existing.quantity + fill.price * fill.quantity
+            ) / new_qty
             existing.quantity = new_qty
             existing.avg_entry_price = new_avg
             existing.updated_at = now_ms
@@ -130,10 +129,7 @@ class PositionManager:
 
     def get_positions(self, account_id: str) -> list[Position]:
         """Get all positions for an account."""
-        return [
-            pos for (aid, _), pos in self._positions.items()
-            if aid == account_id
-        ]
+        return [pos for (aid, _), pos in self._positions.items() if aid == account_id]
 
     def get_open_positions(self, account_id: str) -> list[Position]:
         """Get positions with quantity > 0."""
@@ -162,10 +158,7 @@ class PositionManager:
 
     def get_all_data(self) -> dict[str, Any]:
         """Return internal state for serialization."""
-        return {
-            f"{aid}:{sym}": pos.model_dump()
-            for (aid, sym), pos in self._positions.items()
-        }
+        return {f"{aid}:{sym}": pos.model_dump() for (aid, sym), pos in self._positions.items()}
 
     def load_data(self, data: dict[str, Any]) -> None:
         """Load state from deserialized data."""

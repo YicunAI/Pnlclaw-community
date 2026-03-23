@@ -20,15 +20,17 @@ async def repo():
 
 @pytest.mark.asyncio
 async def test_append_and_query(repo: AuditLogRepository):
-    event_id = await repo.append({
-        "event_type": "order_placed",
-        "severity": "info",
-        "actor": "user:alice",
-        "action": "place_order",
-        "resource": "paper_account:a1",
-        "outcome": "success",
-        "details": {"symbol": "BTC/USDT", "quantity": 0.5},
-    })
+    event_id = await repo.append(
+        {
+            "event_type": "order_placed",
+            "severity": "info",
+            "actor": "user:alice",
+            "action": "place_order",
+            "resource": "paper_account:a1",
+            "outcome": "success",
+            "details": {"symbol": "BTC/USDT", "quantity": 0.5},
+        }
+    )
     assert event_id  # non-empty string
 
     logs = await repo.query()
@@ -74,7 +76,7 @@ async def test_query_since(repo: AuditLogRepository):
 @pytest.mark.asyncio
 async def test_query_limit(repo: AuditLogRepository):
     for i in range(10):
-        await repo.append({"event_type": "bulk", "timestamp": f"2025-01-{i+1:02d}T00:00:00"})
+        await repo.append({"event_type": "bulk", "timestamp": f"2025-01-{i + 1:02d}T00:00:00"})
 
     results = await repo.query(limit=3)
     assert len(results) == 3

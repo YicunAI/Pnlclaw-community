@@ -7,7 +7,7 @@ to keep the repository layer free of business logic.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
@@ -35,7 +35,7 @@ class PaperAccountRepository:
         Returns:
             The account ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self._db.execute(
             """
             INSERT INTO paper_accounts
@@ -57,7 +57,7 @@ class PaperAccountRepository:
                 now,
             ),
         )
-        return account["id"]
+        return str(account["id"])
 
     async def get_account(self, account_id: str) -> dict[str, Any] | None:
         """Retrieve a paper account by ID.
@@ -90,7 +90,7 @@ class PaperAccountRepository:
         Returns:
             The order ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self._db.execute(
             """
             INSERT INTO paper_orders
@@ -119,7 +119,7 @@ class PaperAccountRepository:
                 now,
             ),
         )
-        return order["id"]
+        return str(order["id"])
 
     async def get_orders(
         self,
@@ -174,7 +174,7 @@ class PaperAccountRepository:
         Returns:
             The position ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         await self._db.execute(
             """
             INSERT INTO paper_positions
@@ -200,7 +200,7 @@ class PaperAccountRepository:
                 now,
             ),
         )
-        return position["id"]
+        return str(position["id"])
 
     async def get_positions(self, account_id: str) -> list[dict[str, Any]]:
         """List all positions for an account.

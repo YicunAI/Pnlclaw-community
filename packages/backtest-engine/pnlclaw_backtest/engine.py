@@ -165,10 +165,10 @@ class BacktestEngine:
                                 "exit_price": fill.price,
                                 "quantity": fill.quantity,
                                 "pnl": (
-                                (fill.price - _entry_price) * fill.quantity
-                                - _entry_fee
-                                - fill.fee
-                            ),
+                                    (fill.price - _entry_price) * fill.quantity
+                                    - _entry_fee
+                                    - fill.fee
+                                ),
                                 "entry_time": _entry_ts,
                                 "exit_time": kline.timestamp,
                             }

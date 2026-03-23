@@ -15,20 +15,26 @@ class MetricType(str, Enum):
     HISTOGRAM = "histogram"
 
 
+_DEFAULT_HISTOGRAM_MAX_SIZE = 10_000
+
+
 class MetricsCollector:
     """In-process metrics collector with label support.
 
     Provides counter, gauge, and histogram metric types. Thread-safe.
     Metrics are namespaced (e.g. ``pnlclaw.market.ticks``).
+
+    Args:
+        histogram_max_size: Maximum observations kept per histogram label key.
+            When exceeded, the oldest half is discarded to bound memory.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, histogram_max_size: int = _DEFAULT_HISTOGRAM_MAX_SIZE) -> None:
         self._metrics: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
+        self._histogram_max_size = histogram_max_size
 
-    def register(
-        self, name: str, metric_type: MetricType, description: str = ""
-    ) -> None:
+    def register(self, name: str, metric_type: MetricType, description: str = "") -> None:
         """Register a named metric.
 
         Args:
@@ -65,7 +71,11 @@ class MetricsCollector:
             m["values"][key] = value
 
     def observe(self, name: str, value: float, labels: dict[str, str] | None = None) -> None:
-        """Record a histogram observation."""
+        """Record a histogram observation.
+
+        When the observation list exceeds ``histogram_max_size``, the oldest
+        half is discarded to bound memory usage in long-running processes.
+        """
         key = self._label_key(labels)
         with self._lock:
             m = self._metrics.get(name)
@@ -73,7 +83,10 @@ class MetricsCollector:
                 return
             if key not in m["values"]:
                 m["values"][key] = []
-            m["values"][key].append(value)
+            bucket: list[float] = m["values"][key]
+            bucket.append(value)
+            if len(bucket) > self._histogram_max_size:
+                m["values"][key] = bucket[len(bucket) // 2 :]
 
     def get_value(self, name: str, labels: dict[str, str] | None = None) -> Any:
         """Read the current value of a metric."""

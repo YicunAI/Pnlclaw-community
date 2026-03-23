@@ -11,9 +11,9 @@ from enum import Enum
 class ScheduleType(str, Enum):
     """Schedule trigger type."""
 
-    AT = "at"          # One-shot at a specific time
-    EVERY = "every"    # Recurring interval
-    CRON = "cron"      # Cron expression (simplified 5-field)
+    AT = "at"  # One-shot at a specific time
+    EVERY = "every"  # Recurring interval
+    CRON = "cron"  # Cron expression (simplified 5-field)
 
 
 @dataclass

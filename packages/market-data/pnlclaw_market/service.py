@@ -60,8 +60,8 @@ class MarketDataService:
     def __init__(
         self,
         *,
-        ws_url: str = "wss://stream.binance.com:9443/ws",
-        rest_url: str = "https://api.binance.com/api/v3/depth",
+        ws_url: str = "wss://data-stream.binance.vision/ws",
+        rest_url: str = "https://data-api.binance.vision/api/v3/depth",
         kline_interval: str = "1h",
         cache_ttl: float = 60.0,
         cache_max_size: int = 1000,
@@ -196,12 +196,25 @@ class MarketDataService:
         for st in stream_types:
             await self._stream_manager.start_stream(symbol, st)
 
-        # Initialize L2 book if depth requested
+        # Initialize L2 book if depth requested — gracefully degrade on failure
+        l2_active = False
         if depth and self._l2_manager is not None:
             binance_symbol = symbol.replace("/", "").upper()
-            await self._l2_manager.initialize(binance_symbol)
+            try:
+                await self._l2_manager.initialize(binance_symbol)
+                l2_active = True
+            except Exception:
+                logger.warning(
+                    "L2 depth init failed for %s (REST snapshot unavailable). "
+                    "Ticker/kline will still work.",
+                    symbol,
+                    exc_info=True,
+                )
 
-        logger.info("Added symbol %s (ticker=%s, kline=%s, depth=%s)", symbol, ticker, kline, depth)
+        logger.info(
+            "Added symbol %s (ticker=%s, kline=%s, depth=%s, l2_active=%s)",
+            symbol, ticker, kline, depth, l2_active,
+        )
 
     async def remove_symbol(self, symbol: str) -> None:
         """Unsubscribe from all streams for *symbol*."""

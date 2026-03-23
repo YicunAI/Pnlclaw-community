@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from pnlclaw_llm.base import (
     LLMAuthError,
@@ -18,7 +19,6 @@ from pnlclaw_llm.base import (
     LLMRateLimitError,
     LLMRole,
 )
-
 
 # ---------------------------------------------------------------------------
 # Concrete stub for testing the ABC
@@ -99,9 +99,9 @@ class TestLLMConfig:
         assert restored == cfg
 
     def test_temperature_bounds(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             LLMConfig(model="m", temperature=-0.1)
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             LLMConfig(model="m", temperature=2.1)
 
 

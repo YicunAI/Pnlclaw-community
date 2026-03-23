@@ -15,7 +15,6 @@ import httpx
 
 from pnlclaw_core.resilience.backoff import BackoffPolicy
 from pnlclaw_core.resilience.retry import retry_async
-
 from pnlclaw_llm.base import (
     LLMAuthError,
     LLMConfig,
@@ -158,7 +157,7 @@ class OpenAICompatProvider(LLMProvider):
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue
-                    data_str = line[len("data: "):]
+                    data_str = line[len("data: ") :]
                     if data_str.strip() == "[DONE]":
                         break
                     try:

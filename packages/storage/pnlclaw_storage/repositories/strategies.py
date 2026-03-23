@@ -6,12 +6,10 @@ storing the full config as JSON in the ``config_json`` column.
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-
-from pnlclaw_types.strategy import StrategyConfig
+from datetime import UTC, datetime
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
+from pnlclaw_types.strategy import StrategyConfig
 
 
 class StrategyRepository:
@@ -33,7 +31,7 @@ class StrategyRepository:
         Returns:
             The strategy ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         config_json = strategy.model_dump_json()
 
         await self._db.execute(
@@ -67,9 +65,7 @@ class StrategyRepository:
             return None
         return StrategyConfig.model_validate_json(rows[0]["config_json"])
 
-    async def list(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[StrategyConfig]:
+    async def list(self, limit: int = 50, offset: int = 0) -> list[StrategyConfig]:
         """List strategies ordered by creation date (newest first).
 
         Args:

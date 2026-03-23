@@ -93,9 +93,7 @@ class ReconnectManager:
                 category = classify_error(exc)
 
                 if category == ErrorCategory.AUTH:
-                    logger.error(
-                        "Authentication error — stopping reconnect: %s", exc
-                    )
+                    logger.error("Authentication error — stopping reconnect: %s", exc)
                     break
 
                 if not self._check_restart_rate():
@@ -116,9 +114,7 @@ class ReconnectManager:
                 )
 
                 try:
-                    await asyncio.wait_for(
-                        self._shutdown_event.wait(), timeout=delay
-                    )
+                    await asyncio.wait_for(self._shutdown_event.wait(), timeout=delay)
                     # Shutdown was requested during backoff.
                     break
                 except TimeoutError:

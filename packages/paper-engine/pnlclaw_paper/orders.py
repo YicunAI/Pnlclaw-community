@@ -160,10 +160,7 @@ class PaperOrderManager:
         """Get all orders that can still be filled (ACCEPTED or PARTIAL)."""
         open_statuses = {OrderStatus.ACCEPTED, OrderStatus.PARTIAL}
         if account_id:
-            return [
-                o for o in self.get_orders(account_id)
-                if o.status in open_statuses
-            ]
+            return [o for o in self.get_orders(account_id) if o.status in open_statuses]
         return [o for o in self._orders.values() if o.status in open_statuses]
 
     # -- internal --------------------------------------------------------------
@@ -191,8 +188,5 @@ class PaperOrderManager:
 
     def load_data(self, data: dict[str, Any]) -> None:
         """Load state from deserialized data."""
-        self._orders = {
-            k: Order.model_validate(v)
-            for k, v in data.get("orders", {}).items()
-        }
+        self._orders = {k: Order.model_validate(v) for k, v in data.get("orders", {}).items()}
         self._account_orders = data.get("account_orders", {})

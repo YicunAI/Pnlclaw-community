@@ -5,12 +5,11 @@ from __future__ import annotations
 import pytest
 import pytest_asyncio
 
-from pnlclaw_types.strategy import StrategyConfig, StrategyType
-
 from pnlclaw_storage.migrations import MigrationRunner
 from pnlclaw_storage.migrations_pkg import ALL_MIGRATIONS
 from pnlclaw_storage.repositories.strategies import StrategyRepository
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
+from pnlclaw_types.strategy import StrategyConfig, StrategyType
 
 
 def _make_strategy(id: str = "strat-001", name: str = "Test SMA") -> StrategyConfig:

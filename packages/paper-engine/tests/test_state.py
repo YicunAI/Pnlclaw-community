@@ -35,8 +35,11 @@ class TestPaperState:
         ps = PaperState(state_dir)
         omgr = PaperOrderManager()
         omgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.5,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.5,
         )
 
         ps.save_state(AccountManager(), omgr, PositionManager())
@@ -48,7 +51,9 @@ class TestPaperState:
     def test_save_and_load_extra(self, state_dir: Path) -> None:
         ps = PaperState(state_dir)
         ps.save_state(
-            AccountManager(), PaperOrderManager(), PositionManager(),
+            AccountManager(),
+            PaperOrderManager(),
+            PositionManager(),
             extra={"fees": {"BTC/USDT": 42.5}},
         )
 

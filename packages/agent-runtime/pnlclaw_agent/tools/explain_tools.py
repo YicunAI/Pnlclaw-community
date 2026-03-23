@@ -8,11 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from pnlclaw_agent.tools.base import BaseTool, ToolResult
 from pnlclaw_types.market import KlineEvent
 from pnlclaw_types.risk import RiskLevel
-
-from pnlclaw_agent.tools.base import BaseTool, ToolResult
-
 
 # ---------------------------------------------------------------------------
 # ExplainPnlTool
@@ -194,9 +192,7 @@ class ExplainMarketTool(BaseTool):
             )
 
         if len(klines) < 5:
-            return ToolResult(
-                output="Need at least 5 kline bars for market state analysis."
-            )
+            return ToolResult(output="Need at least 5 kline bars for market state analysis.")
 
         try:
             state = self._state_engine.analyze(symbol, klines)
@@ -211,11 +207,13 @@ class ExplainMarketTool(BaseTool):
         }
         regime_text = regime_desc.get(state.regime.value, state.regime.value)
 
-        trend_label = "weak" if state.trend_strength < 0.3 else (
-            "moderate" if state.trend_strength < 0.7 else "strong"
+        trend_label = (
+            "weak"
+            if state.trend_strength < 0.3
+            else ("moderate" if state.trend_strength < 0.7 else "strong")
         )
-        vol_label = "low" if state.volatility < 0.3 else (
-            "moderate" if state.volatility < 0.7 else "high"
+        vol_label = (
+            "low" if state.volatility < 0.3 else ("moderate" if state.volatility < 0.7 else "high")
         )
 
         lines = [

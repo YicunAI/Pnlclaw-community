@@ -128,9 +128,7 @@ class RiskParams(BaseModel):
     max_position_pct: float = Field(
         0.1, ge=0, le=1, description="Maximum position size as fraction of portfolio"
     )
-    max_open_positions: int = Field(
-        1, ge=1, description="Maximum concurrent open positions"
-    )
+    max_open_positions: int = Field(1, ge=1, description="Maximum concurrent open positions")
 
     model_config = ConfigDict(
         json_schema_extra={

@@ -20,9 +20,7 @@ from pnlclaw_core.logging import bind_request_id
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Inject a unique request ID into every request/response cycle."""
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Reuse incoming header or generate a new UUID
         request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
 

@@ -40,9 +40,7 @@ class FileLock:
                     self._held = True
                     return
                 if self._is_process_alive(existing_pid):
-                    raise FileLockError(
-                        f"Lock held by PID {existing_pid}: {self._path}"
-                    )
+                    raise FileLockError(f"Lock held by PID {existing_pid}: {self._path}")
             # Stale lock — clean up
             self._path.unlink(missing_ok=True)
 

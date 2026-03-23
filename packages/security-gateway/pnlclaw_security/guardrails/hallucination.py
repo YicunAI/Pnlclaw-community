@@ -33,19 +33,37 @@ class PriceDeviationAlert(BaseModel):
 
 # Graduated severity thresholds
 _SEVERITY_THRESHOLDS: list[tuple[float, RiskLevel]] = [
-    (0.50, RiskLevel.BLOCKED),     # >50% deviation
-    (0.25, RiskLevel.DANGEROUS),   # >25% deviation
+    (0.50, RiskLevel.BLOCKED),  # >50% deviation
+    (0.25, RiskLevel.DANGEROUS),  # >25% deviation
     (0.10, RiskLevel.RESTRICTED),  # >10% deviation
 ]
 
 # Known indicator names (extensible)
-KNOWN_INDICATORS: frozenset[str] = frozenset({
-    "sma", "ema", "rsi", "macd", "macd_signal", "macd_histogram",
-    "bollinger_upper", "bollinger_middle", "bollinger_lower",
-    "atr", "adx", "cci", "stochastic_k", "stochastic_d",
-    "williams_r", "obv", "vwap", "ichimoku_tenkan", "ichimoku_kijun",
-    "ichimoku_senkou_a", "ichimoku_senkou_b",
-})
+KNOWN_INDICATORS: frozenset[str] = frozenset(
+    {
+        "sma",
+        "ema",
+        "rsi",
+        "macd",
+        "macd_signal",
+        "macd_histogram",
+        "bollinger_upper",
+        "bollinger_middle",
+        "bollinger_lower",
+        "atr",
+        "adx",
+        "cci",
+        "stochastic_k",
+        "stochastic_d",
+        "williams_r",
+        "obv",
+        "vwap",
+        "ichimoku_tenkan",
+        "ichimoku_kijun",
+        "ichimoku_senkou_a",
+        "ichimoku_senkou_b",
+    }
+)
 
 
 class HallucinationDetector:

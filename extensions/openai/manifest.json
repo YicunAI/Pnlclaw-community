@@ -1,0 +1,7 @@
+{
+  "name": "pnlclaw-ext-openai",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible LLM provider (chat completions) for PnLClaw",
+  "capabilities": ["llm_provider"],
+  "entry_point": "pnlclaw_ext_openai.plugin:setup"
+}

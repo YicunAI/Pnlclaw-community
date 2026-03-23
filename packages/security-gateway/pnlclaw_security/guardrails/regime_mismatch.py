@@ -90,9 +90,7 @@ class RegimeMismatchDetector:
             return None
 
         # Determine severity based on strength of mismatch
-        severity = self._assess_severity(
-            strategy_type, current_regime, trend_strength, volatility
-        )
+        severity = self._assess_severity(strategy_type, current_regime, trend_strength, volatility)
 
         return RegimeMismatchAlert(
             strategy_name=strategy_name,
@@ -140,9 +138,7 @@ class RegimeMismatchDetector:
             strategy_name=strategy_name,
             strategy_type=strategy_type,
             current_regime=MarketRegime.VOLATILE,
-            expected_regimes=sorted(
-                self._compat.get(strategy_type, set()), key=lambda r: r.value
-            ),
+            expected_regimes=sorted(self._compat.get(strategy_type, set()), key=lambda r: r.value),
             severity=RiskLevel.RESTRICTED,
             message=(
                 f"High volatility ({volatility:.2f}) detected but strategy "

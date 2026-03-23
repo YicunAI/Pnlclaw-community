@@ -18,9 +18,7 @@ class MACDResult:
 
     __slots__ = ("macd_line", "signal_line", "histogram")
 
-    def __init__(
-        self, macd_line: pd.Series, signal_line: pd.Series, histogram: pd.Series
-    ) -> None:
+    def __init__(self, macd_line: pd.Series, signal_line: pd.Series, histogram: pd.Series) -> None:
         self.macd_line = macd_line
         self.signal_line = signal_line
         self.histogram = histogram
@@ -113,7 +111,4 @@ class MACD(Indicator):
         )
 
     def __repr__(self) -> str:
-        return (
-            f"MACD(fast={self._fast_period}, slow={self._period}, "
-            f"signal={self._signal_period})"
-        )
+        return f"MACD(fast={self._fast_period}, slow={self._period}, signal={self._signal_period})"

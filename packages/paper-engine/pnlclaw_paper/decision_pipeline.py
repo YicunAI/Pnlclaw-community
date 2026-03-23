@@ -154,7 +154,7 @@ class DecisionPipeline:
                 return PipelineResult(
                     action=PipelineAction.SKIPPED,
                     reason=f"Throttled: {elapsed:.1f}s since last order "
-                           f"(min {self._config.min_order_interval_seconds:.0f}s)",
+                    f"(min {self._config.min_order_interval_seconds:.0f}s)",
                 )
 
         # Stage 4: Generate TradeIntent from Signal
@@ -241,22 +241,22 @@ class DecisionPipeline:
         if self._audit is None:
             return
         severity = (
-            AuditSeverity.INFO
-            if result.action == PipelineAction.EXECUTED
-            else AuditSeverity.WARN
+            AuditSeverity.INFO if result.action == PipelineAction.EXECUTED else AuditSeverity.WARN
         )
-        self._audit.log(AuditEvent(
-            event_type=AuditEventType.ORDER_INTENT,
-            severity=severity,
-            actor="pipeline",
-            action=action,
-            resource=signal.symbol,
-            outcome=result.action.value,
-            details={
-                "strategy_id": signal.strategy_id,
-                "signal_side": signal.side.value,
-                "signal_strength": signal.strength,
-                "result_reason": result.reason,
-                "order_id": result.order_id or "",
-            },
-        ))
+        self._audit.log(
+            AuditEvent(
+                event_type=AuditEventType.ORDER_INTENT,
+                severity=severity,
+                actor="pipeline",
+                action=action,
+                resource=signal.symbol,
+                outcome=result.action.value,
+                details={
+                    "strategy_id": signal.strategy_id,
+                    "signal_side": signal.side.value,
+                    "signal_strength": signal.strength,
+                    "result_reason": result.reason,
+                    "order_id": result.order_id or "",
+                },
+            )
+        )

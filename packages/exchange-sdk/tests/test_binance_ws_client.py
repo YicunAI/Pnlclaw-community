@@ -256,16 +256,10 @@ class TestStreamName:
         assert BinanceWSClient.stream_name("btcusdt", "ticker") == "btcusdt@ticker"
 
     def test_kline_with_interval(self) -> None:
-        assert (
-            BinanceWSClient.stream_name("btcusdt", "kline", interval="1h")
-            == "btcusdt@kline_1h"
-        )
+        assert BinanceWSClient.stream_name("btcusdt", "kline", interval="1h") == "btcusdt@kline_1h"
 
     def test_depth(self) -> None:
-        assert (
-            BinanceWSClient.stream_name("btcusdt", "depth@100ms")
-            == "btcusdt@depth@100ms"
-        )
+        assert BinanceWSClient.stream_name("btcusdt", "depth@100ms") == "btcusdt@depth@100ms"
 
     def test_trade(self) -> None:
         assert BinanceWSClient.stream_name("ethusdt", "trade") == "ethusdt@trade"

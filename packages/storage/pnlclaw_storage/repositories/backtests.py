@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import cast
 
-from pnlclaw_types.strategy import BacktestMetrics, BacktestResult
+import aiosqlite
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
+from pnlclaw_types.strategy import BacktestMetrics, BacktestResult
 
 
 def _timestamp_ms_to_storage(value: int) -> str:
@@ -74,17 +76,17 @@ class BacktestRepository:
         )
         return result.id
 
-    def _row_to_result(self, row: dict) -> BacktestResult:
+    def _row_to_result(self, row: aiosqlite.Row) -> BacktestResult:
         """Convert a database row to a BacktestResult."""
         return BacktestResult(
-            id=row["id"],
-            strategy_id=row["strategy_id"],
-            start_date=datetime.fromisoformat(row["start_date"]),
-            end_date=datetime.fromisoformat(row["end_date"]),
-            metrics=BacktestMetrics.model_validate_json(row["metrics_json"]),
-            equity_curve=json.loads(row["equity_curve_json"]),
-            trades_count=row["trades_count"],
-            created_at=_storage_to_timestamp_ms(row["created_at"]),
+            id=cast(str, row["id"]),
+            strategy_id=cast(str, row["strategy_id"]),
+            start_date=datetime.fromisoformat(cast(str, row["start_date"])),
+            end_date=datetime.fromisoformat(cast(str, row["end_date"])),
+            metrics=BacktestMetrics.model_validate_json(cast(str, row["metrics_json"])),
+            equity_curve=json.loads(cast(str, row["equity_curve_json"])),
+            trades_count=cast(int, row["trades_count"]),
+            created_at=_storage_to_timestamp_ms(cast(str, row["created_at"])),
         )
 
     async def get(self, backtest_id: str) -> BacktestResult | None:
@@ -108,9 +110,7 @@ class BacktestRepository:
             return None
         return self._row_to_result(rows[0])
 
-    async def list_by_strategy(
-        self, strategy_id: str, limit: int = 20
-    ) -> list[BacktestResult]:
+    async def list_by_strategy(self, strategy_id: str, limit: int = 20) -> list[BacktestResult]:
         """List backtest results for a strategy, newest first.
 
         Args:

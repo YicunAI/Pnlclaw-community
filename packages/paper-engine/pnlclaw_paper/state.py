@@ -51,10 +51,7 @@ class PaperState:
             extra: Additional metadata to persist (e.g., fee accumulators).
         """
         # Accounts
-        accounts_data = {
-            aid: acc.model_dump()
-            for aid, acc in account_mgr.get_all_data().items()
-        }
+        accounts_data = {aid: acc.model_dump() for aid, acc in account_mgr.get_all_data().items()}
         atomic_write(
             self._dir / "accounts.json",
             json.dumps(accounts_data, indent=2),
@@ -94,10 +91,7 @@ class PaperState:
         if accounts_path.exists():
             raw = accounts_path.read_text(encoding="utf-8")
             accounts_data = json.loads(raw)
-            loaded = {
-                aid: PaperAccount.model_validate(data)
-                for aid, data in accounts_data.items()
-            }
+            loaded = {aid: PaperAccount.model_validate(data) for aid, data in accounts_data.items()}
             account_mgr.load_data(loaded)
 
         # Orders

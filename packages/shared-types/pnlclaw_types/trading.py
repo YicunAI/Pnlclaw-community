@@ -1,11 +1,13 @@
 """Trading data models for PnLClaw.
 
-Covers order lifecycle, fills, positions, and PnL records.
+Covers order lifecycle, fills, positions, PnL records,
+exchange-originated private events, and execution mode.
 """
 
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +16,13 @@ from pnlclaw_types.common import Symbol, Timestamp
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
+
+class ExecutionMode(str, Enum):
+    """Trading execution mode."""
+
+    PAPER = "paper"
+    LIVE = "live"
 
 
 class OrderSide(str, Enum):
@@ -60,19 +69,11 @@ class Order(BaseModel):
     symbol: Symbol = Field(..., description="Normalized trading pair")
     side: OrderSide = Field(..., description="Buy or sell")
     type: OrderType = Field(..., description="Order type")
-    status: OrderStatus = Field(
-        OrderStatus.CREATED, description="Current order status"
-    )
+    status: OrderStatus = Field(OrderStatus.CREATED, description="Current order status")
     quantity: float = Field(..., gt=0, description="Requested quantity in base currency")
-    price: float | None = Field(
-        None, ge=0, description="Limit price (None for market orders)"
-    )
-    stop_price: float | None = Field(
-        None, ge=0, description="Stop trigger price (for stop orders)"
-    )
-    filled_quantity: float = Field(
-        0.0, ge=0, description="Total quantity filled so far"
-    )
+    price: float | None = Field(None, ge=0, description="Limit price (None for market orders)")
+    stop_price: float | None = Field(None, ge=0, description="Stop trigger price (for stop orders)")
+    filled_quantity: float = Field(0.0, ge=0, description="Total quantity filled so far")
     avg_fill_price: float | None = Field(
         None, ge=0, description="Volume-weighted average fill price"
     )
@@ -198,3 +199,51 @@ class PnLRecord(BaseModel):
             ]
         }
     )
+
+
+# ---------------------------------------------------------------------------
+# Exchange-originated private events (WS push)
+# ---------------------------------------------------------------------------
+
+
+class ExchangeOrderUpdate(BaseModel):
+    """Real-time order status change pushed from an exchange private WS channel.
+
+    Distinct from ``Order`` which is our internal model — this captures the
+    raw exchange event with exchange-native identifiers and status strings.
+    """
+
+    exchange: str = Field(..., description="Exchange identifier, e.g. 'binance'")
+    exchange_order_id: str = Field(..., description="Exchange-assigned order ID")
+    client_order_id: str | None = Field(None, description="Client-assigned order ID")
+    symbol: Symbol = Field(..., description="Normalized trading pair")
+    side: OrderSide
+    order_type: str = Field(..., description="Exchange-native order type string")
+    status: str = Field(..., description="Exchange-native status (NEW/PARTIALLY_FILLED/FILLED/CANCELED)")
+    quantity: float = Field(..., ge=0)
+    filled_quantity: float = Field(0.0, ge=0)
+    avg_fill_price: float = Field(0.0, ge=0)
+    last_fill_price: float = Field(0.0, ge=0)
+    last_fill_quantity: float = Field(0.0, ge=0)
+    commission: float = Field(0.0, ge=0)
+    commission_asset: str | None = None
+    timestamp: Timestamp
+    raw: dict[str, Any] | None = Field(None, description="Raw exchange payload for debugging")
+
+
+class BalanceUpdate(BaseModel):
+    """Account balance snapshot for a single asset, pushed via private WS."""
+
+    exchange: str = Field(..., description="Exchange identifier")
+    asset: str = Field(..., description="Asset ticker, e.g. 'BTC'")
+    free: float = Field(0.0, ge=0, description="Available balance")
+    locked: float = Field(0.0, ge=0, description="Balance locked in open orders")
+    timestamp: Timestamp
+
+
+class AccountSnapshot(BaseModel):
+    """Full account balance snapshot, typically from REST reconciliation."""
+
+    exchange: str = Field(..., description="Exchange identifier")
+    balances: list[BalanceUpdate] = Field(default_factory=list)
+    timestamp: Timestamp

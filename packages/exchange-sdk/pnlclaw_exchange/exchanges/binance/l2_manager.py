@@ -164,9 +164,7 @@ class BinanceL2Manager:
 
         # Depth validation: best bid < best ask.
         if not self._validate_depth(book):
-            logger.warning(
-                "Depth validation failed for %s (bid >= ask) — recovering", symbol
-            )
+            logger.warning("Depth validation failed for %s (bid >= ask) — recovering", symbol)
             await self._recover(book)
             return None
 
@@ -211,9 +209,7 @@ class BinanceL2Manager:
         try:
             await self._fetch_and_apply_snapshot(book)
             elapsed = time.monotonic() - start
-            logger.info(
-                "L2 recovery for %s completed in %.3fs", book.symbol, elapsed
-            )
+            logger.info("L2 recovery for %s completed in %.3fs", book.symbol, elapsed)
         except Exception as exc:
             logger.error("L2 recovery failed for %s: %s", book.symbol, exc)
             raise SnapshotRecoveryError(
@@ -263,9 +259,7 @@ class BinanceL2Manager:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _apply_levels(
-        side: dict[float, float], updates: list[PriceLevel]
-    ) -> None:
+    def _apply_levels(side: dict[float, float], updates: list[PriceLevel]) -> None:
         """Apply delta updates to one side of the book.
 
         quantity == 0 means remove the price level.
@@ -287,14 +281,8 @@ class BinanceL2Manager:
 
     def _build_snapshot(self, book: _LocalOrderBook) -> OrderBookL2Snapshot:
         """Build an OrderBookL2Snapshot from the local book state."""
-        bids = [
-            PriceLevel(price=p, quantity=q)
-            for p, q in sorted(book.bids.items(), reverse=True)
-        ]
-        asks = [
-            PriceLevel(price=p, quantity=q)
-            for p, q in sorted(book.asks.items())
-        ]
+        bids = [PriceLevel(price=p, quantity=q) for p, q in sorted(book.bids.items(), reverse=True)]
+        asks = [PriceLevel(price=p, quantity=q) for p, q in sorted(book.asks.items())]
         return OrderBookL2Snapshot(
             exchange="binance",
             symbol=book.unified_symbol,

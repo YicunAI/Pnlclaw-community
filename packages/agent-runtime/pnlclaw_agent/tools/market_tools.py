@@ -8,14 +8,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from pnlclaw_types.risk import RiskLevel
-
 from pnlclaw_agent.tools.base import BaseTool, ToolResult
-
+from pnlclaw_types.risk import RiskLevel
 
 # ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
+
 
 def _fmt_price(value: float) -> str:
     """Format a price with up to 8 significant decimals."""

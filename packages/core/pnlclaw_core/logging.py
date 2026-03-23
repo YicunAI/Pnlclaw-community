@@ -14,13 +14,13 @@ _request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 # Patterns that should be redacted in log output
 _REDACT_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"(sk-[A-Za-z0-9]{3})[A-Za-z0-9]+"),           # OpenAI-style keys
-    re.compile(r"(key-[A-Za-z0-9]{3})[A-Za-z0-9]+"),          # generic key-xxx
+    re.compile(r"(sk-[A-Za-z0-9]{3})[A-Za-z0-9]+"),  # OpenAI-style keys
+    re.compile(r"(key-[A-Za-z0-9]{3})[A-Za-z0-9]+"),  # generic key-xxx
     re.compile(r"(secret[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
     re.compile(r"(token[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
     re.compile(r"(password[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
     re.compile(r"(Bearer\s+[A-Za-z0-9._\-]{5})[A-Za-z0-9._\-]+"),
-    re.compile(r"(eyJ[A-Za-z0-9_\-]{5})[A-Za-z0-9._\-]+"),   # JWT-like
+    re.compile(r"(eyJ[A-Za-z0-9_\-]{5})[A-Za-z0-9._\-]+"),  # JWT-like
 ]
 
 
@@ -42,9 +42,7 @@ def _redact_value(value: str) -> str:
     return result
 
 
-def _redact_processor(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+def _redact_processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     """structlog processor that redacts sensitive values."""
     for key, value in event_dict.items():
         if isinstance(value, str):

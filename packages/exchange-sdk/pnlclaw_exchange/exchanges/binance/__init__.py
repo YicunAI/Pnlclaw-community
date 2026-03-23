@@ -1,1 +1,1 @@
-"""Binance exchange adapter for PnLClaw."""
+"""Binance exchange adapter — WebSocket market data and REST trading."""

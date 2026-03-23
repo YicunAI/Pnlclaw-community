@@ -15,7 +15,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-
 _DEFAULT_PREFS_PATH = Path.home() / ".pnlclaw" / "memory" / "preferences.json"
 
 

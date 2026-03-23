@@ -12,8 +12,9 @@ Design notes:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Awaitable, Callable, Protocol
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from typing import Protocol
 
 import aiosqlite
 
@@ -54,9 +55,7 @@ class MigrationRunner:
     """
 
     def __init__(self, migrations: list[Migration] | None = None) -> None:
-        self._migrations: list[Migration] = sorted(
-            migrations or [], key=lambda m: m.version
-        )
+        self._migrations: list[Migration] = sorted(migrations or [], key=lambda m: m.version)
 
     def register(self, migration: Migration) -> None:
         """Register an additional migration and re-sort."""

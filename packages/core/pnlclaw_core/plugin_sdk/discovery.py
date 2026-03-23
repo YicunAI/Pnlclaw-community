@@ -43,9 +43,7 @@ class PluginDiscovery:
     ) -> None:
         self._bundled = bundled or []
         self._workspace_dir = workspace_dir
-        self._user_config_path = user_config_path or (
-            Path.home() / ".pnlclaw" / "plugins.yaml"
-        )
+        self._user_config_path = user_config_path or (Path.home() / ".pnlclaw" / "plugins.yaml")
         self._cache: list[DiscoveredPlugin] | None = None
 
     def discover(self, *, force_refresh: bool = False) -> list[DiscoveredPlugin]:

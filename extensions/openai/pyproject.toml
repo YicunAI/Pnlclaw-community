@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pnlclaw-ext-openai"
+version = "0.1.0"
+description = "PnLClaw extension: OpenAI-compatible LLM provider"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pnlclaw-core",
+    "pnlclaw-llm",
+]
+
+[tool.setuptools]
+package-dir = {"pnlclaw_ext_openai" = "."}
+packages = ["pnlclaw_ext_openai"]
+
+[tool.setuptools.package-data]
+pnlclaw_ext_openai = ["manifest.json"]

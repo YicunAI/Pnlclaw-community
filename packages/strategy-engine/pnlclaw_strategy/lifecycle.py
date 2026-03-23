@@ -58,9 +58,7 @@ class StrategyDraft(BaseModel):
     """
 
     config: EngineStrategyConfig = Field(..., description="The strategy configuration")
-    state: StrategyState = Field(
-        StrategyState.DRAFT, description="Current lifecycle state"
-    )
+    state: StrategyState = Field(StrategyState.DRAFT, description="Current lifecycle state")
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="When the draft was created",
@@ -96,9 +94,7 @@ class ValidatedStrategy(BaseModel):
     """
 
     config: EngineStrategyConfig = Field(..., description="The strategy configuration")
-    state: StrategyState = Field(
-        StrategyState.VALIDATED, description="Current lifecycle state"
-    )
+    state: StrategyState = Field(StrategyState.VALIDATED, description="Current lifecycle state")
     validation_result: ValidationResult = Field(
         ..., description="Validation result (should be valid)"
     )
@@ -189,9 +185,7 @@ def validate_draft(
     result = validate(draft.config, available_indicators=available_indicators)
 
     if not result.valid:
-        raise LifecycleError(
-            f"Strategy validation failed: {'; '.join(result.errors)}"
-        )
+        raise LifecycleError(f"Strategy validation failed: {'; '.join(result.errors)}")
 
     return ValidatedStrategy(
         config=draft.config,

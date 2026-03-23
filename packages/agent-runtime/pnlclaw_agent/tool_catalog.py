@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from pnlclaw_types.risk import RiskLevel
-
 from pnlclaw_agent.tools.base import BaseTool
+from pnlclaw_types.risk import RiskLevel
 
 
 class ToolCatalogError(Exception):
@@ -90,7 +89,7 @@ class ToolCatalog:
         """
         if self._policy_engine is None:
             return True
-        return self._policy_engine.is_tool_allowed(name)
+        return bool(self._policy_engine.is_tool_allowed(name))
 
     # -- info ----------------------------------------------------------------
 

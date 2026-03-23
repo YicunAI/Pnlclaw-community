@@ -28,16 +28,12 @@ class TestCompatibilityMatrix:
 class TestCheckMismatch:
     def test_sma_cross_in_trending_ok(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_mismatch(
-            StrategyType.SMA_CROSS, MarketRegime.TRENDING
-        )
+        result = detector.check_mismatch(StrategyType.SMA_CROSS, MarketRegime.TRENDING)
         assert result is None
 
     def test_sma_cross_in_ranging_alerts(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_mismatch(
-            StrategyType.SMA_CROSS, MarketRegime.RANGING
-        )
+        result = detector.check_mismatch(StrategyType.SMA_CROSS, MarketRegime.RANGING)
         assert result is not None
         assert result.strategy_type == StrategyType.SMA_CROSS
         assert result.current_regime == MarketRegime.RANGING
@@ -45,16 +41,12 @@ class TestCheckMismatch:
 
     def test_rsi_reversal_in_trending_alerts(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_mismatch(
-            StrategyType.RSI_REVERSAL, MarketRegime.TRENDING
-        )
+        result = detector.check_mismatch(StrategyType.RSI_REVERSAL, MarketRegime.TRENDING)
         assert result is not None
 
     def test_rsi_reversal_in_ranging_ok(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_mismatch(
-            StrategyType.RSI_REVERSAL, MarketRegime.RANGING
-        )
+        result = detector.check_mismatch(StrategyType.RSI_REVERSAL, MarketRegime.RANGING)
         assert result is None
 
     def test_custom_always_ok(self) -> None:
@@ -119,24 +111,18 @@ class TestSeverity:
 class TestVolatilityMismatch:
     def test_volatile_compatible_no_alert(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_volatility_mismatch(
-            StrategyType.MACD, volatility=0.95
-        )
+        result = detector.check_volatility_mismatch(StrategyType.MACD, volatility=0.95)
         assert result is None  # MACD handles volatility
 
     def test_not_volatile_compatible_alerts(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_volatility_mismatch(
-            StrategyType.RSI_REVERSAL, volatility=0.9
-        )
+        result = detector.check_volatility_mismatch(StrategyType.RSI_REVERSAL, volatility=0.9)
         assert result is not None
         assert "volatility" in result.message.lower()
 
     def test_below_threshold_no_alert(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_volatility_mismatch(
-            StrategyType.RSI_REVERSAL, volatility=0.5
-        )
+        result = detector.check_volatility_mismatch(StrategyType.RSI_REVERSAL, volatility=0.5)
         assert result is None
 
     def test_custom_threshold(self) -> None:
@@ -153,7 +139,5 @@ class TestCustomCompat:
             StrategyType.SMA_CROSS: {MarketRegime.RANGING, MarketRegime.TRENDING},
         }
         detector = RegimeMismatchDetector(custom_compat=custom)
-        result = detector.check_mismatch(
-            StrategyType.SMA_CROSS, MarketRegime.RANGING
-        )
+        result = detector.check_mismatch(StrategyType.SMA_CROSS, MarketRegime.RANGING)
         assert result is None  # Now compatible with our custom matrix

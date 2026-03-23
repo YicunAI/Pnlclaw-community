@@ -9,7 +9,6 @@ import pytest
 from pnlclaw_agent.tools.base import BaseTool, ToolResult
 from pnlclaw_types.risk import RiskLevel
 
-
 # ---------------------------------------------------------------------------
 # Concrete test tool
 # ---------------------------------------------------------------------------

@@ -117,16 +117,12 @@ class StreamManager:
     def active_symbols(self) -> list[str]:
         """Return a list of symbols with at least one active stream."""
         with self._lock:
-            return sorted({
-                sym for (sym, st), ref in self._refs.items() if ref.count > 0
-            })
+            return sorted({sym for (sym, st), ref in self._refs.items() if ref.count > 0})
 
     def active_streams(self) -> list[tuple[str, StreamType]]:
         """Return all active (symbol, stream_type) pairs."""
         with self._lock:
-            return [
-                (sym, st) for (sym, st), ref in self._refs.items() if ref.count > 0
-            ]
+            return [(sym, st) for (sym, st), ref in self._refs.items() if ref.count > 0]
 
     def ref_count(self, symbol: str, stream_type: StreamType) -> int:
         """Return the current reference count for a stream."""
@@ -140,20 +136,14 @@ class StreamManager:
         Called by the service after the ReconnectManager restores the WS connection.
         """
         with self._lock:
-            active = [
-                (sym, st) for (sym, st), ref in self._refs.items() if ref.count > 0
-            ]
+            active = [(sym, st) for (sym, st), ref in self._refs.items() if ref.count > 0]
 
         for symbol, stream_type in active:
             try:
                 await self._subscribe(symbol, stream_type)
-                logger.info(
-                    "Resubscribed stream %s for %s", stream_type.value, symbol
-                )
+                logger.info("Resubscribed stream %s for %s", stream_type.value, symbol)
             except Exception:
-                logger.exception(
-                    "Failed to resubscribe %s for %s", stream_type.value, symbol
-                )
+                logger.exception("Failed to resubscribe %s for %s", stream_type.value, symbol)
 
     # ------------------------------------------------------------------
     # Internal

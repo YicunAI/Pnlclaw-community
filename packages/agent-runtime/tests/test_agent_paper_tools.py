@@ -7,19 +7,19 @@ from dataclasses import dataclass, field
 from pnlclaw_agent.tools.paper_tools import (
     PaperCreateAccountTool,
     PaperPlaceOrderTool,
-    PaperPositionsTool,
     PaperPnlTool,
+    PaperPositionsTool,
 )
 from pnlclaw_paper.accounts import AccountManager
 from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_paper.positions import PositionManager
 from pnlclaw_types.market import TickerEvent
-from pnlclaw_types.trading import Fill, OrderSide, Position
-
+from pnlclaw_types.trading import Fill, OrderSide
 
 # ---------------------------------------------------------------------------
 # Mock MarketDataService (for PnL)
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class MockMarketService:
@@ -66,38 +66,44 @@ class TestPaperPlaceOrderTool:
     def test_place_market_order(self) -> None:
         manager = PaperOrderManager()
         tool = PaperPlaceOrderTool(manager)
-        result = tool.execute({
-            "account_id": "acct-1",
-            "symbol": "BTC/USDT",
-            "side": "buy",
-            "order_type": "market",
-            "quantity": 0.5,
-        })
+        result = tool.execute(
+            {
+                "account_id": "acct-1",
+                "symbol": "BTC/USDT",
+                "side": "buy",
+                "order_type": "market",
+                "quantity": 0.5,
+            }
+        )
         assert result.error is None
         assert "BTC/USDT" in result.output
         assert "buy" in result.output.lower()
 
     def test_invalid_side(self) -> None:
         tool = PaperPlaceOrderTool(PaperOrderManager())
-        result = tool.execute({
-            "account_id": "acct-1",
-            "symbol": "BTC/USDT",
-            "side": "invalid",
-            "order_type": "market",
-            "quantity": 1.0,
-        })
+        result = tool.execute(
+            {
+                "account_id": "acct-1",
+                "symbol": "BTC/USDT",
+                "side": "invalid",
+                "order_type": "market",
+                "quantity": 1.0,
+            }
+        )
         assert result.error is not None
         assert "side" in result.error.lower()
 
     def test_invalid_order_type(self) -> None:
         tool = PaperPlaceOrderTool(PaperOrderManager())
-        result = tool.execute({
-            "account_id": "acct-1",
-            "symbol": "BTC/USDT",
-            "side": "buy",
-            "order_type": "weird",
-            "quantity": 1.0,
-        })
+        result = tool.execute(
+            {
+                "account_id": "acct-1",
+                "symbol": "BTC/USDT",
+                "side": "buy",
+                "order_type": "weird",
+                "quantity": 1.0,
+            }
+        )
         assert result.error is not None
 
     def test_missing_required_fields(self) -> None:
@@ -149,9 +155,14 @@ class TestPaperPnlTool:
         market = MockMarketService(
             tickers={
                 "BTC/USDT": TickerEvent(
-                    exchange="binance", symbol="BTC/USDT", timestamp=_NOW,
-                    last_price=65000.0, bid=64999.0, ask=65001.0,
-                    volume_24h=1000.0, change_24h_pct=1.0,
+                    exchange="binance",
+                    symbol="BTC/USDT",
+                    timestamp=_NOW,
+                    last_price=65000.0,
+                    bid=64999.0,
+                    ask=65001.0,
+                    volume_24h=1000.0,
+                    change_24h_pct=1.0,
                 ),
             }
         )

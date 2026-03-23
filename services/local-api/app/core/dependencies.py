@@ -25,6 +25,8 @@ _paper_order_manager: Any | None = None
 _paper_position_manager: Any | None = None
 _risk_engine: Any | None = None
 _agent_runtime: Any | None = None
+_execution_engine: Any | None = None
+_execution_mode: str = "paper"
 
 
 # ---------------------------------------------------------------------------
@@ -61,6 +63,16 @@ def set_risk_engine(engine: Any) -> None:
 def set_agent_runtime(runtime: Any) -> None:
     global _agent_runtime
     _agent_runtime = runtime
+
+
+def set_execution_engine(engine: Any) -> None:
+    global _execution_engine
+    _execution_engine = engine
+
+
+def set_execution_mode(mode: str) -> None:
+    global _execution_mode
+    _execution_mode = mode
 
 
 def build_response_meta(
@@ -119,3 +131,13 @@ def get_risk_engine() -> Any:
 def get_agent_runtime() -> Any:
     """Return the AgentRuntime instance (or None)."""
     return _agent_runtime
+
+
+def get_execution_engine() -> Any:
+    """Return the current ExecutionEngine (Paper or Live)."""
+    return _execution_engine
+
+
+def get_execution_mode() -> str:
+    """Return the current execution mode ('paper' or 'live')."""
+    return _execution_mode

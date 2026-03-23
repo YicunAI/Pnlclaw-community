@@ -31,7 +31,7 @@ class BackoffPolicy:
         Returns:
             Delay in seconds, clamped to *max_delay*.
         """
-        delay = self.initial * (self.factor ** attempt)
+        delay = self.initial * (self.factor**attempt)
         delay = min(delay, self.max_delay)
         if self.jitter:
             delay *= 0.75 + random.random() * 0.5  # ±25%

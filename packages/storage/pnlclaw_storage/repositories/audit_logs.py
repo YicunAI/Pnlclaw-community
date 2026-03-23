@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
@@ -37,7 +37,7 @@ class AuditLogRepository:
             The event ID.
         """
         event_id = event.get("id", str(uuid.uuid4()))
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         details = event.get("details", {})
         details_json = json.dumps(details, default=str)
 
@@ -60,7 +60,7 @@ class AuditLogRepository:
                 details_json,
             ),
         )
-        return event_id
+        return str(event_id)
 
     async def query(
         self,

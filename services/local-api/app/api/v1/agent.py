@@ -57,7 +57,7 @@ async def _mock_stream(message: str, session_id: str) -> AsyncIterator[str]:
     """Generate a mock SSE stream when AgentRuntime is not available."""
     # text_delta events
     response_text = (
-        f"I received your message: \"{message}\". "
+        f'I received your message: "{message}". '
         "The agent runtime is not yet connected. "
         "This is a placeholder response from the API layer."
     )
@@ -85,9 +85,7 @@ async def _mock_stream(message: str, session_id: str) -> AsyncIterator[str]:
     )
 
 
-async def _agent_stream(
-    runtime: Any, message: str, session_id: str
-) -> AsyncIterator[str]:
+async def _agent_stream(runtime: Any, message: str, session_id: str) -> AsyncIterator[str]:
     """Stream events from the real AgentRuntime."""
     try:
         async for event in runtime.process_message(message):

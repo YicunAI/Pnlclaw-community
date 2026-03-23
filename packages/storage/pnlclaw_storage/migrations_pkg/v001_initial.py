@@ -129,6 +129,9 @@ async def _apply(conn: aiosqlite.Connection) -> None:
 migration = Migration(
     id="v001_initial",
     version=1,
-    description="Create initial schema (strategies, backtests, paper_accounts, paper_orders, paper_positions, audit_logs)",
+    description=(
+        "Create initial schema "
+        "(strategies, backtests, paper_accounts, paper_orders, paper_positions, audit_logs)"
+    ),
     apply=_apply,
 )

@@ -132,14 +132,16 @@ class TestCompile:
             symbols=["BTC/USDT"],
             interval="1h",
             parsed_entry_rules=EntryRules(long=[entry_rule]),
-            parsed_exit_rules=ExitRules(close_long=[
-                ConditionRule(
-                    indicator="ichimoku",
-                    params={"period": 9},
-                    operator="crosses_below",
-                    comparator=50.0,
-                )
-            ]),
+            parsed_exit_rules=ExitRules(
+                close_long=[
+                    ConditionRule(
+                        indicator="ichimoku",
+                        params={"period": 9},
+                        operator="crosses_below",
+                        comparator=50.0,
+                    )
+                ]
+            ),
         )
         with pytest.raises(CompilationError, match="ichimoku"):
             compile(config)
@@ -158,14 +160,16 @@ class TestCompile:
             symbols=["BTC/USDT"],
             interval="1h",
             parsed_entry_rules=EntryRules(long=[entry_rule]),
-            parsed_exit_rules=ExitRules(close_long=[
-                ConditionRule(
-                    indicator="sma",
-                    params={"period": -5},
-                    operator="crosses_below",
-                    comparator=50.0,
-                )
-            ]),
+            parsed_exit_rules=ExitRules(
+                close_long=[
+                    ConditionRule(
+                        indicator="sma",
+                        params={"period": -5},
+                        operator="crosses_below",
+                        comparator=50.0,
+                    )
+                ]
+            ),
         )
         with pytest.raises(CompilationError):
             compile(config)

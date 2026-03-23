@@ -44,9 +44,7 @@ def _make_delta(
         bids=bid_levels,
         asks=ask_levels,
     )
-    return BinanceDepthDelta(
-        delta=delta, first_update_id=first_id, last_update_id=last_id
-    )
+    return BinanceDepthDelta(delta=delta, first_update_id=first_id, last_update_id=last_id)
 
 
 def _mock_http_client(snapshot_data: dict[str, Any]) -> AsyncMock:
@@ -108,7 +106,8 @@ async def test_apply_sequential_deltas() -> None:
 
     # First delta: U=100, u=101 bridges snapshot (lastUpdateId=100)
     delta1 = _make_delta(
-        100, 101,
+        100,
+        101,
         bids=[(66999.0, 3.0)],  # Update bid quantity
         asks=[(67001.0, 0.0)],  # Remove ask level
     )
@@ -120,7 +119,8 @@ async def test_apply_sequential_deltas() -> None:
 
     # Second delta: contiguous U=102, u=103
     delta2 = _make_delta(
-        102, 103,
+        102,
+        103,
         bids=[(67000.0, 1.0)],  # New bid level
     )
     snap2 = await mgr.apply_delta("BTCUSDT", delta2)
@@ -283,7 +283,8 @@ async def test_depth_validation_bid_ask_cross_triggers_recovery() -> None:
 
     # Delta that causes bid >= ask (bid=68000 > ask=67001)
     bad_delta = _make_delta(
-        100, 101,
+        100,
+        101,
         bids=[(68000.0, 1.0)],  # Bid above ask
     )
     result = await mgr.apply_delta("BTCUSDT", bad_delta)
@@ -328,9 +329,7 @@ async def test_on_snapshot_callback_fires() -> None:
     http = _mock_http_client(BASIC_SNAPSHOT)
     snapshots: list[OrderBookL2Snapshot] = []
 
-    mgr = BinanceL2Manager(
-        http_client=http, on_snapshot=lambda s: snapshots.append(s)
-    )
+    mgr = BinanceL2Manager(http_client=http, on_snapshot=lambda s: snapshots.append(s))
     await mgr.initialize("BTCUSDT")
 
     delta = _make_delta(100, 101, bids=[(66999.0, 5.0)])

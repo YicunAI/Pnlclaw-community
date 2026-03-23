@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
 
-from pnlclaw_agent.attribution.engine import PnLAttribution, PnLAttributionEngine
+from pnlclaw_agent.attribution.engine import PnLAttributionEngine
 from pnlclaw_agent.memory.preferences import (
     RiskAppetite,
     UserPreferences,
@@ -18,7 +17,6 @@ from pnlclaw_agent.memory.preferences import (
 from pnlclaw_agent.memory.trading_memory import TradingMemory
 from pnlclaw_types.agent import ChatMessage
 
-
 # ---------------------------------------------------------------------------
 # Sample trade data
 # ---------------------------------------------------------------------------
@@ -28,7 +26,7 @@ _TRADES = [
         "strategy_id": "strat-001",
         "pnl": 500.0,
         "entry_time": 1_704_067_200_000,  # 2024-01-01
-        "exit_time": 1_704_153_600_000,    # 2024-01-02
+        "exit_time": 1_704_153_600_000,  # 2024-01-02
         "symbol": "BTC/USDT",
         "side": "buy",
         "quantity": 0.5,
@@ -41,8 +39,8 @@ _TRADES = [
     {
         "strategy_id": "strat-001",
         "pnl": -200.0,
-        "entry_time": 1_704_240_000_000,   # 2024-01-03
-        "exit_time": 1_704_326_400_000,    # 2024-01-04
+        "entry_time": 1_704_240_000_000,  # 2024-01-03
+        "exit_time": 1_704_326_400_000,  # 2024-01-04
         "symbol": "ETH/USDT",
         "side": "buy",
         "quantity": 2.0,
@@ -55,8 +53,8 @@ _TRADES = [
     {
         "strategy_id": "strat-002",
         "pnl": 800.0,
-        "entry_time": 1_704_412_800_000,   # 2024-01-05
-        "exit_time": 1_704_499_200_000,    # 2024-01-06
+        "entry_time": 1_704_412_800_000,  # 2024-01-05
+        "exit_time": 1_704_499_200_000,  # 2024-01-06
         "symbol": "BTC/USDT",
         "side": "sell",
         "quantity": 1.0,
@@ -69,8 +67,8 @@ _TRADES = [
     {
         "strategy_id": "strat-002",
         "pnl": -100.0,
-        "entry_time": 1_704_585_600_000,   # 2024-01-07
-        "exit_time": 1_704_672_000_000,    # 2024-01-08
+        "entry_time": 1_704_585_600_000,  # 2024-01-07
+        "exit_time": 1_704_672_000_000,  # 2024-01-08
         "symbol": "ETH/USDT",
         "side": "sell",
         "quantity": 3.0,
@@ -164,7 +162,9 @@ class TestTradingMemory:
         mem = TradingMemory(memory_dir=tmp_path)
         msgs = [
             ChatMessage(role="user", content="Analyze BTC/USDT", timestamp=1_700_000_000_000),
-            ChatMessage(role="assistant", content="BTC is trending up", timestamp=1_700_000_001_000),
+            ChatMessage(
+                role="assistant", content="BTC is trending up", timestamp=1_700_000_001_000
+            ),
         ]
         mem.save_context("session-001", msgs, summary="BTC analysis session")
 

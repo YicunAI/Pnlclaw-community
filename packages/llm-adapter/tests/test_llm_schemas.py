@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from pnlclaw_llm.base import LLMError
 from pnlclaw_llm.schemas import (
@@ -16,7 +16,6 @@ from pnlclaw_llm.schemas import (
     strategy_config_schema,
     trade_intent_schema,
 )
-
 
 # ---------------------------------------------------------------------------
 # get_json_schema tests
@@ -89,15 +88,17 @@ class TestExtractStructured:
             extract_structured('{"name": "ok", "value": "not_an_int"}', SimpleModel)
 
     def test_extract_market_analysis(self) -> None:
-        raw = json.dumps({
-            "symbol": "BTC/USDT",
-            "summary": "Strong uptrend with high volume",
-            "regime": "trending",
-            "trend_direction": "bullish",
-            "confidence": 0.85,
-            "key_levels": {"support": 65000, "resistance": 72000},
-            "recommendation": "Consider long positions",
-        })
+        raw = json.dumps(
+            {
+                "symbol": "BTC/USDT",
+                "summary": "Strong uptrend with high volume",
+                "regime": "trending",
+                "trend_direction": "bullish",
+                "confidence": 0.85,
+                "key_levels": {"support": 65000, "resistance": 72000},
+                "recommendation": "Consider long positions",
+            }
+        )
         result = extract_structured(raw, MarketAnalysis)
         assert result.symbol == "BTC/USDT"
         assert result.confidence == 0.85
@@ -106,15 +107,17 @@ class TestExtractStructured:
     def test_extract_trade_intent(self) -> None:
         from pnlclaw_types.agent import TradeIntent
 
-        raw = json.dumps({
-            "symbol": "BTC/USDT",
-            "side": "buy",
-            "quantity": 0.1,
-            "order_type": "market",
-            "reasoning": "SMA cross",
-            "confidence": 0.8,
-            "timestamp": 1711000000000,
-        })
+        raw = json.dumps(
+            {
+                "symbol": "BTC/USDT",
+                "side": "buy",
+                "quantity": 0.1,
+                "order_type": "market",
+                "reasoning": "SMA cross",
+                "confidence": 0.8,
+                "timestamp": 1711000000000,
+            }
+        )
         result = extract_structured(raw, TradeIntent)
         assert result.symbol == "BTC/USDT"
         assert result.confidence == 0.8

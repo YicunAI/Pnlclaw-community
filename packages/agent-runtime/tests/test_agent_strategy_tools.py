@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
-import pytest
 
 from pnlclaw_agent.tools.strategy_tools import (
     BacktestResultTool,
@@ -15,7 +13,6 @@ from pnlclaw_agent.tools.strategy_tools import (
     get_results_store,
 )
 from pnlclaw_types.strategy import BacktestMetrics, BacktestResult
-
 
 # ---------------------------------------------------------------------------
 # Mock BacktestEngine
@@ -30,8 +27,8 @@ class MockBacktestEngine:
         return BacktestResult(
             id="bt-test-001",
             strategy_id="strat-001",
-            start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-            end_date=datetime(2025, 3, 31, tzinfo=timezone.utc),
+            start_date=datetime(2025, 1, 1, tzinfo=UTC),
+            end_date=datetime(2025, 3, 31, tzinfo=UTC),
             metrics=BacktestMetrics(
                 total_return=0.15,
                 annual_return=0.6,
@@ -108,8 +105,14 @@ class TestBacktestRunTool:
             "risk_params": {},
         }
         data = [
-            {"timestamp": i * 3600000, "open": 100.0, "high": 101.0,
-             "low": 99.0, "close": 100.5, "volume": 10.0}
+            {
+                "timestamp": i * 3600000,
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.5,
+                "volume": 10.0,
+            }
             for i in range(10)
         ]
 
@@ -144,8 +147,8 @@ class TestBacktestResultTool:
             "bt-001": BacktestResult(
                 id="bt-001",
                 strategy_id="strat-001",
-                start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-                end_date=datetime(2025, 3, 31, tzinfo=timezone.utc),
+                start_date=datetime(2025, 1, 1, tzinfo=UTC),
+                end_date=datetime(2025, 3, 31, tzinfo=UTC),
                 metrics=BacktestMetrics(
                     total_return=0.10,
                     annual_return=0.4,

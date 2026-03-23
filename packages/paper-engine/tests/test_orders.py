@@ -38,8 +38,11 @@ class TestPaperOrderManager:
     def test_place_order_creates_accepted(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.1,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.1,
         )
         assert order.status == OrderStatus.ACCEPTED
         assert order.quantity == 0.1
@@ -47,8 +50,11 @@ class TestPaperOrderManager:
     def test_cancel_order(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.1,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.1,
         )
         cancelled = mgr.cancel_order(order.id)
         assert cancelled.status == OrderStatus.CANCELLED
@@ -56,8 +62,11 @@ class TestPaperOrderManager:
     def test_cancel_filled_raises(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.1,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.1,
         )
         mgr.update_fill(order.id, 0.1, 67000.0)
         assert order.status == OrderStatus.FILLED
@@ -67,8 +76,11 @@ class TestPaperOrderManager:
     def test_update_fill_partial(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=1.0,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=1.0,
         )
         mgr.update_fill(order.id, 0.5, 67000.0)
         assert order.status == OrderStatus.PARTIAL
@@ -77,8 +89,11 @@ class TestPaperOrderManager:
     def test_update_fill_complete(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.5,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.5,
         )
         mgr.update_fill(order.id, 0.5, 67000.0)
         assert order.status == OrderStatus.FILLED
@@ -86,8 +101,11 @@ class TestPaperOrderManager:
     def test_weighted_avg_price(self) -> None:
         mgr = self._make_mgr()
         order = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=1.0,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=1.0,
         )
         mgr.update_fill(order.id, 0.5, 66000.0)
         mgr.update_fill(order.id, 0.5, 68000.0)
@@ -97,12 +115,18 @@ class TestPaperOrderManager:
     def test_get_orders_by_status(self) -> None:
         mgr = self._make_mgr()
         o1 = mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.1,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.1,
         )
         o2 = mgr.place_order(
-            "acc-1", symbol="ETH/USDT", side=OrderSide.SELL,
-            order_type=OrderType.MARKET, quantity=1.0,
+            "acc-1",
+            symbol="ETH/USDT",
+            side=OrderSide.SELL,
+            order_type=OrderType.MARKET,
+            quantity=1.0,
         )
         mgr.cancel_order(o2.id)
         accepted = mgr.get_orders("acc-1", status=OrderStatus.ACCEPTED)
@@ -112,8 +136,11 @@ class TestPaperOrderManager:
     def test_get_open_orders(self) -> None:
         mgr = self._make_mgr()
         mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, quantity=0.1,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            quantity=0.1,
         )
         open_orders = mgr.get_open_orders("acc-1")
         assert len(open_orders) == 1
@@ -126,8 +153,12 @@ class TestPaperOrderManager:
     def test_serialization_roundtrip(self) -> None:
         mgr = self._make_mgr()
         mgr.place_order(
-            "acc-1", symbol="BTC/USDT", side=OrderSide.BUY,
-            order_type=OrderType.LIMIT, quantity=0.5, price=65000.0,
+            "acc-1",
+            symbol="BTC/USDT",
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            quantity=0.5,
+            price=65000.0,
         )
         data = mgr.get_all_data()
 

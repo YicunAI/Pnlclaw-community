@@ -7,7 +7,6 @@ Distilled from OpenClaw context pruning.
 
 from __future__ import annotations
 
-import copy
 import time
 
 from pnlclaw_types.agent import ChatMessage
@@ -34,9 +33,7 @@ class ContextPruner:
         self._soft_threshold = soft_threshold
         self._hard_threshold = hard_threshold
 
-    def prune(
-        self, messages: list[ChatMessage], budget_tokens: int
-    ) -> list[ChatMessage]:
+    def prune(self, messages: list[ChatMessage], budget_tokens: int) -> list[ChatMessage]:
         """Prune stale tool results to fit within token budget.
 
         Returns a new list — does not modify the input.
@@ -55,7 +52,8 @@ class ContextPruner:
 
         # Stage 1: identify stale tool results
         stale_indices = [
-            i for i, m in enumerate(result)
+            i
+            for i, m in enumerate(result)
             if m.role == "tool" and (now_ms - m.timestamp) > self._ttl_ms
         ]
 

@@ -134,9 +134,7 @@ def _compile_condition(
     indicator_cache: dict[str, Indicator],
 ) -> CompiledCondition:
     """Compile a single ConditionRule into a CompiledCondition."""
-    ind, col_name = _resolve_indicator(
-        rule.indicator, rule.params, registry, indicator_cache
-    )
+    ind, col_name = _resolve_indicator(rule.indicator, rule.params, registry, indicator_cache)
 
     comp_ind = None
     comp_val = None
@@ -152,9 +150,7 @@ def _compile_condition(
                 comp_name, comp_params, registry, indicator_cache
             )
         else:
-            raise CompilationError(
-                f"Comparator dict must have 'indicator' key: {rule.comparator}"
-            )
+            raise CompilationError(f"Comparator dict must have 'indicator' key: {rule.comparator}")
     else:
         raise CompilationError(f"Invalid comparator type: {type(rule.comparator)}")
 
@@ -196,9 +192,7 @@ def compile(
     available = set(registry.list())
     validation = validate(config, available_indicators=available)
     if not validation.valid:
-        raise CompilationError(
-            f"Strategy validation failed: {'; '.join(validation.errors)}"
-        )
+        raise CompilationError(f"Strategy validation failed: {'; '.join(validation.errors)}")
 
     indicator_cache: dict[str, Indicator] = {}
     compiled = CompiledStrategy(config=config)

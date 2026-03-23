@@ -9,9 +9,10 @@ Provides a thin async wrapper around aiosqlite with:
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, cast
 
 import aiosqlite
 
@@ -95,9 +96,7 @@ class AsyncSQLiteManager:
     def _require_connection(self) -> aiosqlite.Connection:
         """Return the active connection or raise."""
         if self._conn is None:
-            raise ConnectionError(
-                "Database not connected. Call connect() first."
-            )
+            raise ConnectionError("Database not connected. Call connect() first.")
         return self._conn
 
     async def execute(
@@ -116,11 +115,9 @@ class AsyncSQLiteManager:
         cursor = await conn.execute(sql, params)
         rows = await cursor.fetchall()
         await conn.commit()
-        return rows
+        return cast(list[aiosqlite.Row], rows)
 
-    async def execute_many(
-        self, sql: str, params_list: list[tuple[Any, ...]]
-    ) -> None:
+    async def execute_many(self, sql: str, params_list: list[tuple[Any, ...]]) -> None:
         """Execute a SQL statement against each parameter set.
 
         Args:

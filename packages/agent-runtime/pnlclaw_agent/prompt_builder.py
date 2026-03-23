@@ -12,7 +12,6 @@ from typing import Any
 
 from pnlclaw_types.agent import AgentRole, MarketState
 
-
 # ---------------------------------------------------------------------------
 # AgentContext
 # ---------------------------------------------------------------------------
@@ -93,6 +92,7 @@ def build_system_prompt(context: AgentContext) -> str:
     # 1. Role instruction
     if context.role is not None:
         from pnlclaw_agent.team.roles import get_role
+
         role_def = get_role(context.role)
         sections.append(role_def.system_prompt)
     else:
@@ -135,8 +135,7 @@ def build_system_prompt(context: AgentContext) -> str:
 
     if context.active_symbols:
         sections.append(
-            f"## Active Symbols\n"
-            f"Currently tracking: {', '.join(context.active_symbols)}"
+            f"## Active Symbols\nCurrently tracking: {', '.join(context.active_symbols)}"
         )
 
     # 4. User preferences
@@ -151,9 +150,7 @@ def build_system_prompt(context: AgentContext) -> str:
 
     # 5. Memory context
     if context.memory_context:
-        sections.append(
-            f"## Relevant Prior Context\n{context.memory_context}"
-        )
+        sections.append(f"## Relevant Prior Context\n{context.memory_context}")
 
     # 6. Safety constraints
     sections.append(_SAFETY_PROMPT)

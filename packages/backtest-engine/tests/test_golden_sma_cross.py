@@ -162,9 +162,7 @@ class TestGoldenSmaCross:
 
         # Compare metrics
         for key in golden["metrics"]:
-            assert result["metrics"][key] == pytest.approx(
-                golden["metrics"][key], abs=1e-6
-            ), (
+            assert result["metrics"][key] == pytest.approx(golden["metrics"][key], abs=1e-6), (
                 f"Metric '{key}' differs: got {result['metrics'][key]}, "
                 f"expected {golden['metrics'][key]}"
             )
@@ -176,9 +174,9 @@ class TestGoldenSmaCross:
         for i, (actual, expected) in enumerate(
             zip(result["equity_curve"], golden["equity_curve"], strict=False)
         ):
-            assert actual == pytest.approx(
-                expected, abs=1e-4
-            ), f"Equity curve point {i} differs: got {actual}, expected {expected}"
+            assert actual == pytest.approx(expected, abs=1e-4), (
+                f"Equity curve point {i} differs: got {actual}, expected {expected}"
+            )
 
         # Compare trade count
         assert result["trades_count"] == golden["trades_count"]

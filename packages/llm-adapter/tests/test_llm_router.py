@@ -17,8 +17,7 @@ from pnlclaw_llm.base import (
     LLMRateLimitError,
     LLMRole,
 )
-from pnlclaw_llm.router import LLMRouter, ProviderHealth
-
+from pnlclaw_llm.router import LLMRouter
 
 # ---------------------------------------------------------------------------
 # Stub providers
@@ -79,10 +78,12 @@ class TestConstruction:
             LLMRouter([])
 
     def test_provider_names(self) -> None:
-        router = LLMRouter([
-            ("primary", SuccessProvider("a")),
-            ("fallback", SuccessProvider("b")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", SuccessProvider("a")),
+                ("fallback", SuccessProvider("b")),
+            ]
+        )
         assert router.provider_names == ["primary", "fallback"]
 
 
@@ -94,56 +95,68 @@ class TestConstruction:
 class TestChatFallback:
     @pytest.mark.asyncio
     async def test_primary_success(self) -> None:
-        router = LLMRouter([
-            ("primary", SuccessProvider("primary_response")),
-            ("fallback", SuccessProvider("fallback_response")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", SuccessProvider("primary_response")),
+                ("fallback", SuccessProvider("fallback_response")),
+            ]
+        )
         result = await router.chat(MSG)
         assert result == "primary_response"
 
     @pytest.mark.asyncio
     async def test_fallback_on_connection_error(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMConnectionError("down"))),
-            ("fallback", SuccessProvider("fallback_response")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMConnectionError("down"))),
+                ("fallback", SuccessProvider("fallback_response")),
+            ]
+        )
         result = await router.chat(MSG)
         assert result == "fallback_response"
 
     @pytest.mark.asyncio
     async def test_fallback_on_rate_limit(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMRateLimitError("429"))),
-            ("fallback", SuccessProvider("fallback_response")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMRateLimitError("429"))),
+                ("fallback", SuccessProvider("fallback_response")),
+            ]
+        )
         result = await router.chat(MSG)
         assert result == "fallback_response"
 
     @pytest.mark.asyncio
     async def test_fallback_on_auth_error(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMAuthError("bad key"))),
-            ("fallback", SuccessProvider("fallback_response")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMAuthError("bad key"))),
+                ("fallback", SuccessProvider("fallback_response")),
+            ]
+        )
         result = await router.chat(MSG)
         assert result == "fallback_response"
 
     @pytest.mark.asyncio
     async def test_all_fail_raises_error(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMConnectionError("down"))),
-            ("fallback", FailProvider(LLMAuthError("bad key"))),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMConnectionError("down"))),
+                ("fallback", FailProvider(LLMAuthError("bad key"))),
+            ]
+        )
         with pytest.raises(LLMError, match="All LLM providers failed"):
             await router.chat(MSG)
 
     @pytest.mark.asyncio
     async def test_three_level_chain(self) -> None:
-        router = LLMRouter([
-            ("openai", FailProvider(LLMConnectionError("timeout"))),
-            ("deepseek", FailProvider(LLMRateLimitError("429"))),
-            ("ollama", SuccessProvider("local_response")),
-        ])
+        router = LLMRouter(
+            [
+                ("openai", FailProvider(LLMConnectionError("timeout"))),
+                ("deepseek", FailProvider(LLMRateLimitError("429"))),
+                ("ollama", SuccessProvider("local_response")),
+            ]
+        )
         result = await router.chat(MSG)
         assert result == "local_response"
 
@@ -156,9 +169,11 @@ class TestChatFallback:
 class TestStreamFallback:
     @pytest.mark.asyncio
     async def test_stream_primary_success(self) -> None:
-        router = LLMRouter([
-            ("primary", SuccessProvider("hello world")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", SuccessProvider("hello world")),
+            ]
+        )
         chunks: list[str] = []
         async for chunk in router.chat_stream(MSG):
             chunks.append(chunk)
@@ -166,10 +181,12 @@ class TestStreamFallback:
 
     @pytest.mark.asyncio
     async def test_stream_fallback_on_error(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMConnectionError("down"))),
-            ("fallback", SuccessProvider("fallback ok")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMConnectionError("down"))),
+                ("fallback", SuccessProvider("fallback ok")),
+            ]
+        )
         chunks: list[str] = []
         async for chunk in router.chat_stream(MSG):
             chunks.append(chunk)
@@ -184,18 +201,22 @@ class TestStreamFallback:
 class TestStructuredFallback:
     @pytest.mark.asyncio
     async def test_structured_primary_success(self) -> None:
-        router = LLMRouter([
-            ("primary", SuccessProvider("ok")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", SuccessProvider("ok")),
+            ]
+        )
         result = await router.generate_structured(MSG, {"type": "object"})
         assert result == {"result": "ok"}
 
     @pytest.mark.asyncio
     async def test_structured_fallback_on_error(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMConnectionError("down"))),
-            ("fallback", SuccessProvider("fallback")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMConnectionError("down"))),
+                ("fallback", SuccessProvider("fallback")),
+            ]
+        )
         result = await router.generate_structured(MSG, {"type": "object"})
         assert result == {"result": "fallback"}
 
@@ -208,20 +229,24 @@ class TestStructuredFallback:
 class TestHealthCheck:
     @pytest.mark.asyncio
     async def test_all_healthy(self) -> None:
-        router = LLMRouter([
-            ("primary", SuccessProvider("ok")),
-            ("fallback", SuccessProvider("ok")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", SuccessProvider("ok")),
+                ("fallback", SuccessProvider("ok")),
+            ]
+        )
         results = await router.health_check()
         assert len(results) == 2
         assert all(r.available for r in results)
 
     @pytest.mark.asyncio
     async def test_mixed_health(self) -> None:
-        router = LLMRouter([
-            ("primary", FailProvider(LLMConnectionError("down"))),
-            ("fallback", SuccessProvider("ok")),
-        ])
+        router = LLMRouter(
+            [
+                ("primary", FailProvider(LLMConnectionError("down"))),
+                ("fallback", SuccessProvider("ok")),
+            ]
+        )
         results = await router.health_check()
         assert results[0].available is False
         assert results[0].error is not None

@@ -77,9 +77,7 @@ async def test_successful_connect_resets_attempt() -> None:
 @pytest.mark.asyncio
 async def test_backoff_increases_on_failure() -> None:
     """Each failure increases the computed delay."""
-    config = ReconnectConfig(
-        initial_delay_s=1.0, max_delay_s=30.0, factor=2.0, jitter=0.0
-    )
+    config = ReconnectConfig(initial_delay_s=1.0, max_delay_s=30.0, factor=2.0, jitter=0.0)
     mgr = ReconnectManager(FakeWSClient(), config)
 
     mgr._attempt = 1
@@ -95,9 +93,7 @@ async def test_backoff_increases_on_failure() -> None:
 @pytest.mark.asyncio
 async def test_jitter_within_range() -> None:
     """Jitter should be within ±20% of the base delay."""
-    config = ReconnectConfig(
-        initial_delay_s=10.0, max_delay_s=30.0, factor=2.0, jitter=0.2
-    )
+    config = ReconnectConfig(initial_delay_s=10.0, max_delay_s=30.0, factor=2.0, jitter=0.2)
     mgr = ReconnectManager(FakeWSClient(), config)
     mgr._attempt = 1
 
@@ -110,9 +106,7 @@ async def test_jitter_within_range() -> None:
 @pytest.mark.asyncio
 async def test_resubscribe_after_reconnect() -> None:
     """Subscriptions are restored after successful reconnection."""
-    client = FakeWSClient(
-        connect_side_effects=[None, ConnectionError("fail"), None]
-    )
+    client = FakeWSClient(connect_side_effects=[None, ConnectionError("fail"), None])
     # Pre-subscribe some streams.
     await client.subscribe(["btcusdt@ticker", "ethusdt@trade"])
 
@@ -137,9 +131,7 @@ async def test_resubscribe_after_reconnect() -> None:
 @pytest.mark.asyncio
 async def test_auth_error_stops_reconnect() -> None:
     """AUTH errors should stop the reconnection loop."""
-    client = FakeWSClient(
-        connect_side_effects=[Exception("401 unauthorized")]
-    )
+    client = FakeWSClient(connect_side_effects=[Exception("401 unauthorized")])
     config = ReconnectConfig(initial_delay_s=0.01)
     mgr = ReconnectManager(client, config)
     await mgr.run()
@@ -152,12 +144,8 @@ async def test_auth_error_stops_reconnect() -> None:
 @pytest.mark.asyncio
 async def test_restart_rate_limit() -> None:
     """After max_restarts_per_hour, the loop should stop."""
-    config = ReconnectConfig(
-        initial_delay_s=0.001, max_delay_s=0.001, max_restarts_per_hour=3
-    )
-    client = FakeWSClient(
-        connect_side_effects=[ConnectionError("fail")] * 10
-    )
+    config = ReconnectConfig(initial_delay_s=0.001, max_delay_s=0.001, max_restarts_per_hour=3)
+    client = FakeWSClient(connect_side_effects=[ConnectionError("fail")] * 10)
     mgr = ReconnectManager(client, config)
     await mgr.run()
 

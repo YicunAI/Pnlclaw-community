@@ -48,6 +48,9 @@ dev = [
   "pre-commit>=3.7.0",
 ]
 
+[project.scripts]
+pnlclaw = "pnlclaw_cli.main:main"
+
 [tool.hatch.build.targets.wheel]
 packages = []
 
@@ -61,21 +64,9 @@ testpaths = [
 ]
 pythonpath = [
   ".",
+  "packages/cli",
 ]
 
-[tool.ruff]
-line-length = 100
-target-version = "py311"
 
-[tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["pnlclaw_types", "pnlclaw_core", "pnlclaw_security", "pnlclaw_exchange", "pnlclaw_market", "pnlclaw_strategy", "pnlclaw_backtest", "pnlclaw_paper", "pnlclaw_risk", "pnlclaw_agent", "pnlclaw_llm", "pnlclaw_storage"]
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
+# Ruff config lives in ruff.toml (single source of truth)
+# mypy config lives in mypy.ini (single source of truth)

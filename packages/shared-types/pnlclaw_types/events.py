@@ -41,9 +41,7 @@ class DiagnosticEvent(BaseModel):
     category: str = Field(..., description="Event category, e.g. 'market', 'order', 'llm'")
     level: DiagnosticLevel = Field(..., description="Severity level")
     message: str = Field(..., description="Human-readable event description")
-    data: dict[str, Any] | None = Field(
-        None, description="Optional structured payload"
-    )
+    data: dict[str, Any] | None = Field(None, description="Optional structured payload")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -75,9 +73,7 @@ class HookEvent(BaseModel):
         ...,
         description="Hook identifier, e.g. 'on_market_tick', 'on_signal', 'on_order_placed'",
     )
-    payload: dict[str, Any] = Field(
-        default_factory=dict, description="Hook-specific data"
-    )
+    payload: dict[str, Any] = Field(default_factory=dict, description="Hook-specific data")
 
     model_config = ConfigDict(
         json_schema_extra={

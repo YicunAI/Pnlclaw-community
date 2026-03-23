@@ -73,13 +73,9 @@ class PairingStore:
         Uses the unambiguous alphabet (no 0/O/1/I/L) and ``secrets.choice``
         for cryptographic randomness.
         """
-        return "".join(
-            secrets.choice(UNAMBIGUOUS_ALPHABET) for _ in range(CODE_LENGTH)
-        )
+        return "".join(secrets.choice(UNAMBIGUOUS_ALPHABET) for _ in range(CODE_LENGTH))
 
-    def create_request(
-        self, device_info: dict[str, str] | None = None
-    ) -> PairingRequest:
+    def create_request(self, device_info: dict[str, str] | None = None) -> PairingRequest:
         """Create a new pairing request.
 
         Enforces :data:`MAX_PENDING` limit by removing the oldest request

@@ -9,7 +9,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
@@ -26,7 +25,9 @@ class LLMConnectionError(LLMError):
 class LLMRateLimitError(LLMError):
     """Provider returned a rate-limit response (429)."""
 
-    def __init__(self, message: str = "Rate limit exceeded", retry_after: float | None = None) -> None:
+    def __init__(
+        self, message: str = "Rate limit exceeded", retry_after: float | None = None
+    ) -> None:
         super().__init__(message)
         self.retry_after = retry_after
 

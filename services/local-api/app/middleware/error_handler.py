@@ -20,9 +20,7 @@ def install_error_handlers(app: FastAPI) -> None:
     """Register exception handlers on the FastAPI application."""
 
     @app.exception_handler(PnLClawError)
-    async def _handle_pnlclaw_error(
-        request: Request, exc: PnLClawError
-    ) -> JSONResponse:
+    async def _handle_pnlclaw_error(request: Request, exc: PnLClawError) -> JSONResponse:
         """Map PnLClawError to the correct HTTP status with unified body."""
         status = ERROR_CODE_HTTP_STATUS.get(exc.code, exc.http_status)
         body = {
@@ -63,9 +61,7 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=422, content=body)
 
     @app.exception_handler(Exception)
-    async def _handle_unknown_error(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def _handle_unknown_error(request: Request, exc: Exception) -> JSONResponse:
         """Catch-all for unhandled exceptions → 500.
 
         Internal details are logged but NOT exposed in the response.

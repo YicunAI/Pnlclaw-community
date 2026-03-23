@@ -40,6 +40,7 @@ class TestRequestId:
     def test_default_none(self):
         # Reset by binding None-ish — but we test the default path
         from pnlclaw_core.logging import _request_id_var
+
         token = _request_id_var.set(None)
         assert get_request_id() is None
         _request_id_var.reset(token)

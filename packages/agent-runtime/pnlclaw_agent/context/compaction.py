@@ -14,7 +14,6 @@ from typing import Protocol
 
 from pnlclaw_types.agent import ChatMessage
 
-
 # ---------------------------------------------------------------------------
 # Summarizer protocol (injected, no direct pnlclaw_llm import)
 # ---------------------------------------------------------------------------
@@ -39,10 +38,10 @@ class SummarizerProtocol(Protocol):
 # Patterns for identifiers that must survive summarization
 _IDENTIFIER_PATTERNS = [
     re.compile(r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}", re.I),  # UUIDs
-    re.compile(r"bt-[a-f0-9]+", re.I),     # backtest IDs
-    re.compile(r"ord-[a-f0-9]+", re.I),    # order IDs
+    re.compile(r"bt-[a-f0-9]+", re.I),  # backtest IDs
+    re.compile(r"ord-[a-f0-9]+", re.I),  # order IDs
     re.compile(r"strat-[a-f0-9]+", re.I),  # strategy IDs
-    re.compile(r"https?://\S+"),           # URLs
+    re.compile(r"https?://\S+"),  # URLs
     re.compile(r"[A-Z]{2,10}/[A-Z]{2,10}"),  # Symbol pairs like BTC/USDT
 ]
 
@@ -101,7 +100,9 @@ class ContextCompactor:
         # Keep system messages and the last few messages intact
         protected_count = min(6, len(messages))
         compactable = messages[:-protected_count] if protected_count < len(messages) else []
-        protected = messages[-protected_count:] if protected_count < len(messages) else list(messages)
+        protected = (
+            messages[-protected_count:] if protected_count < len(messages) else list(messages)
+        )
 
         if not compactable:
             return list(messages)
@@ -121,7 +122,9 @@ class ContextCompactor:
 
             # Try partial summarization (only the largest chunk)
             try:
-                largest_idx = max(range(len(chunks)), key=lambda i: sum(len(m.content) for m in chunks[i]))
+                largest_idx = max(
+                    range(len(chunks)), key=lambda i: sum(len(m.content) for m in chunks[i])
+                )
                 partial = list(chunks)
                 partial[largest_idx] = [await self._summarize_single(chunks[largest_idx])]
                 flat = [m for chunk in partial for m in chunk]
@@ -136,8 +139,7 @@ class ContextCompactor:
         marker = ChatMessage(
             role="system",
             content=(
-                f"[{len(compactable)} messages compacted, "
-                f"~{total_compacted_tokens} tokens freed]"
+                f"[{len(compactable)} messages compacted, ~{total_compacted_tokens} tokens freed]"
             ),
             timestamp=int(time.time() * 1000),
         )
@@ -171,9 +173,7 @@ class ContextCompactor:
 
         return chunks
 
-    async def _summarize_chunks(
-        self, chunks: list[list[ChatMessage]]
-    ) -> list[ChatMessage]:
+    async def _summarize_chunks(self, chunks: list[list[ChatMessage]]) -> list[ChatMessage]:
         """Summarize each chunk, preserving identifiers."""
         result: list[ChatMessage] = []
 
@@ -187,16 +187,12 @@ class ContextCompactor:
 
         return result
 
-    async def _summarize_single(
-        self, chunk: list[ChatMessage], index: int = 0
-    ) -> ChatMessage:
+    async def _summarize_single(self, chunk: list[ChatMessage], index: int = 0) -> ChatMessage:
         """Summarize a single chunk into one message."""
         assert self._summarizer is not None
 
         # Combine chunk text
-        combined = "\n".join(
-            f"[{m.role}]: {m.content}" for m in chunk
-        )
+        combined = "\n".join(f"[{m.role}]: {m.content}" for m in chunk)
 
         # Extract identifiers to preserve
         identifiers = _extract_identifiers(combined)

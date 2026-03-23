@@ -8,9 +8,8 @@ import pytest
 
 from pnlclaw_agent.tool_catalog import ToolCatalog, ToolCatalogError
 from pnlclaw_agent.tools.base import BaseTool, ToolResult
-from pnlclaw_types.risk import RiskLevel
 from pnlclaw_security.tool_policy import ToolPolicy, ToolPolicyEngine
-
+from pnlclaw_types.risk import RiskLevel
 
 # ---------------------------------------------------------------------------
 # Helpers — concrete test tools
@@ -127,9 +126,11 @@ class TestPolicyIntegration:
         assert allowed[0].name == "market_ticker"
 
     def test_policy_allow_list(self) -> None:
-        policy = ToolPolicyEngine([
-            ToolPolicy(allow=["group:market-read"]),
-        ])
+        policy = ToolPolicyEngine(
+            [
+                ToolPolicy(allow=["group:market-read"]),
+            ]
+        )
         catalog = ToolCatalog(policy_engine=policy)
         catalog.register(_make_tool("market_ticker"))
         catalog.register(_make_tool("backtest_run", RiskLevel.RESTRICTED))

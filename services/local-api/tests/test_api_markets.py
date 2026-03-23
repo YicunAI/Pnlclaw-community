@@ -16,6 +16,7 @@ from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, PriceLevel, Ti
 # Stub MarketDataService
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class StubMarketService:
     """Minimal stub matching MarketDataService interface."""

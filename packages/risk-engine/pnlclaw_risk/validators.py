@@ -78,29 +78,17 @@ def validate_direction(intent: TradeIntent) -> list[str]:
         return errors
 
     if intent.side == OrderSide.BUY and take_profit <= entry:
-        errors.append(
-            f"BUY direction but take_profit ({take_profit:.2f}) "
-            f"<= entry ({entry:.2f})"
-        )
+        errors.append(f"BUY direction but take_profit ({take_profit:.2f}) <= entry ({entry:.2f})")
     elif intent.side == OrderSide.SELL and take_profit >= entry:
-        errors.append(
-            f"SELL direction but take_profit ({take_profit:.2f}) "
-            f">= entry ({entry:.2f})"
-        )
+        errors.append(f"SELL direction but take_profit ({take_profit:.2f}) >= entry ({entry:.2f})")
 
     # Also check stop_loss direction
     stop_loss = intent.risk_params.get("stop_loss")
     if stop_loss is not None:
         if intent.side == OrderSide.BUY and stop_loss >= entry:
-            errors.append(
-                f"BUY direction but stop_loss ({stop_loss:.2f}) "
-                f">= entry ({entry:.2f})"
-            )
+            errors.append(f"BUY direction but stop_loss ({stop_loss:.2f}) >= entry ({entry:.2f})")
         elif intent.side == OrderSide.SELL and stop_loss <= entry:
-            errors.append(
-                f"SELL direction but stop_loss ({stop_loss:.2f}) "
-                f"<= entry ({entry:.2f})"
-            )
+            errors.append(f"SELL direction but stop_loss ({stop_loss:.2f}) <= entry ({entry:.2f})")
     return errors
 
 

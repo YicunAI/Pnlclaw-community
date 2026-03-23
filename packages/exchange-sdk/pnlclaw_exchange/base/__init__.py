@@ -1,1 +1,1 @@
-"""Base abstractions for exchange WebSocket clients."""
+"""Base abstractions for exchange WebSocket and REST clients."""

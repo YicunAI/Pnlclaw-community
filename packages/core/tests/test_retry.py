@@ -1,6 +1,5 @@
 """Tests for pnlclaw_core.resilience.retry."""
 
-
 import pytest
 
 from pnlclaw_core.resilience.backoff import BackoffPolicy

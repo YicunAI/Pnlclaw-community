@@ -123,12 +123,8 @@ class BacktestMetrics(BaseModel):
     max_drawdown: float = Field(
         ..., le=0, description="Maximum drawdown as a negative decimal (-0.1 = -10%)"
     )
-    win_rate: float = Field(
-        ..., ge=0, le=1, description="Winning trades / total trades"
-    )
-    profit_factor: float = Field(
-        ..., ge=0, description="Gross profit / gross loss"
-    )
+    win_rate: float = Field(..., ge=0, le=1, description="Winning trades / total trades")
+    profit_factor: float = Field(..., ge=0, description="Gross profit / gross loss")
     total_trades: int = Field(..., ge=0, description="Total number of trades executed")
 
     model_config = ConfigDict(

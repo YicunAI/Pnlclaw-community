@@ -100,13 +100,15 @@ _HOMOGLYPH_MAP: dict[str, str] = {
 }
 
 # Zero-width characters that could split marker tokens
-_ZERO_WIDTH_CHARS = frozenset({
-    "\u200b",  # Zero-width space
-    "\u200c",  # Zero-width non-joiner
-    "\u200d",  # Zero-width joiner
-    "\u2060",  # Word joiner
-    "\ufeff",  # Zero-width no-break space (BOM)
-})
+_ZERO_WIDTH_CHARS = frozenset(
+    {
+        "\u200b",  # Zero-width space
+        "\u200c",  # Zero-width non-joiner
+        "\u200d",  # Zero-width joiner
+        "\u2060",  # Word joiner
+        "\ufeff",  # Zero-width no-break space (BOM)
+    }
+)
 
 
 def _normalize_homoglyphs(text: str) -> str:

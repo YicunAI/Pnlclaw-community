@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import pytest_asyncio
-
-from pnlclaw_types.strategy import (
-    BacktestMetrics,
-    BacktestResult,
-    StrategyConfig,
-    StrategyType,
-)
 
 from pnlclaw_storage.migrations import MigrationRunner
 from pnlclaw_storage.migrations_pkg import ALL_MIGRATIONS
 from pnlclaw_storage.repositories.backtests import BacktestRepository
 from pnlclaw_storage.repositories.strategies import StrategyRepository
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
-
+from pnlclaw_types.strategy import (
+    BacktestMetrics,
+    BacktestResult,
+    StrategyConfig,
+    StrategyType,
+)
 
 _METRICS = BacktestMetrics(
     total_return=0.15,
@@ -36,8 +34,8 @@ def _make_result(id: str = "bt-001", strategy_id: str = "strat-001") -> Backtest
     return BacktestResult(
         id=id,
         strategy_id=strategy_id,
-        start_date=datetime(2025, 1, 1, tzinfo=timezone.utc),
-        end_date=datetime(2025, 3, 31, tzinfo=timezone.utc),
+        start_date=datetime(2025, 1, 1, tzinfo=UTC),
+        end_date=datetime(2025, 3, 31, tzinfo=UTC),
         metrics=_METRICS,
         equity_curve=[10000.0, 10050.0, 10200.0, 10500.0],
         trades_count=42,

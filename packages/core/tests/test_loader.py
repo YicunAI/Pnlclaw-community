@@ -1,6 +1,5 @@
 """Tests for pnlclaw_core.plugin_sdk.loader."""
 
-
 import pytest
 
 from pnlclaw_core.plugin_sdk.loader import PluginLoader, PluginManifest

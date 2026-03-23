@@ -113,10 +113,13 @@ class TestRiskEngine:
         class RestrictedRule:
             rule_id = "restricted"
             enabled = True
+
             def check(self, intent: TradeIntent, context: dict[str, Any]) -> RiskDecision:
                 return RiskDecision(
-                    rule_id=self.rule_id, allowed=False,
-                    level=RiskLevel.RESTRICTED, reason="restricted",
+                    rule_id=self.rule_id,
+                    allowed=False,
+                    level=RiskLevel.RESTRICTED,
+                    reason="restricted",
                     timestamp=int(time.time() * 1000),
                 )
 

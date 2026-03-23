@@ -58,18 +58,10 @@ class TradeIntent(BaseModel):
     symbol: Symbol = Field(..., description="Target trading pair")
     side: OrderSide = Field(..., description="Intended direction")
     quantity: float = Field(..., gt=0, description="Intended quantity in base currency")
-    price: float | None = Field(
-        None, ge=0, description="Target price (None for market)"
-    )
-    order_type: OrderType = Field(
-        OrderType.MARKET, description="Intended order type"
-    )
-    reasoning: str = Field(
-        ..., min_length=1, description="AI's reasoning for this trade"
-    )
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="AI confidence score (0.0 to 1.0)"
-    )
+    price: float | None = Field(None, ge=0, description="Target price (None for market)")
+    order_type: OrderType = Field(OrderType.MARKET, description="Intended order type")
+    reasoning: str = Field(..., min_length=1, description="AI's reasoning for this trade")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="AI confidence score (0.0 to 1.0)")
     risk_params: dict[str, Any] = Field(
         default_factory=dict,
         description="Risk parameters (stop_loss, take_profit, max_slippage, etc.)",
@@ -139,9 +131,7 @@ class MarketState(BaseModel):
 class ChatMessage(BaseModel):
     """Single message in an agent conversation."""
 
-    role: str = Field(
-        ..., description="Message role: 'user', 'assistant', 'system', or 'tool'"
-    )
+    role: str = Field(..., description="Message role: 'user', 'assistant', 'system', or 'tool'")
     content: str = Field(..., description="Message content")
     timestamp: Timestamp = Field(..., description="Message time (ms epoch)")
     metadata: dict[str, Any] | None = Field(
@@ -175,9 +165,7 @@ class AgentStreamEvent(BaseModel):
     """
 
     type: AgentStreamEventType = Field(..., description="Event type")
-    data: dict[str, Any] = Field(
-        default_factory=dict, description="Event payload (varies by type)"
-    )
+    data: dict[str, Any] = Field(default_factory=dict, description="Event payload (varies by type)")
     timestamp: Timestamp = Field(..., description="Event time (ms epoch)")
 
     model_config = ConfigDict(

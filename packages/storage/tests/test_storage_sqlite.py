@@ -98,8 +98,6 @@ async def test_error_when_not_connected():
         await mgr.execute("SELECT 1")
 
 
-
-
 @pytest.mark.asyncio
 async def test_default_migrations_run_without_runner():
     async with AsyncSQLiteManager(db_path=":memory:") as mgr:

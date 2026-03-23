@@ -206,9 +206,7 @@ class DailyLossLimitRule:
 class SymbolBlacklistRule:
     """Blocks trading on blacklisted symbols."""
 
-    def __init__(
-        self, blacklist: list[str] | None = None, *, enabled: bool = True
-    ) -> None:
+    def __init__(self, blacklist: list[str] | None = None, *, enabled: bool = True) -> None:
         self._blacklist: set[str] = set(blacklist) if blacklist else set()
         self._enabled = enabled
 
@@ -299,11 +297,7 @@ class CooldownRule:
 
 
 RuleSet = (
-    MaxPositionRule
-    | MaxSingleRiskRule
-    | DailyLossLimitRule
-    | SymbolBlacklistRule
-    | CooldownRule
+    MaxPositionRule | MaxSingleRiskRule | DailyLossLimitRule | SymbolBlacklistRule | CooldownRule
 )
 
 

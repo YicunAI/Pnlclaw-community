@@ -61,18 +61,20 @@ class StrategyRuntime:
             return None
 
         # Append bar data
-        self._bars.append({
-            "timestamp": event.timestamp,
-            "open": event.open,
-            "high": event.high,
-            "low": event.low,
-            "close": event.close,
-            "volume": event.volume,
-        })
+        self._bars.append(
+            {
+                "timestamp": event.timestamp,
+                "open": event.open,
+                "high": event.high,
+                "low": event.low,
+                "close": event.close,
+                "volume": event.volume,
+            }
+        )
 
         # Trim to max_bars
         if len(self._bars) > self._max_bars:
-            self._bars = self._bars[-self._max_bars:]
+            self._bars = self._bars[-self._max_bars :]
 
         # Need at least some bars to evaluate
         if len(self._bars) < 2:
@@ -124,9 +126,7 @@ class StrategyRuntime:
 
         return signal
 
-    def _all_conditions_met(
-        self, df: pd.DataFrame, conditions: list[CompiledCondition]
-    ) -> bool:
+    def _all_conditions_met(self, df: pd.DataFrame, conditions: list[CompiledCondition]) -> bool:
         """Check if ALL conditions in the list are currently met."""
         for cond in conditions:
             if not self._evaluate_condition(df, cond):

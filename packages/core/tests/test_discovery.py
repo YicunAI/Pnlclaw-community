@@ -53,9 +53,7 @@ class TestPluginDiscovery:
 
     def test_user_config_discovery(self, tmp_path):
         config = tmp_path / "plugins.yaml"
-        config.write_text(
-            "plugins:\n  - name: custom\n    module: custom_plugin\n"
-        )
+        config.write_text("plugins:\n  - name: custom\n    module: custom_plugin\n")
         disco = PluginDiscovery(user_config_path=config)
         results = disco.discover()
         user = [r for r in results if r.source == "user"]

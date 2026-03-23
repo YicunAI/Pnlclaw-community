@@ -46,9 +46,7 @@ class TestPnLClawError:
         assert err.http_status == 400
 
     def test_to_dict(self):
-        err = PnLClawError(
-            ErrorCode.NOT_FOUND, "Not found", details={"id": "123"}
-        )
+        err = PnLClawError(ErrorCode.NOT_FOUND, "Not found", details={"id": "123"})
         d = err.to_dict()
         assert d["code"] == "NOT_FOUND"
         assert d["message"] == "Not found"

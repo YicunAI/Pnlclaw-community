@@ -76,6 +76,7 @@ class TestVerifyCode:
 
         # With expired code
         import time
+
         store2 = PairingStore(store_dir=tmp_path, ttl_seconds=1)
         store2.create_request()
         time.sleep(1.1)

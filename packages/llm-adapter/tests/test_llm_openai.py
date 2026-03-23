@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -20,15 +19,13 @@ from pnlclaw_llm.base import (
 )
 from pnlclaw_llm.openai_compat import OpenAICompatProvider
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_chat_response(content: str = "hello") -> dict[str, Any]:
-    return {
-        "choices": [{"message": {"role": "assistant", "content": content}}]
-    }
+    return {"choices": [{"message": {"role": "assistant", "content": content}}]}
 
 
 def _make_provider(
@@ -160,12 +157,14 @@ class TestChatStream:
     async def test_stream_yields_chunks(self) -> None:
         sse_lines = (
             'data: {"choices":[{"delta":{"content":"Hello"}}]}\n'
-            '\n'
+            "\n"
             'data: {"choices":[{"delta":{"content":" World"}}]}\n'
-            '\n'
-            'data: [DONE]\n'
+            "\n"
+            "data: [DONE]\n"
         )
-        mock_resp = httpx.Response(200, content=sse_lines.encode(), headers={"content-type": "text/event-stream"})
+        mock_resp = httpx.Response(
+            200, content=sse_lines.encode(), headers={"content-type": "text/event-stream"}
+        )
 
         async def mock_stream(method, url, **kwargs):  # type: ignore[no-untyped-def]
             return mock_resp
@@ -183,10 +182,10 @@ class TestChatStream:
     async def test_stream_handles_empty_delta(self) -> None:
         sse_lines = (
             'data: {"choices":[{"delta":{}}]}\n'
-            '\n'
+            "\n"
             'data: {"choices":[{"delta":{"content":"ok"}}]}\n'
-            '\n'
-            'data: [DONE]\n'
+            "\n"
+            "data: [DONE]\n"
         )
         mock_resp = httpx.Response(200, content=sse_lines.encode())
         transport = httpx.MockTransport(lambda req: mock_resp)

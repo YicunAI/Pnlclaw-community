@@ -1,6 +1,5 @@
 """Tests for pnlclaw_core.config."""
 
-
 from pnlclaw_core.config import PnLClawConfig, load_config
 
 

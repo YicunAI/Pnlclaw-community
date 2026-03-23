@@ -9,7 +9,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -85,13 +85,14 @@ class TokenCostTracker:
             Same structure as :meth:`get_session_cost`.
         """
         if date is None:
-            target = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+            target = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         else:
             target = date
 
         filtered = [
-            r for r in self._records
-            if datetime.fromtimestamp(r.timestamp, tz=timezone.utc).strftime("%Y-%m-%d") == target
+            r
+            for r in self._records
+            if datetime.fromtimestamp(r.timestamp, tz=UTC).strftime("%Y-%m-%d") == target
         ]
         return self._aggregate(filtered)
 

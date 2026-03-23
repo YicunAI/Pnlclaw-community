@@ -47,8 +47,7 @@ class IndicatorRegistry:
         key = name.lower()
         if key not in self._indicators:
             raise IndicatorNotFoundError(
-                f"Indicator '{name}' not found. "
-                f"Available: {sorted(self._indicators.keys())}"
+                f"Indicator '{name}' not found. Available: {sorted(self._indicators.keys())}"
             )
         return self._indicators[key]
 

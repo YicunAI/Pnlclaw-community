@@ -12,7 +12,6 @@ requires-python = ">=3.11"
 dependencies = [
     "pnlclaw-types",
     "pnlclaw-core",
-    "structlog>=24.4.0",
 ]
 
 [project.optional-dependencies]

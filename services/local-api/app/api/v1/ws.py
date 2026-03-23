@@ -20,6 +20,8 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.core.dependencies import get_market_service
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(tags=["websocket"])
@@ -74,6 +76,7 @@ class ConnectionManager:
 # Singleton managers
 _market_manager = ConnectionManager()
 _paper_manager = ConnectionManager()
+_trading_manager = ConnectionManager()
 
 
 # ---------------------------------------------------------------------------
@@ -120,19 +123,31 @@ async def ws_markets(ws: WebSocket) -> None:
             if action == "subscribe":
                 for sym in symbols:
                     _market_manager.subscribe(ws, f"market:{sym}")
-                await ws.send_json({
-                    "type": "subscribed",
-                    "symbols": symbols,
-                    "timestamp": int(time.time() * 1000),
-                })
+                # Drive MarketDataService subscriptions
+                svc = get_market_service()
+                if svc is not None:
+                    for sym in symbols:
+                        try:
+                            await svc.add_symbol(sym)
+                        except Exception:
+                            logger.warning("ws_add_symbol_failed", symbol=sym, exc_info=True)
+                await ws.send_json(
+                    {
+                        "type": "subscribed",
+                        "symbols": symbols,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             elif action == "unsubscribe":
                 for sym in symbols:
                     _market_manager.unsubscribe(ws, f"market:{sym}")
-                await ws.send_json({
-                    "type": "unsubscribed",
-                    "symbols": symbols,
-                    "timestamp": int(time.time() * 1000),
-                })
+                await ws.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "symbols": symbols,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             else:
                 await ws.send_json({"type": "error", "message": f"Unknown action: {action}"})
 
@@ -185,18 +200,22 @@ async def ws_paper(ws: WebSocket) -> None:
 
             if action == "subscribe" and account_id:
                 _paper_manager.subscribe(ws, f"paper:{account_id}")
-                await ws.send_json({
-                    "type": "subscribed",
-                    "account_id": account_id,
-                    "timestamp": int(time.time() * 1000),
-                })
+                await ws.send_json(
+                    {
+                        "type": "subscribed",
+                        "account_id": account_id,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             elif action == "unsubscribe" and account_id:
                 _paper_manager.unsubscribe(ws, f"paper:{account_id}")
-                await ws.send_json({
-                    "type": "unsubscribed",
-                    "account_id": account_id,
-                    "timestamp": int(time.time() * 1000),
-                })
+                await ws.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "account_id": account_id,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             else:
                 await ws.send_json({"type": "error", "message": f"Unknown action: {action}"})
 
@@ -205,6 +224,77 @@ async def ws_paper(ws: WebSocket) -> None:
     finally:
         _paper_manager.disconnect(ws)
         logger.info("ws_paper_disconnected", connections=_paper_manager.active_count)
+
+
+# ---------------------------------------------------------------------------
+# /api/v1/ws/trading
+# ---------------------------------------------------------------------------
+
+
+@router.websocket("/api/v1/ws/trading")
+async def ws_trading(ws: WebSocket) -> None:
+    """Unified trading WebSocket — receives order, fill, position, balance events.
+
+    Client messages (JSON):
+        ``{"action": "subscribe", "channels": ["orders", "positions", "balances"]}``
+        ``{"action": "unsubscribe", "channels": ["orders"]}``
+
+    Server pushes:
+        ``{"type": "order_update", "data": {...}}``
+        ``{"type": "fill", "data": {...}}``
+        ``{"type": "position_update", "data": {...}}``
+        ``{"type": "balance_update", "data": [...]}``
+    """
+    await _trading_manager.connect(ws)
+    logger.info("ws_trading_connected", connections=_trading_manager.active_count)
+    try:
+        while True:
+            try:
+                raw = await asyncio.wait_for(ws.receive_text(), timeout=60.0)
+            except TimeoutError:
+                try:
+                    await ws.send_json({"type": "ping", "timestamp": int(time.time() * 1000)})
+                except Exception:
+                    break
+                continue
+
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                await ws.send_json({"type": "error", "message": "Invalid JSON"})
+                continue
+
+            action = msg.get("action")
+            channels = msg.get("channels", [])
+
+            if action == "subscribe":
+                for ch in channels:
+                    _trading_manager.subscribe(ws, f"trading:{ch}")
+                await ws.send_json(
+                    {
+                        "type": "subscribed",
+                        "channels": channels,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+            elif action == "unsubscribe":
+                for ch in channels:
+                    _trading_manager.unsubscribe(ws, f"trading:{ch}")
+                await ws.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "channels": channels,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+            else:
+                await ws.send_json({"type": "error", "message": f"Unknown action: {action}"})
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _trading_manager.disconnect(ws)
+        logger.info("ws_trading_disconnected", connections=_trading_manager.active_count)
 
 
 # ---------------------------------------------------------------------------
@@ -230,4 +320,18 @@ async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str
             "data": data,
             "timestamp": int(time.time() * 1000),
         },
+    )
+
+
+async def broadcast_trading_event(channel: str, event_type: str, data: dict[str, Any]) -> None:
+    """Push a trading event (order/fill/position/balance) to WS subscribers.
+
+    Args:
+        channel: One of 'orders', 'positions', 'balances'.
+        event_type: Event type string, e.g. 'order_update', 'fill', 'balance_update'.
+        data: Serialized event data.
+    """
+    await _trading_manager.broadcast(
+        f"trading:{channel}",
+        {"type": event_type, "data": data, "timestamp": int(time.time() * 1000)},
     )

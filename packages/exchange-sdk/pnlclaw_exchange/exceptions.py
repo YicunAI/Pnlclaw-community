@@ -111,3 +111,53 @@ class SnapshotRecoveryError(ExchangeError):
         if details:
             extra.update(details)
         super().__init__(message, details=extra or None)
+
+
+# ---------------------------------------------------------------------------
+# Trading / REST API exceptions
+# ---------------------------------------------------------------------------
+
+
+class ExchangeAPIError(ExchangeError):
+    """Generic REST API error with status code and exchange identification."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        exchange: str | None = None,
+        status_code: int | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        extra: dict[str, Any] = {}
+        if exchange is not None:
+            extra["exchange"] = exchange
+        if status_code is not None:
+            extra["status_code"] = status_code
+        if details:
+            extra.update(details)
+        super().__init__(message, details=extra or None)
+
+
+class AuthenticationError(ExchangeAPIError):
+    """API key, secret, or signature is invalid or expired."""
+
+
+class RateLimitExceededError(ExchangeAPIError):
+    """Request was rejected due to rate limiting (HTTP 429)."""
+
+
+class InsufficientBalanceError(ExchangeAPIError):
+    """Account balance is insufficient for the requested order."""
+
+
+class OrderNotFoundError(ExchangeAPIError):
+    """Referenced order does not exist or has already been finalized."""
+
+
+class OrderRejectedError(ExchangeAPIError):
+    """Exchange rejected the order (invalid params, market closed, etc.)."""
+
+
+class InvalidOrderError(ExchangeAPIError):
+    """Order parameters fail client-side validation before sending."""

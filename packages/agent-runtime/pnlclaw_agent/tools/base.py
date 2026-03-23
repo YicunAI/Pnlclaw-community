@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 
 from pnlclaw_types.risk import RiskLevel
 
-
 # ---------------------------------------------------------------------------
 # ToolResult
 # ---------------------------------------------------------------------------

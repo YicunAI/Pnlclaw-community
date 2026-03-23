@@ -1,0 +1,7 @@
+{
+  "name": "pnlclaw-ext-ollama",
+  "version": "0.1.0",
+  "description": "Ollama local LLM provider for PnLClaw (default http://localhost:11434)",
+  "capabilities": ["llm_provider"],
+  "entry_point": "pnlclaw_ext_ollama.plugin:setup"
+}

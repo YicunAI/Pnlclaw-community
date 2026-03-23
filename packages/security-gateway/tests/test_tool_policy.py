@@ -85,15 +85,11 @@ class TestExpandToolGroups:
 class TestToolPolicyEngineDenyFirst:
     def test_deny_overrides_allow(self) -> None:
         """If a tool is in both allow and deny, it must be blocked (deny-first)."""
-        engine = ToolPolicyEngine(
-            [ToolPolicy(allow=["shell_exec"], deny=["shell_exec"])]
-        )
+        engine = ToolPolicyEngine([ToolPolicy(allow=["shell_exec"], deny=["shell_exec"])])
         assert engine.is_tool_allowed("shell_exec") is False
 
     def test_deny_group_overrides_allow(self) -> None:
-        engine = ToolPolicyEngine(
-            [ToolPolicy(allow=["market_ticker"], deny=["group:market-read"])]
-        )
+        engine = ToolPolicyEngine([ToolPolicy(allow=["market_ticker"], deny=["group:market-read"])])
         assert engine.is_tool_allowed("market_ticker") is False
 
     def test_denied_via_alias(self) -> None:
@@ -110,9 +106,7 @@ class TestToolPolicyEngineDenyFirst:
 
 class TestToolPolicyEngineAllowList:
     def test_explicit_allow_blocks_unlisted(self) -> None:
-        engine = ToolPolicyEngine(
-            [ToolPolicy(allow=["market_ticker"])]
-        )
+        engine = ToolPolicyEngine([ToolPolicy(allow=["market_ticker"])])
         assert engine.is_tool_allowed("market_ticker") is True
         assert engine.is_tool_allowed("shell_exec") is False
 

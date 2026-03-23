@@ -12,11 +12,9 @@ from typing import Any
 import pandas as pd
 from pydantic import ValidationError
 
+from pnlclaw_agent.tools.base import BaseTool, ToolResult
 from pnlclaw_types.risk import RiskLevel
 from pnlclaw_types.strategy import BacktestResult
-
-from pnlclaw_agent.tools.base import BaseTool, ToolResult
-
 
 # ---------------------------------------------------------------------------
 # Shared backtest results store
@@ -75,6 +73,7 @@ class StrategyValidateTool(BaseTool):
 
         try:
             from pnlclaw_strategy.models import EngineStrategyConfig
+
             engine_config = EngineStrategyConfig.model_validate(config_dict)
         except (ValidationError, Exception) as exc:
             return ToolResult(
@@ -83,6 +82,7 @@ class StrategyValidateTool(BaseTool):
             )
 
         from pnlclaw_strategy.validator import validate
+
         result = validate(engine_config)
 
         if result.valid:
@@ -134,8 +134,7 @@ class BacktestRunTool(BaseTool):
                 "data": {
                     "type": "array",
                     "description": (
-                        "List of OHLCV dicts with keys: "
-                        "timestamp, open, high, low, close, volume"
+                        "List of OHLCV dicts with keys: timestamp, open, high, low, close, volume"
                     ),
                 },
             },

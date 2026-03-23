@@ -79,5 +79,28 @@ def _get_fill_price(order: Order, current_price: float) -> float | None:
             return order.price
         return None
 
-    # stop_market / stop_limit not yet implemented for paper trading
+    if order.type == OrderType.STOP_MARKET:
+        if order.stop_price is None:
+            return None
+        if order.side == OrderSide.BUY and current_price >= order.stop_price:
+            return current_price
+        if order.side == OrderSide.SELL and current_price <= order.stop_price:
+            return current_price
+        return None
+
+    if order.type == OrderType.STOP_LIMIT:
+        if order.stop_price is None or order.price is None:
+            return None
+        triggered = (
+            (order.side == OrderSide.BUY and current_price >= order.stop_price)
+            or (order.side == OrderSide.SELL and current_price <= order.stop_price)
+        )
+        if not triggered:
+            return None
+        if order.side == OrderSide.BUY and current_price <= order.price:
+            return order.price
+        if order.side == OrderSide.SELL and current_price >= order.price:
+            return order.price
+        return None
+
     return None

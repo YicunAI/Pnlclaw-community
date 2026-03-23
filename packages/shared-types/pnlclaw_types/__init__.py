@@ -55,6 +55,10 @@ from pnlclaw_types.strategy import (
     StrategyType,
 )
 from pnlclaw_types.trading import (
+    AccountSnapshot,
+    BalanceUpdate,
+    ExchangeOrderUpdate,
+    ExecutionMode,
     Fill,
     Order,
     OrderSide,
@@ -80,6 +84,10 @@ __all__ = [
     "TickerEvent",
     "TradeEvent",
     # trading
+    "AccountSnapshot",
+    "BalanceUpdate",
+    "ExchangeOrderUpdate",
+    "ExecutionMode",
     "Fill",
     "Order",
     "OrderSide",
