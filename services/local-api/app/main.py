@@ -15,6 +15,7 @@ from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
 from app.api.v1.agent import router as agent_router
 from app.middleware.error_handler import install_error_handlers
+from app.middleware.request_id import RequestIDMiddleware
 
 
 @asynccontextmanager
@@ -37,6 +38,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    # Middleware (outermost first)
+    app.add_middleware(RequestIDMiddleware)
 
     # CORS — allow desktop frontend
     app.add_middleware(
