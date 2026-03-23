@@ -13,6 +13,7 @@ from app.api.v1.markets import router as markets_router
 from app.api.v1.strategies import router as strategies_router
 from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
+from app.api.v1.agent import router as agent_router
 
 
 @asynccontextmanager
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(strategies_router, prefix="/api/v1")
     app.include_router(backtests_router, prefix="/api/v1")
     app.include_router(paper_router, prefix="/api/v1")
+    app.include_router(agent_router, prefix="/api/v1")
 
     return app
 
