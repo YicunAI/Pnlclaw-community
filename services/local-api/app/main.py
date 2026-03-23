@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.health import router as health_router
 from app.api.v1.markets import router as markets_router
+from app.api.v1.strategies import router as strategies_router
 
 
 @asynccontextmanager
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
     # Routers
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(markets_router, prefix="/api/v1")
+    app.include_router(strategies_router, prefix="/api/v1")
 
     return app
 
