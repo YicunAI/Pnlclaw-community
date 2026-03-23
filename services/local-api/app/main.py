@@ -14,6 +14,7 @@ from app.api.v1.strategies import router as strategies_router
 from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
 from app.api.v1.agent import router as agent_router
+from app.middleware.error_handler import install_error_handlers
 
 
 @asynccontextmanager
@@ -45,6 +46,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Error handlers (must be installed before routers for catch-all to work)
+    install_error_handlers(app)
 
     # Routers
     app.include_router(health_router, prefix="/api/v1")
