@@ -58,7 +58,6 @@ async def test_request_id_in_response_meta():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.get("/api/v1/health")
-    # The health endpoint returns APIResponse with ResponseMeta
-    # request_id in meta may be None until we wire it into the dependency
-    # but X-Request-ID header is always present
     assert "X-Request-ID" in resp.headers
+    body = resp.json()
+    assert body["meta"]["request_id"] == resp.headers["X-Request-ID"]

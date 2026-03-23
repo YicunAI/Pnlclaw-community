@@ -8,6 +8,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
+
 from app.api.v1.health import router as health_router
 from app.api.v1.markets import router as markets_router
 from app.api.v1.strategies import router as strategies_router
@@ -15,18 +17,23 @@ from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
 from app.api.v1.agent import router as agent_router
 from app.api.v1.ws import router as ws_router
+from app.core.dependencies import set_health_registry
 from app.middleware.error_handler import install_error_handlers
 from app.middleware.request_id import RequestIDMiddleware
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan: startup and shutdown hooks.
+    """Application lifespan: startup and shutdown hooks."""
 
-    Startup: initialize WebSocket connections, load config, etc.
-    Shutdown: close WS connections, flush logs, save state.
-    """
+    async def _local_api_health() -> HealthCheckResult:
+        return HealthCheckResult(name="local_api", status="healthy", latency_ms=0.0)
+
     # --- Startup ---
+    registry = HealthRegistry()
+    registry.register_check("local_api", _local_api_health)
+    set_health_registry(registry)
+
     yield
     # --- Shutdown ---
 

@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from pnlclaw_core.diagnostics.health import HealthRegistry
-from pnlclaw_types.common import APIResponse, ResponseMeta
+from pnlclaw_types.common import APIResponse
 
-from app.core.dependencies import get_health_registry
+from app.core.dependencies import build_response_meta, get_health_registry
 
 router = APIRouter(tags=["health"])
 
@@ -36,6 +36,7 @@ def _aggregate_status(components: dict[str, Any]) -> str:
 
 @router.get("/health")
 async def health_check(
+    request: Request,
     registry: HealthRegistry = Depends(get_health_registry),
 ) -> APIResponse[dict[str, Any]]:
     """Return service health status with per-component breakdown.
@@ -65,6 +66,6 @@ async def health_check(
             "version": "0.1.0",
             "components": components,
         },
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )

@@ -19,6 +19,18 @@ def _make_app(registry: HealthRegistry | None = None):
 
 
 @pytest.mark.asyncio
+async def test_health_default_component_registered_on_startup():
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/health")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "local_api" in body["data"]["components"]
+    assert body["data"]["components"]["local_api"]["status"] == "healthy"
+
+
+@pytest.mark.asyncio
 async def test_health_no_components():
     app = _make_app(HealthRegistry())
     transport = ASGITransport(app=app)

@@ -18,6 +18,7 @@ from pnlclaw_llm.base import (
     LLMError,
     LLMMessage,
     LLMProvider,
+    LLMRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,7 +153,7 @@ class LLMRouter:
         Returns:
             List of ``ProviderHealth`` for each provider in the chain.
         """
-        test_messages = [LLMMessage(role="user", content="ping")]
+        test_messages = [LLMMessage(role=LLMRole.USER, content="ping")]
         results: list[ProviderHealth] = []
         for entry in self._chain:
             try:

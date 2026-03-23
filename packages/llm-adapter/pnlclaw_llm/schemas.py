@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 from pnlclaw_llm.base import LLMError
 
@@ -97,5 +97,5 @@ class MarketAnalysis(BaseModel):
     regime: str  # trending / ranging / volatile
     trend_direction: str  # bullish / bearish / neutral
     confidence: float
-    key_levels: dict[str, float] = {}
+    key_levels: dict[str, float] = Field(default_factory=dict)
     recommendation: str = ""

@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
-from pnlclaw_types.common import APIResponse, ResponseMeta
+from pnlclaw_types.common import APIResponse
 from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
 
-from app.core.dependencies import get_market_service
+from app.core.dependencies import build_response_meta, get_market_service
 
 router = APIRouter(prefix="/markets", tags=["markets"])
 
@@ -44,13 +44,14 @@ def _require_market_service(svc: Any = Depends(get_market_service)) -> Any:
 
 @router.get("")
 async def list_symbols(
+    request: Request,
     svc: Any = Depends(_require_market_service),
 ) -> APIResponse[dict[str, Any]]:
     """List all currently subscribed symbols."""
     symbols: list[str] = svc.get_symbols()
     return APIResponse(
         data={"symbols": symbols, "count": len(symbols)},
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -58,6 +59,7 @@ async def list_symbols(
 @router.get("/{symbol}/ticker")
 async def get_ticker(
     symbol: str,
+    request: Request,
     svc: Any = Depends(_require_market_service),
 ) -> APIResponse[dict[str, Any]]:
     """Get the latest ticker for *symbol*.
@@ -70,7 +72,7 @@ async def get_ticker(
         raise NotFoundError(f"No ticker data for symbol '{sym}'")
     return APIResponse(
         data=ticker.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -78,6 +80,7 @@ async def get_ticker(
 @router.get("/{symbol}/kline")
 async def get_kline(
     symbol: str,
+    request: Request,
     interval: str = Query("1h", description="Kline interval, e.g. 1m, 1h, 1d"),
     limit: int = Query(100, ge=1, le=1000, description="Max number of klines"),
     svc: Any = Depends(_require_market_service),
@@ -97,7 +100,7 @@ async def get_kline(
             "interval": interval,
             "klines": [kline.model_dump()],
         },
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -105,6 +108,7 @@ async def get_kline(
 @router.get("/{symbol}/orderbook")
 async def get_orderbook(
     symbol: str,
+    request: Request,
     depth: int = Query(20, ge=1, le=100, description="Orderbook depth (number of levels)"),
     svc: Any = Depends(_require_market_service),
 ) -> APIResponse[dict[str, Any]]:
@@ -119,6 +123,6 @@ async def get_orderbook(
     data["asks"] = data["asks"][:depth]
     return APIResponse(
         data=data,
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )

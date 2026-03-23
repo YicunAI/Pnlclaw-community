@@ -10,12 +10,14 @@ import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.common import APIResponse, Pagination, ResponseMeta
+from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import StrategyConfig, StrategyType
+
+from app.core.dependencies import build_response_meta
 
 router = APIRouter(prefix="/strategies", tags=["strategies"])
 
@@ -66,6 +68,7 @@ class ValidateStrategyRequest(BaseModel):
 
 @router.post("")
 async def create_strategy(
+    request: Request,
     body: CreateStrategyRequest,
 ) -> APIResponse[dict[str, Any]]:
     """Create a new strategy and store it."""
@@ -85,13 +88,14 @@ async def create_strategy(
     _strategies[strategy_id] = config
     return APIResponse(
         data=config.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
 
 @router.get("")
 async def list_strategies(
+    request: Request,
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=1000, description="Page size"),
 ) -> APIResponse[list[dict[str, Any]]]:
@@ -101,7 +105,8 @@ async def list_strategies(
     page = all_strategies[offset : offset + limit]
     return APIResponse(
         data=[s.model_dump() for s in page],
-        meta=ResponseMeta(
+        meta=build_response_meta(
+            request,
             pagination=Pagination(offset=offset, limit=limit, total=total),
         ),
         error=None,
@@ -111,6 +116,7 @@ async def list_strategies(
 @router.get("/{strategy_id}")
 async def get_strategy(
     strategy_id: str,
+    request: Request,
 ) -> APIResponse[dict[str, Any]]:
     """Get a strategy by ID."""
     config = _strategies.get(strategy_id)
@@ -118,7 +124,7 @@ async def get_strategy(
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     return APIResponse(
         data=config.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -126,6 +132,7 @@ async def get_strategy(
 @router.delete("/{strategy_id}")
 async def delete_strategy(
     strategy_id: str,
+    request: Request,
 ) -> APIResponse[dict[str, Any]]:
     """Delete a strategy by ID."""
     config = _strategies.pop(strategy_id, None)
@@ -133,13 +140,14 @@ async def delete_strategy(
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     return APIResponse(
         data={"deleted": strategy_id},
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
 
 @router.post("/validate")
 async def validate_strategy(
+    request: Request,
     body: ValidateStrategyRequest,
 ) -> APIResponse[dict[str, Any]]:
     """Validate a strategy configuration without storing it.
@@ -181,6 +189,6 @@ async def validate_strategy(
             "valid": len(errors) == 0,
             "errors": errors,
         },
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )

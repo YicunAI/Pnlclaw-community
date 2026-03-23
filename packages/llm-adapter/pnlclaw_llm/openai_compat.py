@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -24,6 +24,7 @@ from pnlclaw_llm.base import (
     LLMMessage,
     LLMProvider,
     LLMRateLimitError,
+    LLMRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -122,14 +123,18 @@ class OpenAICompatProvider(LLMProvider):
             if resp.status_code != 200:
                 raise _classify_http_error(resp.status_code, resp.text)
 
-            data = resp.json()
+            raw_data = resp.json()
+            data = cast(dict[str, Any], raw_data)
             return self._extract_content(data)
 
-        return await retry_async(
-            _do_request,
-            max_attempts=_RETRY_MAX_ATTEMPTS,
-            policy=BackoffPolicy(initial=1.0, max_delay=10.0),
-            should_retry=_should_retry_llm,
+        return cast(
+            str,
+            await retry_async(
+                _do_request,
+                max_attempts=_RETRY_MAX_ATTEMPTS,
+                policy=BackoffPolicy(initial=1.0, max_delay=10.0),
+                should_retry=_should_retry_llm,
+            ),
         )
 
     # ----- chat_stream -----
@@ -186,10 +191,25 @@ class OpenAICompatProvider(LLMProvider):
             "You must respond with valid JSON only, no markdown, no explanation. "
             f"Your response must conform to this JSON schema:\n{json.dumps(output_schema)}"
         )
-        augmented = [LLMMessage(role="system", content=schema_instruction)] + list(messages)
+        augmented = [LLMMessage(role=LLMRole.SYSTEM, content=schema_instruction)] + list(messages)
 
-        payload = self._build_payload(augmented, stream=False, **kwargs)
-        payload["response_format"] = {"type": "json_object"}
+        payload_with_response_format = self._build_payload(augmented, stream=False, **kwargs)
+        payload_with_response_format["response_format"] = {"type": "json_object"}
+        payload_without_response_format = self._build_payload(augmented, stream=False, **kwargs)
+
+        async def _parse_response(resp: httpx.Response) -> dict[str, Any]:
+            raw_data = resp.json()
+            data = cast(dict[str, Any], raw_data)
+            raw_text = self._extract_content(data)
+            try:
+                parsed = json.loads(raw_text)
+            except json.JSONDecodeError as exc:
+                raise LLMError(
+                    f"Failed to parse structured output as JSON: {raw_text[:200]}"
+                ) from exc
+            if not isinstance(parsed, dict):
+                raise LLMError("Structured output must be a JSON object")
+            return cast(dict[str, Any], parsed)
 
         async def _do_request() -> dict[str, Any]:
             client = await self._get_client()
@@ -197,26 +217,38 @@ class OpenAICompatProvider(LLMProvider):
                 resp = await client.post(
                     f"{self._base_url}/chat/completions",
                     headers=_build_headers(self._config.api_key),
-                    json=payload,
+                    json=payload_with_response_format,
                 )
             except (httpx.ConnectError, httpx.TimeoutException) as exc:
                 raise LLMConnectionError(str(exc)) from exc
 
-            if resp.status_code != 200:
-                raise _classify_http_error(resp.status_code, resp.text)
+            if resp.status_code == 200:
+                return await _parse_response(resp)
 
-            data = resp.json()
-            raw_text = self._extract_content(data)
-            try:
-                return json.loads(raw_text)
-            except json.JSONDecodeError as exc:
-                raise LLMError(f"Failed to parse structured output as JSON: {raw_text[:200]}") from exc
+            if resp.status_code in (400, 422):
+                try:
+                    fallback_resp = await client.post(
+                        f"{self._base_url}/chat/completions",
+                        headers=_build_headers(self._config.api_key),
+                        json=payload_without_response_format,
+                    )
+                except (httpx.ConnectError, httpx.TimeoutException) as exc:
+                    raise LLMConnectionError(str(exc)) from exc
 
-        return await retry_async(
-            _do_request,
-            max_attempts=_RETRY_MAX_ATTEMPTS,
-            policy=BackoffPolicy(initial=1.0, max_delay=10.0),
-            should_retry=_should_retry_llm,
+                if fallback_resp.status_code == 200:
+                    return await _parse_response(fallback_resp)
+                raise _classify_http_error(fallback_resp.status_code, fallback_resp.text)
+
+            raise _classify_http_error(resp.status_code, resp.text)
+
+        return cast(
+            dict[str, Any],
+            await retry_async(
+                _do_request,
+                max_attempts=_RETRY_MAX_ATTEMPTS,
+                policy=BackoffPolicy(initial=1.0, max_delay=10.0),
+                should_retry=_should_retry_llm,
+            ),
         )
 
     # ----- helpers -----
@@ -239,7 +271,19 @@ class OpenAICompatProvider(LLMProvider):
 
     @staticmethod
     def _extract_content(data: dict[str, Any]) -> str:
-        choices = data.get("choices", [])
-        if not choices:
+        choices_raw = data.get("choices", [])
+        if not isinstance(choices_raw, list) or not choices_raw:
             raise LLMError("Empty choices in API response")
-        return choices[0].get("message", {}).get("content", "")
+
+        first_choice = choices_raw[0]
+        if not isinstance(first_choice, dict):
+            raise LLMError("Malformed choices in API response")
+
+        message = first_choice.get("message", {})
+        if not isinstance(message, dict):
+            raise LLMError("Malformed message in API response")
+
+        content = message.get("content", "")
+        if not isinstance(content, str):
+            raise LLMError("Malformed message content in API response")
+        return content

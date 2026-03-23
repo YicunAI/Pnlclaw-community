@@ -11,12 +11,12 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import Any, AsyncIterator
 
 import aiosqlite
 
-if TYPE_CHECKING:
-    from pnlclaw_storage.migrations import MigrationRunner
+from pnlclaw_storage.migrations import MigrationRunner
+from pnlclaw_storage.migrations_pkg import ALL_MIGRATIONS
 
 # Default database path: ~/.pnlclaw/data/pnlclaw.db
 DEFAULT_DB_PATH = Path.home() / ".pnlclaw" / "data" / "pnlclaw.db"
@@ -48,7 +48,7 @@ class AsyncSQLiteManager:
         migration_runner: MigrationRunner | None = None,
     ) -> None:
         self._db_path = str(db_path)
-        self._migration_runner = migration_runner
+        self._migration_runner = migration_runner or MigrationRunner(ALL_MIGRATIONS)
         self._conn: aiosqlite.Connection | None = None
         self._lock = asyncio.Lock()
 

@@ -36,10 +36,11 @@ async def test_start_backtest_returns_202():
     body = resp.json()
     assert body["data"]["task_id"].startswith("bt-")
     assert body["data"]["status"] == "pending"
+    assert body["meta"]["request_id"] == resp.headers["X-Request-ID"]
 
 
 @pytest.mark.asyncio
-async def test_get_backtest_completes():
+async def test_get_backtest_failed_when_strategy_missing():
     app = _app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
@@ -55,8 +56,9 @@ async def test_get_backtest_completes():
         resp = await c.get(f"/api/v1/backtests/{task_id}")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["data"]["status"] == "completed"
-    assert body["data"]["result"] is not None
+    assert body["data"]["status"] == "failed"
+    assert body["data"].get("result") is None
+    assert "error" in body["data"]
 
 
 @pytest.mark.asyncio

@@ -39,7 +39,7 @@ class AuditLogRepository:
         event_id = event.get("id", str(uuid.uuid4()))
         now = datetime.now(timezone.utc).isoformat()
         details = event.get("details", {})
-        details_json = json.dumps(details) if isinstance(details, dict) else str(details)
+        details_json = json.dumps(details, default=str)
 
         await self._db.execute(
             """
@@ -110,8 +110,10 @@ class AuditLogRepository:
         results: list[dict[str, Any]] = []
         for r in rows:
             d = dict(r)
-            # Parse details_json back to dict
             raw = d.pop("details_json", "{}")
-            d["details"] = json.loads(raw)
+            try:
+                d["details"] = json.loads(raw)
+            except json.JSONDecodeError:
+                d["details"] = raw
             results.append(d)
         return results

@@ -12,12 +12,14 @@ import uuid
 from enum import Enum
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.common import APIResponse, Pagination, ResponseMeta
+from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import BacktestResult
+
+from app.core.dependencies import build_response_meta
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -89,31 +91,9 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
         # For v0.1 API layer, generate a stub result to prove the endpoint works.
         raise ImportError("Full backtest pipeline not wired yet")
 
-    except Exception:
-        # Stub result for v0.1 — proves the async pipeline works end-to-end
-        from datetime import datetime
-
-        from pnlclaw_types.strategy import BacktestMetrics
-
-        task.result = BacktestResult(
-            id=task.task_id,
-            strategy_id=body.strategy_id,
-            start_date=datetime(2025, 1, 1),
-            end_date=datetime(2025, 3, 31),
-            metrics=BacktestMetrics(
-                total_return=0.0,
-                annual_return=0.0,
-                sharpe_ratio=0.0,
-                max_drawdown=0.0,
-                win_rate=0.0,
-                profit_factor=0.0,
-                total_trades=0,
-            ),
-            equity_curve=[body.initial_cash],
-            trades_count=0,
-            created_at=int(time.time() * 1000),
-        )
-        task.status = BacktestTaskStatus.COMPLETED
+    except Exception as exc:
+        task.error = str(exc)
+        task.status = BacktestTaskStatus.FAILED
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +103,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
 
 @router.post("", status_code=202)
 async def start_backtest(
+    request: Request,
     body: RunBacktestRequest,
 ) -> APIResponse[dict[str, Any]]:
     """Start a backtest (async).  Returns 202 with a task_id."""
@@ -135,7 +116,7 @@ async def start_backtest(
 
     return APIResponse(
         data={"task_id": task_id, "status": task.status.value},
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -143,6 +124,7 @@ async def start_backtest(
 @router.get("/{task_id}")
 async def get_backtest(
     task_id: str,
+    request: Request,
 ) -> APIResponse[dict[str, Any]]:
     """Get backtest task status and result (if completed)."""
     task = _tasks.get(task_id)
@@ -162,13 +144,14 @@ async def get_backtest(
 
     return APIResponse(
         data=data,
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
 
 @router.get("")
 async def list_backtests(
+    request: Request,
     strategy_id: str | None = Query(None, description="Filter by strategy ID"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
@@ -191,7 +174,8 @@ async def list_backtests(
             }
             for t in page
         ],
-        meta=ResponseMeta(
+        meta=build_response_meta(
+            request,
             pagination=Pagination(offset=offset, limit=limit, total=total),
         ),
         error=None,

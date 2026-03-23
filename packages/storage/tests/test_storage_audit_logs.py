@@ -109,3 +109,24 @@ async def test_defaults(repo: AuditLogRepository):
     assert logs[0]["severity"] == "info"
     assert logs[0]["actor"] == ""
     assert logs[0]["details"] == {}
+
+
+@pytest.mark.asyncio
+async def test_details_string_roundtrip(repo: AuditLogRepository):
+    await repo.append({"event_type": "string_case", "details": "hello"})
+    logs = await repo.query(event_type="string_case")
+    assert logs[0]["details"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_details_list_roundtrip(repo: AuditLogRepository):
+    await repo.append({"event_type": "list_case", "details": ["BTC/USDT", 1, True]})
+    logs = await repo.query(event_type="list_case")
+    assert logs[0]["details"] == ["BTC/USDT", 1, True]
+
+
+@pytest.mark.asyncio
+async def test_details_none_roundtrip(repo: AuditLogRepository):
+    await repo.append({"event_type": "none_case", "details": None})
+    logs = await repo.query(event_type="none_case")
+    assert logs[0]["details"] is None

@@ -255,6 +255,29 @@ class TestGenerateStructured:
         )
         assert captured[0]["response_format"] == {"type": "json_object"}
 
+    @pytest.mark.asyncio
+    async def test_fallback_without_response_format_on_400(self) -> None:
+        requests: list[dict[str, Any]] = []
+
+        def handler(req: httpx.Request) -> httpx.Response:
+            payload = json.loads(req.content)
+            requests.append(payload)
+            if len(requests) == 1:
+                return httpx.Response(400, text="response_format unsupported")
+            return httpx.Response(200, json=_make_chat_response('{"ok": true}'))
+
+        transport = httpx.MockTransport(handler)
+        client = httpx.AsyncClient(transport=transport)
+
+        provider = _make_provider(client=client)
+        result = await provider.generate_structured(
+            [LLMMessage(role=LLMRole.USER, content="hi")],
+            output_schema={"type": "object"},
+        )
+        assert result == {"ok": True}
+        assert requests[0]["response_format"] == {"type": "json_object"}
+        assert "response_format" not in requests[1]
+
 
 # ---------------------------------------------------------------------------
 # Error classification helper tests

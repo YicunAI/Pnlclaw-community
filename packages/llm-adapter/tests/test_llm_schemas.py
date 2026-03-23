@@ -118,3 +118,21 @@ class TestExtractStructured:
         result = extract_structured(raw, TradeIntent)
         assert result.symbol == "BTC/USDT"
         assert result.confidence == 0.8
+
+    def test_market_analysis_key_levels_not_shared(self) -> None:
+        a = MarketAnalysis(
+            symbol="BTC/USDT",
+            summary="A",
+            regime="trending",
+            trend_direction="bullish",
+            confidence=0.9,
+        )
+        b = MarketAnalysis(
+            symbol="ETH/USDT",
+            summary="B",
+            regime="ranging",
+            trend_direction="neutral",
+            confidence=0.6,
+        )
+        a.key_levels["support"] = 60000.0
+        assert "support" not in b.key_levels

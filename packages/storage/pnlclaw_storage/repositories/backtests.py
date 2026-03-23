@@ -7,11 +7,24 @@ serializing ``metrics`` and ``equity_curve`` as JSON columns.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pnlclaw_types.strategy import BacktestMetrics, BacktestResult
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
+
+
+def _timestamp_ms_to_storage(value: int) -> str:
+    return datetime.fromtimestamp(value / 1000, tz=UTC).isoformat()
+
+
+def _storage_to_timestamp_ms(value: str) -> int:
+    dt = datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    else:
+        dt = dt.astimezone(UTC)
+    return int(dt.timestamp() * 1000)
 
 
 class BacktestRepository:
@@ -33,7 +46,7 @@ class BacktestRepository:
         Returns:
             The backtest ID.
         """
-        now = datetime.now(timezone.utc).isoformat()
+        created_at = _timestamp_ms_to_storage(result.created_at)
         metrics_json = result.metrics.model_dump_json()
         equity_json = json.dumps(result.equity_curve)
 
@@ -56,7 +69,7 @@ class BacktestRepository:
                 metrics_json,
                 equity_json,
                 result.trades_count,
-                now,
+                created_at,
             ),
         )
         return result.id
@@ -71,12 +84,7 @@ class BacktestRepository:
             metrics=BacktestMetrics.model_validate_json(row["metrics_json"]),
             equity_curve=json.loads(row["equity_curve_json"]),
             trades_count=row["trades_count"],
-            created_at=int(
-                datetime.fromisoformat(row["created_at"])
-                .replace(tzinfo=timezone.utc)
-                .timestamp()
-                * 1000
-            ),
+            created_at=_storage_to_timestamp_ms(row["created_at"]),
         )
 
     async def get(self, backtest_id: str) -> BacktestResult | None:

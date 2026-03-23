@@ -25,7 +25,14 @@ from pnlclaw_llm.base import (
 from pnlclaw_llm.ollama import OllamaProvider
 from pnlclaw_llm.openai_compat import OpenAICompatProvider
 from pnlclaw_llm.router import LLMRouter
-from pnlclaw_llm.schemas import extract_structured, get_json_schema
+from pnlclaw_llm.schemas import (
+    MarketAnalysis,
+    extract_structured,
+    get_json_schema,
+    market_analysis_schema,
+    strategy_config_schema,
+    trade_intent_schema,
+)
 
 __all__ = [
     "LLMAuthError",
@@ -39,6 +46,10 @@ __all__ = [
     "LLMRouter",
     "OllamaProvider",
     "OpenAICompatProvider",
+    "MarketAnalysis",
     "extract_structured",
     "get_json_schema",
+    "trade_intent_schema",
+    "strategy_config_schema",
+    "market_analysis_schema",
 ]

@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pnlclaw_core.diagnostics.health import HealthRegistry
+from fastapi import Request
+
+from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
+from pnlclaw_types.common import Pagination, ResponseMeta
 
 # ---------------------------------------------------------------------------
 # Singleton holders — populated during lifespan startup
@@ -60,6 +63,15 @@ def set_agent_runtime(runtime: Any) -> None:
     _agent_runtime = runtime
 
 
+def build_response_meta(
+    request: Request,
+    pagination: Pagination | None = None,
+) -> ResponseMeta:
+    """Build API response metadata with request correlation id."""
+    request_id = getattr(request.state, "request_id", None)
+    return ResponseMeta(request_id=request_id, pagination=pagination)
+
+
 # ---------------------------------------------------------------------------
 # FastAPI dependency callables
 # ---------------------------------------------------------------------------
@@ -67,8 +79,15 @@ def set_agent_runtime(runtime: Any) -> None:
 
 def get_health_registry() -> HealthRegistry:
     """Return the global HealthRegistry instance."""
+    global _health_registry
     if _health_registry is None:
-        return HealthRegistry()
+        registry = HealthRegistry()
+
+        async def _local_api_health() -> HealthCheckResult:
+            return HealthCheckResult(name="local_api", status="healthy", latency_ms=0.0)
+
+        registry.register_check("local_api", _local_api_health)
+        _health_registry = registry
     return _health_registry
 
 

@@ -75,7 +75,6 @@ class MigrationRunner:
             )
             """
         )
-        await conn.commit()
 
     async def _applied_ids(self, conn: aiosqlite.Connection) -> set[str]:
         """Return the set of migration IDs that have already been applied."""
@@ -100,13 +99,18 @@ class MigrationRunner:
             if migration.id in applied:
                 continue
 
-            await migration.apply(conn)
+            try:
+                await conn.execute("BEGIN")
+                await migration.apply(conn)
+                await conn.execute(
+                    "INSERT INTO _migrations (id, version, description) VALUES (?, ?, ?)",
+                    (migration.id, migration.version, migration.description),
+                )
+                await conn.commit()
+            except Exception:
+                await conn.rollback()
+                raise
 
-            await conn.execute(
-                "INSERT INTO _migrations (id, version, description) VALUES (?, ?, ?)",
-                (migration.id, migration.version, migration.description),
-            )
-            await conn.commit()
             executed.append(migration.description)
 
         return executed

@@ -19,6 +19,11 @@ async def _add_column(conn: aiosqlite.Connection) -> None:
     await conn.execute("ALTER TABLE demo ADD COLUMN email TEXT")
 
 
+async def _create_then_fail(conn: aiosqlite.Connection) -> None:
+    await conn.execute("CREATE TABLE tx_fail (id INTEGER PRIMARY KEY)")
+    raise RuntimeError("boom")
+
+
 @pytest_asyncio.fixture
 async def conn():
     c = await aiosqlite.connect(":memory:")
@@ -104,3 +109,21 @@ async def test_migrations_table_records(conn: aiosqlite.Connection):
     assert rows[0][0] == "v001"
     assert rows[0][1] == 1
     assert rows[0][2] == "create demo"
+
+
+@pytest.mark.asyncio
+async def test_failed_migration_rolls_back(conn: aiosqlite.Connection):
+    runner = MigrationRunner([
+        Migration(id="v001", version=1, description="fails", apply=_create_then_fail),
+    ])
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await runner.run_pending(conn)
+
+    cursor = await conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='tx_fail'"
+    )
+    assert (await cursor.fetchone()) is None
+
+    cursor = await conn.execute("SELECT id FROM _migrations WHERE id='v001'")
+    assert (await cursor.fetchone()) is None

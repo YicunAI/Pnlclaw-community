@@ -78,6 +78,7 @@ async def test_save_and_get(repos):
     assert loaded.metrics.sharpe_ratio == 1.8
     assert loaded.equity_curve == [10000.0, 10050.0, 10200.0, 10500.0]
     assert loaded.trades_count == 42
+    assert loaded.created_at == result.created_at
 
 
 @pytest.mark.asyncio
@@ -136,3 +137,14 @@ async def test_dates_roundtrip(repos):
     assert loaded.start_date.year == 2025
     assert loaded.start_date.month == 1
     assert loaded.end_date.month == 3
+
+
+@pytest.mark.asyncio
+async def test_created_at_roundtrip(repos):
+    _, bt_repo = repos
+    original = _make_result("bt-created-at")
+    await bt_repo.save(original)
+
+    loaded = await bt_repo.get("bt-created-at")
+    assert loaded is not None
+    assert loaded.created_at == original.created_at

@@ -8,14 +8,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.common import APIResponse, Pagination, ResponseMeta
+from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
 from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 from app.core.dependencies import (
+    build_response_meta,
     get_paper_account_manager,
     get_paper_order_manager,
     get_paper_position_manager,
@@ -106,6 +107,7 @@ class PlaceOrderRequest(BaseModel):
 
 @router.post("/accounts")
 async def create_account(
+    request: Request,
     body: CreateAccountRequest,
     mgr: Any = Depends(_get_accounts),
 ) -> APIResponse[dict[str, Any]]:
@@ -113,20 +115,21 @@ async def create_account(
     account = mgr.create_account(body.name, body.initial_balance)
     return APIResponse(
         data=account.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
 
 @router.get("/accounts")
 async def list_accounts(
+    request: Request,
     mgr: Any = Depends(_get_accounts),
 ) -> APIResponse[list[dict[str, Any]]]:
     """List all paper trading accounts."""
     accounts = mgr.list_accounts()
     return APIResponse(
         data=[a.model_dump() for a in accounts],
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -134,6 +137,7 @@ async def list_accounts(
 @router.get("/accounts/{account_id}")
 async def get_account(
     account_id: str,
+    request: Request,
     mgr: Any = Depends(_get_accounts),
 ) -> APIResponse[dict[str, Any]]:
     """Get account details."""
@@ -142,7 +146,7 @@ async def get_account(
         raise NotFoundError(f"Account '{account_id}' not found")
     return APIResponse(
         data=account.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -154,6 +158,7 @@ async def get_account(
 
 @router.post("/orders")
 async def place_order(
+    request: Request,
     body: PlaceOrderRequest,
     accounts: Any = Depends(_get_accounts),
     orders: Any = Depends(_get_orders),
@@ -175,13 +180,14 @@ async def place_order(
     )
     return APIResponse(
         data=order.model_dump(),
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
 
 @router.get("/orders")
 async def list_orders(
+    request: Request,
     account_id: str = Query(..., description="Paper account ID"),
     status: OrderStatus | None = Query(None, description="Filter by status"),
     offset: int = Query(0, ge=0),
@@ -194,7 +200,8 @@ async def list_orders(
     page = all_orders[offset : offset + limit]
     return APIResponse(
         data=[o.model_dump() for o in page],
-        meta=ResponseMeta(
+        meta=build_response_meta(
+            request,
             pagination=Pagination(offset=offset, limit=limit, total=total),
         ),
         error=None,
@@ -208,6 +215,7 @@ async def list_orders(
 
 @router.get("/positions")
 async def list_positions(
+    request: Request,
     account_id: str = Query(..., description="Paper account ID"),
     pos_mgr: Any = Depends(_get_positions),
 ) -> APIResponse[list[dict[str, Any]]]:
@@ -215,7 +223,7 @@ async def list_positions(
     positions = pos_mgr.get_positions(account_id)
     return APIResponse(
         data=[p.model_dump() for p in positions],
-        meta=ResponseMeta(),
+        meta=build_response_meta(request),
         error=None,
     )
 
@@ -227,6 +235,7 @@ async def list_positions(
 
 @router.get("/pnl")
 async def get_pnl(
+    request: Request,
     account_id: str = Query(..., description="Paper account ID"),
     pos_mgr: Any = Depends(_get_positions),
 ) -> APIResponse[list[dict[str, Any]]]:
@@ -240,7 +249,7 @@ async def get_pnl(
         records = calculate_account_pnl(positions, prices)
         return APIResponse(
             data=[r.model_dump() for r in records],
-            meta=ResponseMeta(),
+            meta=build_response_meta(request),
             error=None,
         )
     except ImportError:
@@ -254,6 +263,6 @@ async def get_pnl(
                 }
                 for p in positions
             ],
-            meta=ResponseMeta(),
+            meta=build_response_meta(request),
             error=None,
         )

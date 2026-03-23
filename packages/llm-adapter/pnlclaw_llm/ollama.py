@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -19,6 +19,7 @@ from pnlclaw_llm.base import (
     LLMError,
     LLMMessage,
     LLMProvider,
+    LLMRole,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,8 +89,14 @@ class OllamaProvider(LLMProvider):
         if resp.status_code != 200:
             raise LLMError(f"Ollama error ({resp.status_code}): {resp.text}")
 
-        data = resp.json()
-        return data.get("message", {}).get("content", "")
+        data = cast(dict[str, Any], resp.json())
+        message = data.get("message", {})
+        if not isinstance(message, dict):
+            raise LLMError("Malformed Ollama response: missing message object")
+        content = message.get("content", "")
+        if not isinstance(content, str):
+            raise LLMError("Malformed Ollama response: message content must be string")
+        return content
 
     # ----- chat_stream -----
 
@@ -139,7 +146,7 @@ class OllamaProvider(LLMProvider):
             "You must respond with valid JSON only, no markdown, no explanation. "
             f"Your response must conform to this JSON schema:\n{json.dumps(output_schema)}"
         )
-        augmented = [LLMMessage(role="system", content=schema_instruction)] + list(messages)
+        augmented = [LLMMessage(role=LLMRole.SYSTEM, content=schema_instruction)] + list(messages)
         payload = self._build_payload(augmented, stream=False, **kwargs)
         payload["format"] = "json"
 
@@ -158,12 +165,20 @@ class OllamaProvider(LLMProvider):
         if resp.status_code != 200:
             raise LLMError(f"Ollama error ({resp.status_code}): {resp.text}")
 
-        data = resp.json()
-        raw_text = data.get("message", {}).get("content", "")
+        data = cast(dict[str, Any], resp.json())
+        message = data.get("message", {})
+        if not isinstance(message, dict):
+            raise LLMError("Malformed Ollama response: missing message object")
+        raw_text = message.get("content", "")
+        if not isinstance(raw_text, str):
+            raise LLMError("Malformed Ollama response: message content must be string")
         try:
-            return json.loads(raw_text)
+            parsed = json.loads(raw_text)
         except json.JSONDecodeError as exc:
             raise LLMError(f"Failed to parse Ollama JSON output: {raw_text[:200]}") from exc
+        if not isinstance(parsed, dict):
+            raise LLMError("Structured output must be a JSON object")
+        return cast(dict[str, Any], parsed)
 
     # ----- helpers -----
 
