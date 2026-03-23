@@ -14,6 +14,7 @@ from app.api.v1.strategies import router as strategies_router
 from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
 from app.api.v1.agent import router as agent_router
+from app.api.v1.ws import router as ws_router
 from app.middleware.error_handler import install_error_handlers
 from app.middleware.request_id import RequestIDMiddleware
 
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(backtests_router, prefix="/api/v1")
     app.include_router(paper_router, prefix="/api/v1")
     app.include_router(agent_router, prefix="/api/v1")
+    app.include_router(ws_router)
 
     return app
 
