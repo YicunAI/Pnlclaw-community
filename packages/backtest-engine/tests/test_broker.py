@@ -1,11 +1,10 @@
 """Tests for pnlclaw_backtest.broker."""
 
-from pnlclaw_types.market import KlineEvent
-from pnlclaw_types.trading import Order, OrderSide, OrderStatus, OrderType
-
 from pnlclaw_backtest.broker import SimulatedBroker
 from pnlclaw_backtest.commissions import PercentageCommission
 from pnlclaw_backtest.slippage import FixedSlippage
+from pnlclaw_types.market import KlineEvent
+from pnlclaw_types.trading import Order, OrderSide, OrderStatus, OrderType
 
 
 def _make_kline(close: float = 100.0, low: float = 95.0, high: float = 105.0) -> KlineEvent:

@@ -14,19 +14,22 @@ from __future__ import annotations
 
 import json
 import pathlib
+import sys
 from collections import deque
 
 import pytest
 
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+
+from fixtures.generate_data import generate_deterministic_btc_data
+
+from pnlclaw_backtest.commissions import NoCommission
+from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine
+from pnlclaw_backtest.reports import to_dict
+from pnlclaw_backtest.slippage import NoSlippage
 from pnlclaw_types.market import KlineEvent
 from pnlclaw_types.strategy import Signal
 from pnlclaw_types.trading import OrderSide
-
-from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine
-from pnlclaw_backtest.commissions import NoCommission
-from pnlclaw_backtest.reports import to_dict
-from pnlclaw_backtest.slippage import NoSlippage
-from tests.fixtures.generate_data import generate_deterministic_btc_data
 
 FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 GOLDEN_FILE = FIXTURES_DIR / "golden_sma_cross.json"
@@ -161,14 +164,17 @@ class TestGoldenSmaCross:
         for key in golden["metrics"]:
             assert result["metrics"][key] == pytest.approx(
                 golden["metrics"][key], abs=1e-6
-            ), f"Metric '{key}' differs: got {result['metrics'][key]}, expected {golden['metrics'][key]}"
+            ), (
+                f"Metric '{key}' differs: got {result['metrics'][key]}, "
+                f"expected {golden['metrics'][key]}"
+            )
 
         # Compare equity curve length
         assert len(result["equity_curve"]) == len(golden["equity_curve"])
 
         # Compare equity curve values
         for i, (actual, expected) in enumerate(
-            zip(result["equity_curve"], golden["equity_curve"])
+            zip(result["equity_curve"], golden["equity_curve"], strict=False)
         ):
             assert actual == pytest.approx(
                 expected, abs=1e-4

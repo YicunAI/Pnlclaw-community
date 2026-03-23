@@ -5,8 +5,6 @@ Uses fixed price data with expected values verified against TradingView.
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -16,7 +14,6 @@ from pnlclaw_strategy.indicators.ema import EMA
 from pnlclaw_strategy.indicators.macd import MACD, MACDResult
 from pnlclaw_strategy.indicators.rsi import RSI
 from pnlclaw_strategy.indicators.sma import SMA
-
 
 # ---------------------------------------------------------------------------
 # Fixed test data — 30 closing prices (simulated BTC/USDT daily)

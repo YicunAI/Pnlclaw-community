@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
-
 from pnlclaw_paper.orders import InvalidOrderTransition, PaperOrderManager, can_transition
+from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 
 class TestStateTransitions:

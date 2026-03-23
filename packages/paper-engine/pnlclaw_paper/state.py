@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from pnlclaw_core.infra.atomic_write import atomic_write
-
 from pnlclaw_paper.accounts import AccountManager, PaperAccount
 from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_paper.positions import PositionManager
@@ -117,7 +116,8 @@ class PaperState:
         meta_path = self._dir / "meta.json"
         if meta_path.exists():
             raw = meta_path.read_text(encoding="utf-8")
-            return json.loads(raw)
+            loaded = json.loads(raw)
+            return loaded if isinstance(loaded, dict) else {}
 
         return {}
 

@@ -6,9 +6,8 @@ import time
 
 import pytest
 
-from pnlclaw_types.trading import OrderSide, Position
-
 from pnlclaw_paper.pnl import calculate_account_pnl, calculate_pnl
+from pnlclaw_types.trading import OrderSide, Position
 
 
 def _make_position(

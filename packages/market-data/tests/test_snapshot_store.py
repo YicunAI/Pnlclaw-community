@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from pnlclaw_types.market import OrderBookL2Snapshot, PriceLevel
-
 from pnlclaw_market.snapshot_store import SnapshotStore
+from pnlclaw_types.market import OrderBookL2Snapshot, PriceLevel
 
 
 def _make_snapshot(symbol: str = "BTC/USDT", seq: int = 100) -> OrderBookL2Snapshot:

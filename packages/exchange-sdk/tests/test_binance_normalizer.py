@@ -6,13 +6,12 @@ from typing import Any
 
 import pytest
 
-from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
-
 from pnlclaw_exchange.exchanges.binance.normalizer import (
     BinanceDepthDelta,
     BinanceNormalizer,
 )
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
+from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 
 @pytest.fixture

@@ -12,19 +12,14 @@ This is the most critical test file in exchange-sdk, covering:
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from pnlclaw_types.market import OrderBookL2Delta, OrderBookL2Snapshot, PriceLevel
-
-from pnlclaw_exchange.exceptions import SnapshotRecoveryError
 from pnlclaw_exchange.exchanges.binance.l2_manager import BinanceL2Manager
 from pnlclaw_exchange.exchanges.binance.normalizer import BinanceDepthDelta
-from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
-
+from pnlclaw_types.market import OrderBookL2Delta, OrderBookL2Snapshot, PriceLevel
 
 # ---------------------------------------------------------------------------
 # Helpers

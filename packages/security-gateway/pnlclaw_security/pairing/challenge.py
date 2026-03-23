@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 
 from pnlclaw_security.pairing.store import PairingRequest, PairingStore
 
-
 # ---------------------------------------------------------------------------
 # Result model
 # ---------------------------------------------------------------------------

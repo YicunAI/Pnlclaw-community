@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pnlclaw_paper.accounts import AccountManager, AccountStatus, PaperAccount
 
 

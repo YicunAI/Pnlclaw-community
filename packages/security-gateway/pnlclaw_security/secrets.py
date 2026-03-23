@@ -11,10 +11,8 @@ import stat
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Secret source enum

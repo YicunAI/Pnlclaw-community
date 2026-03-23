@@ -6,11 +6,10 @@ changes, secret access, policy changes) are recorded to append-only JSONL files.
 
 from __future__ import annotations
 
-import json
 import os
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -167,7 +166,7 @@ class AuditLogger:
                 return self._current_file
 
         # Create new file with date and sequence number
-        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
         seq = 1
         while True:
             candidate = self._log_dir / f"audit-{date_str}-{seq:03d}.jsonl"

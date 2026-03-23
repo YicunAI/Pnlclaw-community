@@ -24,7 +24,6 @@ def atomic_write(path: str | Path, content: str | bytes, *, encoding: str = "utf
 
     is_bytes = isinstance(content, bytes)
     mode = "wb" if is_bytes else "w"
-    kwargs = {} if is_bytes else {"encoding": encoding}
 
     fd, tmp_path = tempfile.mkstemp(
         dir=target.parent,
@@ -32,10 +31,16 @@ def atomic_write(path: str | Path, content: str | bytes, *, encoding: str = "utf
         suffix=".tmp",
     )
     try:
-        with os.fdopen(fd, mode, **kwargs) as f:
-            f.write(content)
-            f.flush()
-            os.fsync(f.fileno())
+        if is_bytes:
+            with os.fdopen(fd, mode) as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
+        else:
+            with os.fdopen(fd, mode, encoding=encoding) as f:
+                f.write(content)
+                f.flush()
+                os.fsync(f.fileno())
         os.replace(tmp_path, str(target))
     except BaseException:
         # Clean up temp file on any failure

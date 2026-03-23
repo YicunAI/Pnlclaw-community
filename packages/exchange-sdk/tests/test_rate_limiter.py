@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
-from datetime import datetime, timezone, timedelta
 
 import pytest
 
@@ -90,7 +90,7 @@ async def test_set_retry_after_http_date() -> None:
     """set_retry_after with HTTP-date string parses correctly."""
     limiter = SlidingWindowRateLimiter(calls_per_window=100, window_ms=60_000)
     # HTTP-date has 1-second resolution, so use a delay large enough.
-    future = datetime.now(timezone.utc) + timedelta(seconds=2)
+    future = datetime.now(UTC) + timedelta(seconds=2)
     http_date = format_datetime(future, usegmt=True)
 
     # Verify that parsing produces a positive delay that gets stored.

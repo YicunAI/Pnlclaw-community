@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from pnlclaw_types.errors import ValidationError
-
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
+from pnlclaw_types.errors import ValidationError
 
 
 @pytest.fixture

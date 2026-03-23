@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.core.dependencies import (
     get_paper_account_manager,
     get_paper_order_manager,
     get_paper_position_manager,
 )
 from app.main import create_app
+from httpx import ASGITransport, AsyncClient
 
 # Use real pnlclaw_paper managers for integration testing
 from pnlclaw_paper.accounts import AccountManager

@@ -4,18 +4,14 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
-from pnlclaw_types.agent import TradeIntent
-from pnlclaw_types.trading import OrderSide, OrderType
-
 from pnlclaw_risk.validators import (
-    ValidationResult,
     validate,
     validate_direction,
     validate_price,
     validate_stop_loss,
 )
+from pnlclaw_types.agent import TradeIntent
+from pnlclaw_types.trading import OrderSide, OrderType
 
 
 def _make_intent(**overrides) -> TradeIntent:

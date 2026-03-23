@@ -6,9 +6,8 @@ import time
 
 import pytest
 
-from pnlclaw_types.trading import Order, OrderSide, OrderStatus, OrderType
-
 from pnlclaw_paper.fills import try_fill
+from pnlclaw_types.trading import Order, OrderSide, OrderStatus, OrderType
 
 
 def _make_order(**overrides) -> Order:

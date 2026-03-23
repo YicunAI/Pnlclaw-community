@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from pnlclaw_exchange import (
     BinanceL2Manager,
@@ -17,16 +18,15 @@ from pnlclaw_exchange import (
     ReconnectManager,
 )
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
+from pnlclaw_market.cache import MarketDataCache
+from pnlclaw_market.event_bus import EventBus
+from pnlclaw_market.snapshot_store import SnapshotStore
+from pnlclaw_market.stream_manager import StreamManager, StreamType
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Snapshot,
     TickerEvent,
 )
-
-from pnlclaw_market.cache import MarketDataCache
-from pnlclaw_market.event_bus import EventBus
-from pnlclaw_market.snapshot_store import SnapshotStore
-from pnlclaw_market.stream_manager import StreamManager, StreamType
 
 logger = logging.getLogger(__name__)
 

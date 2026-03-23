@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from app.core.dependencies import get_health_registry
+from app.main import create_app
 from httpx import ASGITransport, AsyncClient
 
 from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
-
-from app.core.dependencies import get_health_registry
-from app.main import create_app
 
 
 def _make_app(registry: HealthRegistry | None = None):

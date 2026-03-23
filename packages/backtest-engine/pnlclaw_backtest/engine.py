@@ -11,13 +11,9 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
-
-from pnlclaw_types.market import KlineEvent
-from pnlclaw_types.strategy import BacktestResult
-from pnlclaw_types.trading import Order, OrderSide, OrderType
 
 from pnlclaw_backtest.broker import SimulatedBroker
 from pnlclaw_backtest.commissions import CommissionModel, NoCommission
@@ -25,6 +21,9 @@ from pnlclaw_backtest.metrics import compute_metrics
 from pnlclaw_backtest.portfolio import Portfolio
 from pnlclaw_backtest.protocols import StrategyRunner
 from pnlclaw_backtest.slippage import NoSlippage, SlippageModel
+from pnlclaw_types.market import KlineEvent
+from pnlclaw_types.strategy import BacktestResult
+from pnlclaw_types.trading import Order, OrderSide, OrderType
 
 
 class BacktestError(Exception):
@@ -133,6 +132,7 @@ class BacktestEngine:
         _open_side: OrderSide | None = None  # track current position direction
         _entry_price: float = 0.0
         _entry_ts: int = 0
+        _entry_fee: float = 0.0
 
         strategy_id = self._config.strategy_id or "backtest"
 
@@ -164,7 +164,11 @@ class BacktestEngine:
                                 "entry_price": _entry_price,
                                 "exit_price": fill.price,
                                 "quantity": fill.quantity,
-                                "pnl": (fill.price - _entry_price) * fill.quantity - fill.fee,
+                                "pnl": (
+                                (fill.price - _entry_price) * fill.quantity
+                                - _entry_fee
+                                - fill.fee
+                            ),
                                 "entry_time": _entry_ts,
                                 "exit_time": kline.timestamp,
                             }
@@ -191,6 +195,7 @@ class BacktestEngine:
                             _open_side = OrderSide.BUY
                             _entry_price = fill.price
                             _entry_ts = kline.timestamp
+                            _entry_fee = fill.fee
 
             # Update equity at end of each bar
             portfolio.update_equity(kline.symbol, kline.close)
@@ -199,8 +204,8 @@ class BacktestEngine:
         equity_curve = portfolio.get_equity_curve()
         metrics = compute_metrics(equity_curve, trades)
 
-        start_dt = datetime.fromtimestamp(klines[0].timestamp / 1000, tz=timezone.utc)
-        end_dt = datetime.fromtimestamp(klines[-1].timestamp / 1000, tz=timezone.utc)
+        start_dt = datetime.fromtimestamp(klines[0].timestamp / 1000, tz=UTC)
+        end_dt = datetime.fromtimestamp(klines[-1].timestamp / 1000, tz=UTC)
 
         return BacktestResult(
             id=f"bt-{uuid.uuid4().hex[:8]}",

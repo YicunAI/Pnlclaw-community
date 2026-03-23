@@ -1,11 +1,9 @@
 """Tests for pnlclaw_security.guardrails.hallucination."""
 
-from pnlclaw_types import RiskLevel
-
 from pnlclaw_security.guardrails.hallucination import (
     HallucinationDetector,
-    KNOWN_INDICATORS,
 )
+from pnlclaw_types import RiskLevel
 
 
 class TestPriceDeviation:

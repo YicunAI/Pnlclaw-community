@@ -6,12 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from pnlclaw_types.trading import OrderSide, OrderType
-
 from pnlclaw_paper.accounts import AccountManager
 from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_paper.positions import PositionManager
 from pnlclaw_paper.state import PaperState
+from pnlclaw_types.trading import OrderSide, OrderType
 
 
 @pytest.fixture

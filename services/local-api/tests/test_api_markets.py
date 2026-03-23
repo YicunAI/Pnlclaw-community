@@ -6,13 +6,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from app.core.dependencies import get_market_service
+from app.main import create_app
 from httpx import ASGITransport, AsyncClient
 
 from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, PriceLevel, TickerEvent
-
-from app.core.dependencies import get_market_service
-from app.main import create_app
-
 
 # ---------------------------------------------------------------------------
 # Stub MarketDataService

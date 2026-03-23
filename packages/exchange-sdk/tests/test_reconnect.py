@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-import time
-from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from pnlclaw_exchange.base.reconnect import ReconnectManager
 from pnlclaw_exchange.base.ws_client import BaseWSClient
 from pnlclaw_exchange.types import ReconnectConfig, WSClientConfig
-
 
 # ---------------------------------------------------------------------------
 # Helpers

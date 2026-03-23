@@ -2,9 +2,8 @@
 
 import pytest
 
-from pnlclaw_types.trading import Fill, OrderSide
-
 from pnlclaw_backtest.portfolio import Portfolio
+from pnlclaw_types.trading import Fill, OrderSide
 
 
 def _make_fill(price: float = 100.0, quantity: float = 1.0, fee: float = 0.0) -> Fill:

@@ -95,7 +95,11 @@ class PluginDiscovery:
         found: list[DiscoveredPlugin] = []
         try:
             eps = importlib.metadata.entry_points()
-            group = eps.get(self.ENTRY_POINT_GROUP, [])  # type: ignore[call-overload]
+            group: list[Any]
+            if hasattr(eps, "select"):
+                group = list(eps.select(group=self.ENTRY_POINT_GROUP))
+            else:
+                group = list(eps.get(self.ENTRY_POINT_GROUP, []))  # type: ignore[call-overload]
             for ep in group:
                 found.append(
                     DiscoveredPlugin(
@@ -129,7 +133,7 @@ class PluginDiscovery:
         if not self._user_config_path.is_file():
             return []
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             with open(self._user_config_path) as f:
                 data = yaml.safe_load(f)

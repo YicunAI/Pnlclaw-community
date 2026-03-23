@@ -1,11 +1,10 @@
 """Tests for pnlclaw_security.guardrails.regime_mismatch."""
 
-from pnlclaw_types import MarketRegime, RiskLevel, StrategyType
-
 from pnlclaw_security.guardrails.regime_mismatch import (
-    RegimeMismatchDetector,
     STRATEGY_REGIME_COMPAT,
+    RegimeMismatchDetector,
 )
+from pnlclaw_types import MarketRegime, RiskLevel, StrategyType
 
 
 class TestCompatibilityMatrix:

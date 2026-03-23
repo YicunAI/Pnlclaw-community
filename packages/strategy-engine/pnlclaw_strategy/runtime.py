@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from typing import cast
 
 import pandas as pd
 
@@ -139,14 +140,16 @@ class StrategyRuntime:
             return False
 
         left_col = cond.column_name
-        left_now = df[left_col].iloc[last]
-        left_prev = df[left_col].iloc[last - 1]
+        left_now = cast(float, df[left_col].iloc[last])
+        left_prev = cast(float, df[left_col].iloc[last - 1])
 
         # Determine right-hand side value
+        right_now: float
+        right_prev: float
         if cond.comparator_indicator is not None:
             right_col = cond.comparator_column_name
-            right_now = df[right_col].iloc[last]
-            right_prev = df[right_col].iloc[last - 1]
+            right_now = cast(float, df[right_col].iloc[last])
+            right_prev = cast(float, df[right_col].iloc[last - 1])
         elif cond.comparator_value is not None:
             right_now = cond.comparator_value
             right_prev = cond.comparator_value

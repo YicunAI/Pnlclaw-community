@@ -298,7 +298,16 @@ class CooldownRule:
 # ---------------------------------------------------------------------------
 
 
-def create_default_rules() -> list[MaxPositionRule | MaxSingleRiskRule | DailyLossLimitRule | SymbolBlacklistRule | CooldownRule]:
+RuleSet = (
+    MaxPositionRule
+    | MaxSingleRiskRule
+    | DailyLossLimitRule
+    | SymbolBlacklistRule
+    | CooldownRule
+)
+
+
+def create_default_rules() -> list[RuleSet]:
     """Create the standard five risk rules with default parameters."""
     return [
         MaxPositionRule(),

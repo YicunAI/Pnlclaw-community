@@ -8,18 +8,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
-
+from app.api.v1.agent import router as agent_router
+from app.api.v1.backtests import router as backtests_router
 from app.api.v1.health import router as health_router
 from app.api.v1.markets import router as markets_router
-from app.api.v1.strategies import router as strategies_router
-from app.api.v1.backtests import router as backtests_router
 from app.api.v1.paper import router as paper_router
-from app.api.v1.agent import router as agent_router
+from app.api.v1.strategies import router as strategies_router
 from app.api.v1.ws import router as ws_router
 from app.core.dependencies import set_health_registry
 from app.middleware.error_handler import install_error_handlers
 from app.middleware.request_id import RequestIDMiddleware
+from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
 
 
 @asynccontextmanager

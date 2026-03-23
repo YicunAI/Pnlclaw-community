@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import threading
 from typing import Any
 
@@ -15,13 +16,14 @@ class PluginRegistry:
 
     _instance: PluginRegistry | None = None
     _lock = threading.Lock()
+    _plugins: dict[str, dict[str, Any]]
 
     def __new__(cls) -> PluginRegistry:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
                     inst = super().__new__(cls)
-                    inst._plugins: dict[str, dict[str, Any]] = {}
+                    inst._plugins = {}
                     cls._instance = inst
         return cls._instance
 
@@ -58,7 +60,7 @@ class PluginRegistry:
         """
         return dict(self._plugins.get(capability, {}))
 
-    def list_capabilities(self) -> list[str]:
+    def list_capabilities(self) -> builtins.list[str]:
         """List all registered capability types."""
         return list(self._plugins.keys())
 

@@ -15,11 +15,10 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
+from app.core.dependencies import build_response_meta
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import BacktestResult
-
-from app.core.dependencies import build_response_meta
 
 router = APIRouter(prefix="/backtests", tags=["backtests"])
 
@@ -79,7 +78,6 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
     task.status = BacktestTaskStatus.RUNNING
     try:
         # Attempt real engine execution
-        from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine
 
         from app.api.v1.strategies import _strategies
 

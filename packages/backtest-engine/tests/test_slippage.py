@@ -1,8 +1,7 @@
 """Tests for pnlclaw_backtest.slippage."""
 
-from pnlclaw_types.trading import OrderSide
-
 from pnlclaw_backtest.slippage import FixedSlippage, NoSlippage
+from pnlclaw_types.trading import OrderSide
 
 
 class TestNoSlippage:

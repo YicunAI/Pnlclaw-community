@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from pnlclaw_strategy.models import (
     ConditionRule,
     EngineStrategyConfig,
     EntryRules,
-    ExitRules,
     RiskParams,
     StrategyLoadError,
     load_strategy,
 )
 from pnlclaw_types.strategy import StrategyConfig
-
 
 SAMPLE_YAML = """\
 id: strat-001
@@ -117,7 +116,7 @@ class TestRiskParams:
         assert rp.max_open_positions == 1
 
     def test_validation_bounds(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             RiskParams(stop_loss_pct=1.5)
 
 

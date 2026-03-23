@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pnlclaw_strategy.compiler import compile
 from pnlclaw_strategy.models import (
     ConditionRule,
     EngineStrategyConfig,
     EntryRules,
     ExitRules,
-    RiskParams,
 )
 from pnlclaw_strategy.runtime import StrategyRuntime
 from pnlclaw_types.market import KlineEvent

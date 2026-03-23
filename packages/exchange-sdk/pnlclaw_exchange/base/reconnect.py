@@ -11,10 +11,10 @@ import logging
 import random
 import time
 from collections import deque
+from collections.abc import Awaitable, Callable
 
 from pnlclaw_core.resilience.backoff import BackoffPolicy
 from pnlclaw_core.resilience.error_classifier import ErrorCategory, classify_error
-
 from pnlclaw_exchange.base.ws_client import BaseWSClient
 from pnlclaw_exchange.types import ReconnectConfig
 
@@ -42,7 +42,7 @@ class ReconnectManager:
         client: BaseWSClient,
         config: ReconnectConfig | None = None,
         *,
-        listen: "asyncio.Callable[..., asyncio.Awaitable[None]] | None" = None,
+        listen: Callable[..., Awaitable[None]] | None = None,
     ) -> None:
         self._client = client
         self._config = config or _DEFAULT_CONFIG
@@ -121,7 +121,7 @@ class ReconnectManager:
                     )
                     # Shutdown was requested during backoff.
                     break
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     # Backoff period elapsed — retry.
                     pass
 
@@ -151,8 +151,8 @@ class ReconnectManager:
 
     def _compute_delay(self) -> float:
         """Compute backoff delay with ±20 % jitter."""
-        base = self._backoff.calculate_delay(self._attempt - 1)
-        jitter_range = self._config.jitter
+        base: float = self._backoff.calculate_delay(self._attempt - 1)
+        jitter_range: float = self._config.jitter
         jitter_factor = 1.0 - jitter_range + random.random() * 2 * jitter_range
         return base * jitter_factor
 

@@ -6,7 +6,7 @@ is deferred to later versions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
@@ -15,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from pnlclaw_strategy.compiler import CompilationError, CompiledStrategy, compile
 from pnlclaw_strategy.models import EngineStrategyConfig
 from pnlclaw_strategy.validator import ValidationResult, validate
-
 
 # ---------------------------------------------------------------------------
 # Strategy state enum
@@ -63,7 +62,7 @@ class StrategyDraft(BaseModel):
         StrategyState.DRAFT, description="Current lifecycle state"
     )
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When the draft was created",
     )
     metadata: dict[str, Any] = Field(
@@ -104,7 +103,7 @@ class ValidatedStrategy(BaseModel):
         ..., description="Validation result (should be valid)"
     )
     validated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When validation passed",
     )
 
@@ -136,7 +135,7 @@ class BacktestReadyStrategy:
         self.config = config
         self.state = state
         self.compiled = compiled
-        self.submitted_at = submitted_at or datetime.now(timezone.utc)
+        self.submitted_at = submitted_at or datetime.now(UTC)
 
 
 # ---------------------------------------------------------------------------

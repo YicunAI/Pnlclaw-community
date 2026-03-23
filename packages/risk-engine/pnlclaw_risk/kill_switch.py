@@ -12,7 +12,6 @@ from pathlib import Path
 
 from pnlclaw_core.infra.atomic_write import atomic_write
 
-
 _DEFAULT_STATE_PATH = Path.home() / ".pnlclaw" / "kill_switch.json"
 
 

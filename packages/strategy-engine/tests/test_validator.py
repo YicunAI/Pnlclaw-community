@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pnlclaw_strategy.models import (
     ConditionRule,
     EngineStrategyConfig,
     EntryRules,
     ExitRules,
-    RiskParams,
 )
 from pnlclaw_strategy.validator import ValidationResult, validate
 
@@ -142,7 +139,11 @@ class TestDataAvailabilityValidation:
         rule = _make_rule(indicator="sma")
         config = _make_config(
             parsed_entry_rules=EntryRules(long=[rule]),
-            parsed_exit_rules=ExitRules(close_long=[_make_rule(indicator="sma", operator="crosses_below")]),
+            parsed_exit_rules=ExitRules(
+                close_long=[
+                    _make_rule(indicator="sma", operator="crosses_below")
+                ]
+            ),
         )
         result = validate(config)
         assert result.valid
@@ -151,7 +152,13 @@ class TestDataAvailabilityValidation:
         rule = _make_rule(indicator="ichimoku")
         config = _make_config(
             parsed_entry_rules=EntryRules(long=[rule]),
-            parsed_exit_rules=ExitRules(close_long=[_make_rule(indicator="ichimoku", operator="crosses_below")]),
+            parsed_exit_rules=ExitRules(
+                close_long=[
+                    _make_rule(
+                        indicator="ichimoku", operator="crosses_below"
+                    )
+                ]
+            ),
         )
         result = validate(config)
         assert not result.valid
@@ -161,7 +168,13 @@ class TestDataAvailabilityValidation:
         rule = _make_rule(indicator="custom_ind")
         config = _make_config(
             parsed_entry_rules=EntryRules(long=[rule]),
-            parsed_exit_rules=ExitRules(close_long=[_make_rule(indicator="custom_ind", operator="crosses_below")]),
+            parsed_exit_rules=ExitRules(
+                close_long=[
+                    _make_rule(
+                        indicator="custom_ind", operator="crosses_below"
+                    )
+                ]
+            ),
         )
         result = validate(config, available_indicators={"custom_ind"})
         assert result.valid

@@ -3,7 +3,7 @@
 import time
 from pathlib import Path
 
-from pnlclaw_security.pairing.token import PairingToken, TokenStore
+from pnlclaw_security.pairing.token import TokenStore
 
 
 class TestIssueToken:

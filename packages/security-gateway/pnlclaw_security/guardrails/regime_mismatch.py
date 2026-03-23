@@ -6,7 +6,7 @@ the current market state. Source: distillation-plan-supplement-3 gap 20.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from pnlclaw_types import MarketRegime, RiskLevel, StrategyType
 

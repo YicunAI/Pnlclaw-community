@@ -9,7 +9,6 @@ from pnlclaw_strategy.compiler import (
     CompiledStrategy,
     compile,
 )
-from pnlclaw_strategy.indicators.sma import SMA
 from pnlclaw_strategy.models import (
     ConditionRule,
     EngineStrategyConfig,

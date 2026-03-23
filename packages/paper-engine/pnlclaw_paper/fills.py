@@ -11,7 +11,6 @@ import uuid
 
 from pnlclaw_types.trading import Fill, Order, OrderSide, OrderStatus, OrderType
 
-
 # Default fee rate (0.1% — typical exchange maker/taker fee)
 DEFAULT_FEE_RATE = 0.001
 

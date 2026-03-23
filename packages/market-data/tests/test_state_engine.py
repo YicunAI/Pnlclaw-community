@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import pandas as pd
 import pytest
-
-from pnlclaw_types.agent import MarketRegime, MarketState
-from pnlclaw_types.market import KlineEvent
 
 from pnlclaw_market.state_engine import (
     InsufficientDataError,
@@ -14,11 +10,13 @@ from pnlclaw_market.state_engine import (
     classify_regime,
     classify_trend_strength,
     classify_volatility,
-    compute_atr,
     compute_adx_proxy,
+    compute_atr,
     compute_momentum,
     klines_to_dataframe,
 )
+from pnlclaw_types.agent import MarketRegime, MarketState
+from pnlclaw_types.market import KlineEvent
 
 
 def _make_klines(n: int = 30, base_price: float = 67000.0) -> list[KlineEvent]:

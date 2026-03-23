@@ -5,11 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict, Field
 
 from pnlclaw_types.strategy import StrategyConfig
-
 
 # ---------------------------------------------------------------------------
 # Rule models for entry/exit/risk configuration
@@ -61,10 +60,12 @@ class EntryRules(BaseModel):
     """Entry rule configuration for a strategy."""
 
     long: list[ConditionRule] = Field(
-        default_factory=list, description="Conditions for opening a long position (all must be true)"
+        default_factory=list,
+        description="Conditions for opening a long position (all must be true)",
     )
     short: list[ConditionRule] = Field(
-        default_factory=list, description="Conditions for opening a short position (all must be true)"
+        default_factory=list,
+        description="Conditions for opening a short position (all must be true)",
     )
 
     model_config = ConfigDict(
@@ -217,7 +218,7 @@ def load_strategy(path: str | Path) -> EngineStrategyConfig:
     path = Path(path)
     if not path.exists():
         raise StrategyLoadError(f"Strategy file not found: {path}")
-    if not path.suffix.lower() in (".yaml", ".yml"):
+    if path.suffix.lower() not in (".yaml", ".yml"):
         raise StrategyLoadError(f"Expected .yaml or .yml file, got: {path.suffix}")
 
     try:

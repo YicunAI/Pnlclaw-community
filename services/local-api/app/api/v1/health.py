@@ -10,10 +10,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 
+from app.core.dependencies import build_response_meta, get_health_registry
 from pnlclaw_core.diagnostics.health import HealthRegistry
 from pnlclaw_types.common import APIResponse
-
-from app.core.dependencies import build_response_meta, get_health_registry
 
 router = APIRouter(tags=["health"])
 

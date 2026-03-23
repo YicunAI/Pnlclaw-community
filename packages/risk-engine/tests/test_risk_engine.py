@@ -5,13 +5,10 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import pytest
-
+from pnlclaw_risk.engine import RiskEngine
 from pnlclaw_types.agent import TradeIntent
 from pnlclaw_types.risk import RiskDecision, RiskLevel
 from pnlclaw_types.trading import OrderSide, OrderType
-
-from pnlclaw_risk.engine import RiskEngine
 
 
 def _make_intent(**overrides: Any) -> TradeIntent:

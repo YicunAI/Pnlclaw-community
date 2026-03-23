@@ -9,7 +9,7 @@ This is the v0.1 simplified version: single timeframe, 3-5 core indicators.
 from __future__ import annotations
 
 import time
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd

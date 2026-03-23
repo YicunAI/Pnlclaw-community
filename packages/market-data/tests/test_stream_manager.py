@@ -33,7 +33,11 @@ class TestStreamManager:
     """Unit tests for the StreamManager."""
 
     @pytest.mark.asyncio
-    async def test_start_stream_subscribes(self, manager: StreamManager, ws_client: MagicMock) -> None:
+    async def test_start_stream_subscribes(
+        self,
+        manager: StreamManager,
+        ws_client: MagicMock,
+    ) -> None:
         await manager.start_stream("BTC/USDT", StreamType.TICKER)
         ws_client.subscribe_ticker.assert_awaited_once_with(["btcusdt"])
 
@@ -56,7 +60,11 @@ class TestStreamManager:
         assert manager.ref_count("BTC/USDT", StreamType.TICKER) == 2
 
     @pytest.mark.asyncio
-    async def test_stop_with_remaining_refs(self, manager: StreamManager, ws_client: MagicMock) -> None:
+    async def test_stop_with_remaining_refs(
+        self,
+        manager: StreamManager,
+        ws_client: MagicMock,
+    ) -> None:
         await manager.start_stream("BTC/USDT", StreamType.TICKER)
         await manager.start_stream("BTC/USDT", StreamType.TICKER)
         await manager.stop_stream("BTC/USDT", StreamType.TICKER)
@@ -65,7 +73,11 @@ class TestStreamManager:
         assert manager.ref_count("BTC/USDT", StreamType.TICKER) == 1
 
     @pytest.mark.asyncio
-    async def test_stop_last_ref_unsubscribes(self, manager: StreamManager, ws_client: MagicMock) -> None:
+    async def test_stop_last_ref_unsubscribes(
+        self,
+        manager: StreamManager,
+        ws_client: MagicMock,
+    ) -> None:
         await manager.start_stream("BTC/USDT", StreamType.TICKER)
         await manager.stop_stream("BTC/USDT", StreamType.TICKER)
         ws_client.unsubscribe.assert_awaited_once()

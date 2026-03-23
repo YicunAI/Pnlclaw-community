@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import pytest
 
 from pnlclaw_exchange.base.ws_client import BaseWSClient
 from pnlclaw_exchange.types import WSClientConfig
-
 
 # ---------------------------------------------------------------------------
 # Concrete test implementation

@@ -10,16 +10,15 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.agent import AgentStreamEventType
-from pnlclaw_types.common import APIResponse, ResponseMeta
-
 from app.core.dependencies import get_agent_runtime
+from pnlclaw_types.agent import AgentStreamEventType
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 

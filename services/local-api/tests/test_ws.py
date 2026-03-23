@@ -2,15 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
-import pytest
-from httpx import ASGITransport, AsyncClient
-from starlette.testclient import TestClient
-
-from app.main import create_app
-
 import app.api.v1.ws as _ws_mod
+import pytest
+from app.main import create_app
+from starlette.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)

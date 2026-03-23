@@ -10,11 +10,11 @@ restore them after a reconnection.
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from pnlclaw_exchange.types import WSClientConfig
 

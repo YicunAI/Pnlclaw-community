@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pnlclaw_security.pairing.challenge import ChallengeResult, PairingChallenge
+from pnlclaw_security.pairing.challenge import PairingChallenge
 from pnlclaw_security.pairing.store import PairingStore
 
 

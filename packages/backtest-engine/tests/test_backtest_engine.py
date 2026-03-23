@@ -2,13 +2,12 @@
 
 import pytest
 
+from pnlclaw_backtest.commissions import PercentageCommission
+from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine, BacktestError
+from pnlclaw_backtest.slippage import FixedSlippage
 from pnlclaw_types.market import KlineEvent
 from pnlclaw_types.strategy import Signal
 from pnlclaw_types.trading import OrderSide
-
-from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine, BacktestError
-from pnlclaw_backtest.commissions import PercentageCommission
-from pnlclaw_backtest.slippage import FixedSlippage
 
 
 class AlwaysBuyStrategy:

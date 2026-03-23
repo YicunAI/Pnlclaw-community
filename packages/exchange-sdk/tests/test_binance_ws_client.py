@@ -5,15 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
-
 from pnlclaw_exchange.exchanges.binance.normalizer import BinanceDepthDelta
 from pnlclaw_exchange.exchanges.binance.ws_client import BinanceWSClient
-
+from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 # ---------------------------------------------------------------------------
 # Mock WebSocket

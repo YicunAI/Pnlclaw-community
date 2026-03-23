@@ -8,18 +8,16 @@ from typing import Any
 
 import pytest
 
-from pnlclaw_types.strategy import Signal
-from pnlclaw_types.trading import OrderSide
-
-from pnlclaw_risk.engine import RiskEngine
-from pnlclaw_risk.kill_switch import KillSwitch
-
 from pnlclaw_paper.decision_pipeline import (
     DecisionPipeline,
     PipelineAction,
     PipelineConfig,
 )
 from pnlclaw_paper.orders import PaperOrderManager
+from pnlclaw_risk.engine import RiskEngine
+from pnlclaw_risk.kill_switch import KillSwitch
+from pnlclaw_types.strategy import Signal
+from pnlclaw_types.trading import OrderSide
 
 
 @pytest.fixture(autouse=True)

@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import uuid
 
-from pnlclaw_types.market import KlineEvent
-from pnlclaw_types.trading import Fill, Order, OrderStatus, OrderType
-
 from pnlclaw_backtest.commissions import CommissionModel, NoCommission
 from pnlclaw_backtest.slippage import NoSlippage, SlippageModel
+from pnlclaw_types.market import KlineEvent
+from pnlclaw_types.trading import Fill, Order, OrderStatus, OrderType
 
 
 class SimulatedBroker:

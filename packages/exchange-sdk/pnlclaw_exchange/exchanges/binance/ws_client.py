@@ -9,12 +9,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Awaitable, Callable
+from collections.abc import Callable
+from typing import Any
 
 import websockets
 import websockets.asyncio.client
-
-from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 from pnlclaw_exchange.base.ws_client import BaseWSClient
 from pnlclaw_exchange.exchanges.binance.normalizer import (
@@ -23,6 +22,7 @@ from pnlclaw_exchange.exchanges.binance.normalizer import (
 )
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 from pnlclaw_exchange.types import WSClientConfig
+from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 logger = logging.getLogger(__name__)
 

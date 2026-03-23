@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
-from app.main import create_app
-
 # Reset in-memory store between tests
 import app.api.v1.strategies as _mod
+import pytest
+from app.main import create_app
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture(autouse=True)

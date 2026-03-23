@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import json
 
+import app.api.v1.agent as _mod
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.core.dependencies import get_agent_runtime
 from app.main import create_app
-
-import app.api.v1.agent as _mod
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture(autouse=True)

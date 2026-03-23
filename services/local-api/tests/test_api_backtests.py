@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-from httpx import ASGITransport, AsyncClient
-
-from app.main import create_app
-
 import app.api.v1.backtests as _mod
+import pytest
+from app.main import create_app
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture(autouse=True)

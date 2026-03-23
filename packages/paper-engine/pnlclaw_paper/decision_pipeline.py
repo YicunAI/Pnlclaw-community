@@ -9,25 +9,19 @@ Each step may terminate the pipeline and return a reason.
 from __future__ import annotations
 
 import time
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from pnlclaw_types.agent import TradeIntent
-from pnlclaw_types.strategy import Signal
-from pnlclaw_types.trading import OrderSide, OrderType
-
 from pnlclaw_core.infra.dedupe import Deduplicator
-
+from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_risk.engine import RiskEngine
 from pnlclaw_risk.kill_switch import KillSwitch
 from pnlclaw_risk.validators import validate
-
 from pnlclaw_security.audit import AuditEvent, AuditEventType, AuditLogger, AuditSeverity
-
-from pnlclaw_paper.orders import PaperOrderManager
-
+from pnlclaw_types.agent import TradeIntent
+from pnlclaw_types.strategy import Signal
+from pnlclaw_types.trading import OrderType
 
 # ---------------------------------------------------------------------------
 # Pipeline result

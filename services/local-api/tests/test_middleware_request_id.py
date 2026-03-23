@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from httpx import ASGITransport, AsyncClient
-
 from app.main import create_app
+from httpx import ASGITransport, AsyncClient
 
 
 def _app():

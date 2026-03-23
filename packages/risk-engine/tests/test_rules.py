@@ -5,11 +5,6 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import pytest
-
-from pnlclaw_types.agent import TradeIntent
-from pnlclaw_types.trading import OrderSide, OrderType
-
 from pnlclaw_risk.rules import (
     CooldownRule,
     DailyLossLimitRule,
@@ -18,6 +13,8 @@ from pnlclaw_risk.rules import (
     SymbolBlacklistRule,
     create_default_rules,
 )
+from pnlclaw_types.agent import TradeIntent
+from pnlclaw_types.trading import OrderSide, OrderType
 
 
 def _make_intent(**overrides: Any) -> TradeIntent:

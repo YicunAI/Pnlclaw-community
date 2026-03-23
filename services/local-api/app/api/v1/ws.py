@@ -18,9 +18,7 @@ import time
 from typing import Any
 
 import structlog
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
-
-from app.core.dependencies import get_market_service
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = structlog.get_logger(__name__)
 
@@ -102,7 +100,7 @@ async def ws_markets(ws: WebSocket) -> None:
         while True:
             try:
                 raw = await asyncio.wait_for(ws.receive_text(), timeout=60.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send ping to keep connection alive
                 try:
                     await ws.send_json({"type": "ping", "timestamp": int(time.time() * 1000)})
@@ -169,7 +167,7 @@ async def ws_paper(ws: WebSocket) -> None:
         while True:
             try:
                 raw = await asyncio.wait_for(ws.receive_text(), timeout=60.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 try:
                     await ws.send_json({"type": "ping", "timestamp": int(time.time() * 1000)})
                 except Exception:
@@ -226,5 +224,10 @@ async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str
     """Push a paper trading event to all WebSocket subscribers of that account."""
     await _paper_manager.broadcast(
         f"paper:{account_id}",
-        {"type": event_type, "account_id": account_id, "data": data, "timestamp": int(time.time() * 1000)},
+        {
+            "type": event_type,
+            "account_id": account_id,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        },
     )

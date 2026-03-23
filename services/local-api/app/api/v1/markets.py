@@ -10,10 +10,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 
+from app.core.dependencies import build_response_meta, get_market_service
 from pnlclaw_types.common import APIResponse
 from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
-
-from app.core.dependencies import build_response_meta, get_market_service
 
 router = APIRouter(prefix="/markets", tags=["markets"])
 

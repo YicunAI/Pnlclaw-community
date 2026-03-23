@@ -87,7 +87,6 @@ class TestMarketDataService:
         svc = MarketDataService()
         received: list = []
         svc.on_ticker(received.append)
-        from pnlclaw_market.event_bus import EventBus
         from pnlclaw_types.market import TickerEvent
 
         assert svc.event_bus.handler_count(TickerEvent) == 1

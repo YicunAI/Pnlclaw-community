@@ -145,7 +145,10 @@ def _validate_data_availability(
 
     for loc, name in referenced:
         if name not in available_indicators:
-            result.add_error(f"{loc}: unknown indicator '{name}' (available: {sorted(available_indicators)})")
+            available = sorted(available_indicators)
+            result.add_error(
+                f"{loc}: unknown indicator '{name}' (available: {available})"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 """Tests for pnlclaw_backtest.metrics."""
 
+import numpy as np
 import pytest
 
 from pnlclaw_backtest.metrics import _max_drawdown, compute_metrics
-import numpy as np
 
 
 class TestMaxDrawdown:

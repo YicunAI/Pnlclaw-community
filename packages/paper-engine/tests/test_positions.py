@@ -6,9 +6,8 @@ import time
 
 import pytest
 
-from pnlclaw_types.trading import Fill, OrderSide, Position
-
 from pnlclaw_paper.positions import PositionManager
+from pnlclaw_types.trading import Fill, OrderSide
 
 
 def _make_fill(price: float, quantity: float, order_id: str = "ord-1") -> Fill:

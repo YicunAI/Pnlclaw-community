@@ -12,7 +12,7 @@ from collections import deque
 
 from pydantic import BaseModel, Field
 
-from pnlclaw_types import RiskLevel, OrderSide
+from pnlclaw_types import OrderSide, RiskLevel
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -24,7 +24,11 @@ class OvertradingConfig(BaseModel):
 
     max_orders_per_hour: int = Field(default=20, ge=1)
     max_orders_per_day: int = Field(default=100, ge=1)
-    reversal_window_seconds: int = Field(default=300, ge=1, description="Window for detecting buy/sell reversals")
+    reversal_window_seconds: int = Field(
+        default=300,
+        ge=1,
+        description="Window for detecting buy/sell reversals",
+    )
     max_reversals_per_hour: int = Field(default=3, ge=1)
 
 

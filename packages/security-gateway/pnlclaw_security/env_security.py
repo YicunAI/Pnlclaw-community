@@ -7,7 +7,6 @@ Implements SE-03: Environment variable loading has a dangerous variable blacklis
 from __future__ import annotations
 
 import re
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -197,9 +196,18 @@ def _validate_env_value(key: str, value: str) -> str | None:
 class EnvSanitizationResult(BaseModel):
     """Result of environment variable sanitization."""
 
-    allowed: dict[str, str] = Field(default_factory=dict, description="Sanitized env vars that passed all checks")
-    blocked: list[str] = Field(default_factory=list, description="Keys that were blocked")
-    secrets_detected: list[str] = Field(default_factory=list, description="Keys identified as holding secrets")
+    allowed: dict[str, str] = Field(
+        default_factory=dict,
+        description="Sanitized env vars that passed all checks",
+    )
+    blocked: list[str] = Field(
+        default_factory=list,
+        description="Keys that were blocked",
+    )
+    secrets_detected: list[str] = Field(
+        default_factory=list,
+        description="Keys identified as holding secrets",
+    )
     warnings: list[str] = Field(default_factory=list, description="Warning messages")
 
 

@@ -1,7 +1,5 @@
 """Tests for pnlclaw_security.tool_policy."""
 
-from pnlclaw_types import RiskLevel
-
 from pnlclaw_security.tool_policy import (
     TOOL_GROUPS,
     ToolPolicy,
@@ -9,7 +7,7 @@ from pnlclaw_security.tool_policy import (
     expand_tool_groups,
     normalize_tool_name,
 )
-
+from pnlclaw_types import RiskLevel
 
 # ---------------------------------------------------------------------------
 # normalize_tool_name

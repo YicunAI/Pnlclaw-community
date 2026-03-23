@@ -15,7 +15,6 @@ from pnlclaw_strategy.models import EngineStrategyConfig, load_strategy
 from pnlclaw_strategy.runtime import StrategyRuntime
 from pnlclaw_types.market import KlineEvent
 
-
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "pnlclaw_strategy" / "templates"
 
 

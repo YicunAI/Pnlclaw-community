@@ -11,16 +11,15 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.common import APIResponse, Pagination
-from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
-from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
-
 from app.core.dependencies import (
     build_response_meta,
     get_paper_account_manager,
     get_paper_order_manager,
     get_paper_position_manager,
 )
+from pnlclaw_types.common import APIResponse, Pagination
+from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
+from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 router = APIRouter(prefix="/paper", tags=["paper-trading"])
 

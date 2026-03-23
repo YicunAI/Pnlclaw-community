@@ -16,17 +16,17 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 import httpx
 
-from pnlclaw_types.market import OrderBookL2Snapshot, PriceLevel
-
 from pnlclaw_exchange.base.rate_limiter import SlidingWindowRateLimiter
-from pnlclaw_exchange.exceptions import SequenceGapError, SnapshotRecoveryError
+from pnlclaw_exchange.exceptions import SnapshotRecoveryError
 from pnlclaw_exchange.exchanges.binance.normalizer import BinanceDepthDelta
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
+from pnlclaw_types.market import OrderBookL2Snapshot, PriceLevel
 
 logger = logging.getLogger(__name__)
 

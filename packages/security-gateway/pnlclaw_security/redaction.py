@@ -8,7 +8,7 @@ Implements HC-07: Secrets never enter logs.
 from __future__ import annotations
 
 import re
-from typing import Sequence
+from collections.abc import Sequence
 
 # ---------------------------------------------------------------------------
 # Masking helpers

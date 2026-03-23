@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
+from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Delta,
@@ -17,8 +18,6 @@ from pnlclaw_types.market import (
     TickerEvent,
     TradeEvent,
 )
-
-from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 
 logger = logging.getLogger(__name__)
 

@@ -2,12 +2,11 @@
 
 import time
 
-from pnlclaw_types import OrderSide, RiskLevel
-
 from pnlclaw_security.guardrails.overtrading import (
     OvertradingConfig,
     OvertradingDetector,
 )
+from pnlclaw_types import OrderSide, RiskLevel
 
 
 class TestHourlyRate:
