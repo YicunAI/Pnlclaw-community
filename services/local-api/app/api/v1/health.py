@@ -1,20 +1,70 @@
-"""Health check endpoint."""
+"""Enhanced health check endpoint.
+
+Returns system status with per-component health information
+sourced from the ``HealthRegistry`` in ``pnlclaw_core``.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from typing import Any
+
+from fastapi import APIRouter, Depends
+
+from pnlclaw_core.diagnostics.health import HealthRegistry
+from pnlclaw_types.common import APIResponse, ResponseMeta
+
+from app.core.dependencies import get_health_registry
 
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
-async def health_check() -> dict:
-    """Return service health status.
+def _aggregate_status(components: dict[str, Any]) -> str:
+    """Derive overall status from component statuses.
 
-    Returns 200 with component-level health once diagnostics are wired.
+    Rules:
+    - Any ``unhealthy`` → ``unhealthy``
+    - Any ``degraded`` (but no unhealthy) → ``degraded``
+    - Otherwise → ``healthy``
     """
-    return {
-        "status": "ok",
-        "version": "0.1.0",
-        "components": {},
-    }
+    statuses = {c.get("status", "healthy") for c in components.values()}
+    if "unhealthy" in statuses:
+        return "unhealthy"
+    if "degraded" in statuses:
+        return "degraded"
+    return "healthy"
+
+
+@router.get("/health")
+async def health_check(
+    registry: HealthRegistry = Depends(get_health_registry),
+) -> APIResponse[dict[str, Any]]:
+    """Return service health status with per-component breakdown.
+
+    Response includes:
+    - ``status``: overall health (healthy / degraded / unhealthy)
+    - ``version``: API version string
+    - ``components``: dict of component name → {status, latency_ms, detail}
+    """
+    results = await registry.run_all()
+
+    components: dict[str, Any] = {}
+    for r in results:
+        entry: dict[str, Any] = {
+            "status": r.status,
+            "latency_ms": round(r.latency_ms, 2),
+        }
+        if r.detail:
+            entry["detail"] = r.detail
+        components[r.name] = entry
+
+    overall = _aggregate_status(components)
+
+    return APIResponse(
+        data={
+            "status": overall,
+            "version": "0.1.0",
+            "components": components,
+        },
+        meta=ResponseMeta(),
+        error=None,
+    )
