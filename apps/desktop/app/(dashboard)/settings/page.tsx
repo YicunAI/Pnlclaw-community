@@ -223,6 +223,7 @@ export default function SettingsPage() {
     const payload: Partial<Settings> = {
       llm: {
         provider: settings.llm.provider,
+        api_key: settings.llm.api_key,
         base_url: settings.llm.base_url,
         model,
         smart_mode: smartMode,
