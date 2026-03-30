@@ -29,7 +29,8 @@ dependencies = [
   "fastapi>=0.115.0",
   "uvicorn[standard]>=0.30.0",
   "httpx>=0.27.0",
-  "websockets>=13.0",
+  "websockets>=15.0",
+  "python-socks[asyncio]>=2.4.0",
   "orjson>=3.10.0",
   "structlog>=24.4.0",
   "python-dotenv>=1.0.1",
@@ -39,6 +40,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ai = [
+  "tiktoken>=0.7.0",
+]
 dev = [
   "pytest>=8.3.0",
   "pytest-asyncio>=0.23.0",

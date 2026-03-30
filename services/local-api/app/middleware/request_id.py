@@ -1,4 +1,4 @@
-"""Request ID middleware.
+"""Request ID middleware (pure ASGI for minimal overhead).
 
 Assigns a UUID to each incoming request, binds it to structlog context,
 stores it on ``request.state``, and adds it as ``X-Request-ID`` response header.
@@ -9,30 +9,38 @@ If the request already carries an ``X-Request-ID`` header, that value is reused.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pnlclaw_core.logging import bind_request_id
 
 
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Inject a unique request ID into every request/response cycle."""
+class RequestIDMiddleware:
+    """Pure ASGI middleware — avoids BaseHTTPMiddleware thread overhead."""
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        # Reuse incoming header or generate a new UUID
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
 
-        # Store on request state (used by error handler and routes)
-        request.state.request_id = request_id
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
 
-        # Bind to structlog context for the duration of this request
+        headers = dict(scope.get("headers", []))
+        request_id = headers.get(b"x-request-id", b"").decode() or uuid.uuid4().hex
+
+        scope.setdefault("state", {})["request_id"] = request_id
         bind_request_id(request_id)
 
-        response = await call_next(request)
-
-        # Echo back in response header
-        response.headers["X-Request-ID"] = request_id
-
-        return response
+        if scope["type"] == "http":
+            async def send_with_id(message: Any) -> None:
+                if message["type"] == "http.response.start":
+                    h = list(message.get("headers", []))
+                    h.append((b"x-request-id", request_id.encode()))
+                    message["headers"] = h
+                await send(message)
+            await self.app(scope, receive, send_with_id)
+        else:
+            await self.app(scope, receive, send)

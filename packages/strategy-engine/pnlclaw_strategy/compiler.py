@@ -93,13 +93,31 @@ def _resolve_indicator(
     Returns (indicator_instance, column_name). Uses cache to share
     indicator instances when the same indicator+params combo appears
     multiple times.
+
+    For ``macd_signal`` and ``macd_histogram``, the underlying MACD
+    indicator is resolved and the appropriate sub-column name is returned.
     """
-    col_name = _make_column_name(name, params)
+    # Map macd_signal / macd_histogram to the base macd indicator
+    macd_sub: str | None = None
+    resolved_name = name
+    if name in ("macd_signal", "macd_histogram"):
+        macd_sub = name  # remember which sub-column
+        resolved_name = "macd"
+    elif name in ("bbands_upper", "bbands_lower", "bbands_middle"):
+        macd_sub = name
+        resolved_name = "bbands"
+
+    col_name = _make_column_name(resolved_name, params)
+
+    # For MACD sub-columns, derive the appropriate column name
+    if macd_sub is not None:
+        col_name = col_name.replace("macd", macd_sub, 1)
+
     if col_name in cache:
         return cache[col_name], col_name
 
     try:
-        cls = registry.get(name)
+        cls = registry.get(resolved_name)
     except IndicatorNotFoundError as exc:
         raise CompilationError(str(exc)) from exc
 
@@ -109,7 +127,7 @@ def _resolve_indicator(
         kwargs["period"] = int(params["period"])
 
     # MACD-specific params
-    if name == "macd":
+    if resolved_name == "macd":
         if "fast_period" in params:
             kwargs["fast_period"] = int(params["fast_period"])
         if "slow_period" in params:
@@ -125,6 +143,27 @@ def _resolve_indicator(
         ) from exc
 
     cache[col_name] = instance
+
+    # For MACD (whether base or sub-column), register all three columns
+    if resolved_name == "macd":
+        base_col = _make_column_name("macd", params)
+        signal_col = base_col.replace("macd", "macd_signal", 1)
+        hist_col = base_col.replace("macd", "macd_histogram", 1)
+        cache.setdefault(base_col, instance)
+        cache.setdefault(signal_col, instance)
+        cache.setdefault(hist_col, instance)
+
+    # For Bollinger Bands, register upper/middle/lower columns
+    if resolved_name == "bbands":
+        base_col = _make_column_name("bbands", params)
+        upper_col = base_col.replace("bbands", "bbands_upper", 1)
+        middle_col = base_col.replace("bbands", "bbands_middle", 1)
+        lower_col = base_col.replace("bbands", "bbands_lower", 1)
+        cache.setdefault(base_col, instance)
+        cache.setdefault(upper_col, instance)
+        cache.setdefault(middle_col, instance)
+        cache.setdefault(lower_col, instance)
+
     return instance, col_name
 
 

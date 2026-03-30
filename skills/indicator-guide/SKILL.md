@@ -1,3 +1,13 @@
+---
+name: indicator-guide
+description: Explains common technical indicators (SMA, EMA, RSI, MACD) with quantitative intuition and example calculations
+version: 0.1.0
+tags: [indicators, education, technical-analysis]
+user_invocable: true
+model_invocable: true
+requires_tools: [market_kline]
+---
+
 # Indicator Guide
 
 ## Description

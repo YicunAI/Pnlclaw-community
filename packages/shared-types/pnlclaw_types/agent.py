@@ -25,6 +25,7 @@ class AgentRole(str, Enum):
     MARKET_ANALYST = "market_analyst"
     STRATEGY_ARCHITECT = "strategy_architect"
     RISK_GUARDIAN = "risk_guardian"
+    STRATEGY_CODER = "strategy_coder"
 
 
 class MarketRegime(str, Enum):
@@ -41,6 +42,8 @@ class AgentStreamEventType(str, Enum):
     TEXT_DELTA = "text_delta"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
+    THINKING = "thinking"
+    REFLECTION = "reflection"
     DONE = "done"
 
 

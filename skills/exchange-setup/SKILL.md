@@ -1,3 +1,13 @@
+---
+name: exchange-setup
+description: Guides the user through exchange connectivity and configuration safely, without handling secrets in chat
+version: 0.1.0
+tags: [exchange, setup, configuration]
+user_invocable: true
+model_invocable: true
+requires_tools: []
+---
+
 # Exchange Setup
 
 ## Description

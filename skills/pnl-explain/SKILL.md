@@ -1,3 +1,13 @@
+---
+name: pnl-explain
+description: Explains profit and loss composition and attribution for paper accounts using engine-calculated breakdowns
+version: 0.1.0
+tags: [pnl, explanation, paper-trading]
+user_invocable: true
+model_invocable: true
+requires_tools: [explain_pnl, paper_pnl]
+---
+
 # PnL Explanation
 
 ## Description

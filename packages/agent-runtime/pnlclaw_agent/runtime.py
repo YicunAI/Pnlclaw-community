@@ -7,6 +7,8 @@ LLM is injected via Protocol (no direct import of pnlclaw_llm).
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import time
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
@@ -16,6 +18,8 @@ from pnlclaw_agent.prompt_builder import AgentContext, build_system_prompt
 from pnlclaw_agent.tool_catalog import ToolCatalog
 from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # LLM Provider Protocol (structural typing — no import of pnlclaw_llm)
 # ---------------------------------------------------------------------------
@@ -23,11 +27,7 @@ from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
 
 @runtime_checkable
 class LLMProviderProtocol(Protocol):
-    """Protocol matching the LLMProvider ABC from pnlclaw_llm.
-
-    Any object implementing these three async methods satisfies this
-    protocol at runtime, without needing to import pnlclaw_llm.
-    """
+    """Protocol matching the LLMProvider ABC from pnlclaw_llm."""
 
     async def chat(self, messages: list[Any], **kwargs: Any) -> str: ...
 
@@ -37,37 +37,9 @@ class LLMProviderProtocol(Protocol):
         self, messages: list[Any], output_schema: dict[str, Any], **kwargs: Any
     ) -> dict[str, Any]: ...
 
-
-# ---------------------------------------------------------------------------
-# Response schema for structured LLM output
-# ---------------------------------------------------------------------------
-
-AGENT_RESPONSE_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "thinking": {
-            "type": "string",
-            "description": "Internal reasoning (not shown to user)",
-        },
-        "tool_calls": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "tool": {"type": "string"},
-                    "arguments": {"type": "object"},
-                },
-                "required": ["tool", "arguments"],
-            },
-            "description": "Tool calls to execute (empty if responding directly)",
-        },
-        "response": {
-            "type": "string",
-            "description": "Text response to the user (empty if calling tools)",
-        },
-    },
-    "required": ["response"],
-}
+    async def chat_with_tools(
+        self, messages: list[Any], tools: list[dict[str, Any]] | None = None, **kwargs: Any
+    ) -> Any: ...
 
 
 # ---------------------------------------------------------------------------
@@ -79,19 +51,16 @@ class AgentRuntimeError(Exception):
     """Raised when the agent runtime encounters an unrecoverable error."""
 
 
-class AgentRuntime:
-    """Core agent conversation loop.
+class LegacyAgentRuntime:
+    """Legacy agent conversation loop (pre-ReAct).
 
-    Orchestrates: user message → build prompt → LLM → parse tool calls →
-    execute tools → feed results back → continue or reply.
+    Uses plain ``chat`` for LLM interaction to maximize provider
+    compatibility.  When the model's response is valid JSON containing
+    ``tool_calls``, those tools are executed and results fed back.
+    Otherwise the text is returned directly.
 
-    Args:
-        llm: LLM provider (injected, satisfies LLMProviderProtocol).
-        tool_catalog: Registry of available tools.
-        context_manager: Conversation history and token management.
-        prompt_context: Context for building the system prompt.
-        max_tool_rounds: Maximum number of tool-calling rounds per
-            user message (default 10).
+    .. deprecated:: 0.1.1
+        Use ``ReActAgentRuntime`` (aliased as ``AgentRuntime``) instead.
     """
 
     def __init__(
@@ -109,33 +78,18 @@ class AgentRuntime:
         self._max_tool_rounds = max_tool_rounds
 
     async def process_message(self, user_message: str) -> AsyncIterator[AgentStreamEvent]:
-        """Process a user message through the LLM with tool calling.
+        """Process a user message through the LLM with optional tool calling.
 
-        Yields AgentStreamEvent objects:
-        - TOOL_CALL: when the LLM requests a tool
-        - TOOL_RESULT: after tool execution
-        - TEXT_DELTA: text response from the LLM
-        - DONE: conversation turn complete
-
-        Args:
-            user_message: The user's input text.
-
-        Yields:
-            AgentStreamEvent instances.
+        Yields AgentStreamEvent objects (TEXT_DELTA, TOOL_CALL, TOOL_RESULT, DONE).
         """
-        # Add user message to context
         self._context.add_message("user", user_message)
 
         for _round_num in range(self._max_tool_rounds):
-            # Build system prompt
             system_prompt = build_system_prompt(self._prompt_context)
-
-            # Construct LLM messages
             llm_messages = self._build_llm_messages(system_prompt)
 
-            # Call LLM for structured response
             try:
-                response = await self._llm.generate_structured(llm_messages, AGENT_RESPONSE_SCHEMA)
+                raw_text = await self._llm.chat(llm_messages)
             except Exception as exc:
                 yield _event(
                     AgentStreamEventType.TEXT_DELTA,
@@ -144,12 +98,10 @@ class AgentRuntime:
                 yield _event(AgentStreamEventType.DONE, {})
                 return
 
-            # Extract tool calls and response
-            tool_calls = response.get("tool_calls", [])
-            text_response = response.get("response", "")
+            # Try to interpret as structured JSON (for tool calling)
+            tool_calls, text_response = self._parse_response(raw_text)
 
             if not tool_calls:
-                # No tool calls — return text response
                 if text_response:
                     self._context.add_message("assistant", text_response)
                     yield _event(
@@ -169,7 +121,6 @@ class AgentRuntime:
                     {"tool": tool_name, "arguments": tool_args},
                 )
 
-                # Check policy
                 if not self._catalog.is_tool_allowed(tool_name):
                     error_text = f"Tool '{tool_name}' is blocked by security policy."
                     self._context.add_message("tool", error_text, {"tool_name": tool_name})
@@ -179,7 +130,6 @@ class AgentRuntime:
                     )
                     continue
 
-                # Get tool
                 tool = self._catalog.get(tool_name)
                 if tool is None:
                     error_text = f"Tool '{tool_name}' not found."
@@ -190,9 +140,12 @@ class AgentRuntime:
                     )
                     continue
 
-                # Execute tool in thread pool (tools are sync)
                 try:
-                    result = await asyncio.to_thread(tool.execute, tool_args)
+                    result = None
+                    if hasattr(tool, "async_execute"):
+                        result = await tool.async_execute(tool_args)
+                    if result is None:
+                        result = await asyncio.to_thread(tool.execute, tool_args)
                 except Exception as exc:
                     error_text = f"Tool execution error: {exc}"
                     self._context.add_message("tool", error_text, {"tool_name": tool_name})
@@ -202,7 +155,6 @@ class AgentRuntime:
                     )
                     continue
 
-                # Add result to context
                 result_text = (
                     result.output if not result.error else f"Error: {result.error}\n{result.output}"
                 )
@@ -212,7 +164,6 @@ class AgentRuntime:
                     {"tool": tool_name, "output": result.output, "error": result.error},
                 )
 
-            # Add assistant message noting tool calls were made
             call_summary = ", ".join(tc.get("tool", "") for tc in tool_calls)
             self._context.add_message(
                 "assistant",
@@ -220,9 +171,6 @@ class AgentRuntime:
                 {"tool_calls": tool_calls},
             )
 
-            # Continue loop for next LLM round with tool results
-
-        # Exceeded max rounds
         warning = (
             f"Reached maximum tool calling rounds ({self._max_tool_rounds}). "
             f"Stopping to prevent infinite loops."
@@ -232,6 +180,34 @@ class AgentRuntime:
         yield _event(AgentStreamEventType.DONE, {})
 
     # -- internal ------------------------------------------------------------
+
+    @staticmethod
+    def _parse_response(raw_text: str) -> tuple[list[dict[str, Any]], str]:
+        """Parse LLM text into (tool_calls, text_response).
+
+        If the text is valid JSON with a ``tool_calls`` list, those are
+        extracted.  Otherwise the entire text is treated as a direct reply.
+        """
+        stripped = raw_text.strip()
+        if not stripped:
+            return [], ""
+
+        # Only try JSON parsing if it looks like JSON
+        if stripped.startswith("{"):
+            try:
+                parsed = json.loads(stripped)
+                if isinstance(parsed, dict):
+                    tool_calls = parsed.get("tool_calls", [])
+                    text = parsed.get("response", "")
+                    if isinstance(tool_calls, list) and tool_calls:
+                        return tool_calls, text
+                    if text:
+                        return [], text
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # Not JSON or no tool_calls — treat entire text as reply
+        return [], stripped
 
     def _build_llm_messages(self, system_prompt: str) -> list[dict[str, str]]:
         """Build the message list for the LLM call."""
@@ -244,14 +220,16 @@ class AgentRuntime:
 
 
 # ---------------------------------------------------------------------------
-# Helper
+# Helper — re-export from shared module
 # ---------------------------------------------------------------------------
 
+from pnlclaw_agent.events import make_event as _event  # noqa: E402
 
-def _event(event_type: AgentStreamEventType, data: dict[str, Any]) -> AgentStreamEvent:
-    """Create an AgentStreamEvent with current timestamp."""
-    return AgentStreamEvent(
-        type=event_type,
-        data=data,
-        timestamp=int(time.time() * 1000),
-    )
+
+# ---------------------------------------------------------------------------
+# Backward-compatible alias: AgentRuntime → ReActAgentRuntime
+# ---------------------------------------------------------------------------
+
+from pnlclaw_agent.react import ReActAgentRuntime  # noqa: E402
+
+AgentRuntime = ReActAgentRuntime

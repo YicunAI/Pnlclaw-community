@@ -13,6 +13,7 @@ class WSClientConfig(BaseModel):
     reconnect_enabled: bool = Field(True, description="Whether auto-reconnect is enabled")
     stall_timeout_s: float = Field(30.0, gt=0, description="Stall detection timeout in seconds")
     max_restarts_per_hour: int = Field(10, ge=1, description="Max reconnection attempts per hour")
+    proxy_url: str | None = Field(None, description="SOCKS5/HTTP proxy URL, e.g. 'socks5h://127.0.0.1:1081'")
 
 
 class ReconnectConfig(BaseModel):

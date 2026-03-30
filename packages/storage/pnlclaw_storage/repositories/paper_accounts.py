@@ -65,7 +65,7 @@ class PaperAccountRepository:
         Returns:
             Account dict or ``None`` if not found.
         """
-        rows = await self._db.execute(
+        rows = await self._db.query(
             """
             SELECT id, name, initial_balance, current_balance, status,
                    created_at, updated_at
@@ -76,6 +76,17 @@ class PaperAccountRepository:
         if not rows:
             return None
         return dict(rows[0])
+
+    async def delete_account(self, account_id: str) -> bool:
+        """Permanently delete a paper account.
+        
+        Cascades to orders and positions in database.
+        """
+        rows = await self._db.execute(
+            "DELETE FROM paper_accounts WHERE id = ?", (account_id,)
+        )
+        # rows is empty for DELETE but commit was successful
+        return True
 
     # ------------------------------------------------------------------
     # Orders
@@ -136,7 +147,7 @@ class PaperAccountRepository:
             List of order dicts, newest first.
         """
         if status is not None:
-            rows = await self._db.execute(
+            rows = await self._db.query(
                 """
                 SELECT id, account_id, symbol, side, type, status,
                        quantity, price, filled_quantity, avg_fill_price,
@@ -148,7 +159,7 @@ class PaperAccountRepository:
                 (account_id, status),
             )
         else:
-            rows = await self._db.execute(
+            rows = await self._db.query(
                 """
                 SELECT id, account_id, symbol, side, type, status,
                        quantity, price, filled_quantity, avg_fill_price,
@@ -208,7 +219,7 @@ class PaperAccountRepository:
         Returns:
             List of position dicts.
         """
-        rows = await self._db.execute(
+        rows = await self._db.query(
             """
             SELECT id, account_id, symbol, side, quantity,
                    avg_entry_price, unrealized_pnl, realized_pnl, updated_at
@@ -219,3 +230,55 @@ class PaperAccountRepository:
             (account_id,),
         )
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------------
+    # Equity History
+    # ------------------------------------------------------------------
+
+    async def save_equity_point(self, account_id: str, equity: float) -> str:
+        """Record a current equity point for an account."""
+        import uuid
+        now = datetime.now(UTC).isoformat()
+        point_id = f"eh-{uuid.uuid4().hex[:8]}"
+        await self._db.execute(
+            """
+            INSERT INTO paper_equity_history (id, account_id, timestamp, equity)
+            VALUES (?, ?, ?, ?)
+            """,
+            (point_id, account_id, now, equity),
+        )
+        return point_id
+
+    async def get_equity_history(
+        self, account_id: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """Retrieve the most recent equity points for an account (in ASC order)."""
+        rows = await self._db.query(
+            """
+            SELECT timestamp, equity FROM (
+                SELECT timestamp, equity
+                FROM paper_equity_history
+                WHERE account_id = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ) sub
+            ORDER BY timestamp ASC
+            """,
+            (account_id, limit),
+        )
+        return [dict(r) for r in rows]
+
+    async def has_equity_history(self, account_id: str) -> bool:
+        """Check if an account has any recorded equity history."""
+        rows = await self._db.query(
+            "SELECT 1 FROM paper_equity_history WHERE account_id = ? LIMIT 1",
+            (account_id,),
+        )
+        return len(rows) > 0
+
+    async def clear_equity_history(self, account_id: str) -> None:
+        """Delete all equity history for an account (used on account reset)."""
+        await self._db.execute(
+            "DELETE FROM paper_equity_history WHERE account_id = ?",
+            (account_id,),
+        )

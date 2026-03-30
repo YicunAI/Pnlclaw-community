@@ -1,13 +1,19 @@
 """Market data event models for PnLClaw.
 
-All market events carry ``exchange``, ``symbol``, and ``timestamp`` standard fields.
+All market events carry ``exchange``, ``symbol``, ``market_type``, and
+``timestamp`` standard fields.
 """
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from pnlclaw_types.common import Symbol, Timestamp
+
+MarketType = Literal["spot", "futures"]
+"""Supported market types across all exchanges."""
 
 # ---------------------------------------------------------------------------
 # PriceLevel — helper for order book entries
@@ -32,12 +38,16 @@ class TickerEvent(BaseModel):
     """Real-time ticker snapshot from an exchange."""
 
     exchange: str = Field(..., description="Exchange identifier, e.g. 'binance'")
+    market_type: MarketType = Field("spot", description="Market type: spot or futures")
     symbol: Symbol = Field(..., description="Normalized trading pair, e.g. 'BTC/USDT'")
     timestamp: Timestamp = Field(..., description="Event time in millisecond epoch")
     last_price: float = Field(..., gt=0, description="Last traded price")
     bid: float = Field(..., ge=0, description="Best bid price")
     ask: float = Field(..., ge=0, description="Best ask price")
     volume_24h: float = Field(..., ge=0, description="24-hour trading volume in base currency")
+    quote_volume_24h: float | None = Field(None, ge=0, description="24-hour trading volume in quote currency (USDT)")
+    high_24h: float | None = Field(None, ge=0, description="24-hour high price")
+    low_24h: float | None = Field(None, ge=0, description="24-hour low price")
     change_24h_pct: float = Field(..., description="24-hour price change percentage")
 
     model_config = ConfigDict(
@@ -67,6 +77,7 @@ class TradeEvent(BaseModel):
     """Individual trade (tick) from an exchange."""
 
     exchange: str = Field(..., description="Exchange identifier")
+    market_type: MarketType = Field("spot", description="Market type: spot or futures")
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Trade time in millisecond epoch")
     trade_id: str = Field(..., description="Exchange-assigned trade ID")
@@ -100,6 +111,7 @@ class KlineEvent(BaseModel):
     """Candlestick / K-line data point."""
 
     exchange: str = Field(..., description="Exchange identifier")
+    market_type: MarketType = Field("spot", description="Market type: spot or futures")
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Kline open time in millisecond epoch")
     interval: str = Field(..., description="Kline interval, e.g. '1m', '1h', '1d'")
@@ -139,6 +151,7 @@ class OrderBookL2Snapshot(BaseModel):
     """Full L2 order book snapshot."""
 
     exchange: str = Field(..., description="Exchange identifier")
+    market_type: MarketType = Field("spot", description="Market type: spot or futures")
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Snapshot time in millisecond epoch")
     sequence_id: int = Field(..., description="Sequence number for ordering / gap detection")
@@ -180,6 +193,7 @@ class OrderBookL2Delta(BaseModel):
     """Incremental L2 order book update (delta)."""
 
     exchange: str = Field(..., description="Exchange identifier")
+    market_type: MarketType = Field("spot", description="Market type: spot or futures")
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Delta time in millisecond epoch")
     sequence_id: int = Field(..., description="Sequence number for ordering / gap detection")

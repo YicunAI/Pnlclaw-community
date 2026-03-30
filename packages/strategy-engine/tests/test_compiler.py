@@ -200,3 +200,37 @@ class TestCompile:
         compiled = compile(config)
         # Should be exactly 2 unique indicators (SMA(20) and SMA(50))
         assert len(compiled.indicators) == 2
+
+    def test_macd_exposes_signal_and_histogram(self) -> None:
+        """P6: Compiling a MACD strategy should register macd, macd_signal, macd_histogram columns."""
+        entry_rule = ConditionRule(
+            indicator="macd",
+            params={"fast_period": 12, "slow_period": 26, "signal_period": 9},
+            operator="crosses_above",
+            comparator={"indicator": "macd_signal", "params": {"fast_period": 12, "slow_period": 26, "signal_period": 9}},
+        )
+        exit_rule = ConditionRule(
+            indicator="macd",
+            params={"fast_period": 12, "slow_period": 26, "signal_period": 9},
+            operator="crosses_below",
+            comparator={"indicator": "macd_signal", "params": {"fast_period": 12, "slow_period": 26, "signal_period": 9}},
+        )
+        config = EngineStrategyConfig(
+            id="macd-test",
+            name="MACD Test",
+            type="macd",
+            symbols=["BTC/USDT"],
+            interval="1h",
+            parsed_entry_rules=EntryRules(long=[entry_rule]),
+            parsed_exit_rules=ExitRules(close_long=[exit_rule]),
+        )
+        compiled = compile(config)
+
+        col_names = set(compiled.indicators.keys())
+        # Must have macd line, signal, and histogram columns
+        signal_cols = [c for c in col_names if c.startswith("macd_signal")]
+        histogram_cols = [c for c in col_names if c.startswith("macd_histogram")]
+        base_cols = [c for c in col_names if c.startswith("macd_") and not c.startswith("macd_signal") and not c.startswith("macd_histogram")]
+        assert len(signal_cols) >= 1, f"macd_signal not in {col_names}"
+        assert len(histogram_cols) >= 1, f"macd_histogram not in {col_names}"
+        assert len(base_cols) >= 1, f"base MACD column not in {col_names}"

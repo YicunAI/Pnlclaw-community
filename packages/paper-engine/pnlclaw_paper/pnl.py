@@ -29,12 +29,17 @@ def calculate_pnl(
     """
     realized = position.realized_pnl
 
-    # Unrealized PnL for open quantity
-    if position.quantity > 0 and current_price > 0:
+    # Unrealized PnL: use base quantity for price-based calculation
+    base_qty = getattr(position, "quantity_base", 0.0) or (
+        position.quantity / position.avg_entry_price
+        if position.avg_entry_price > 0
+        else 0.0
+    )
+    if base_qty > 0 and current_price > 0:
         if position.side == OrderSide.BUY:
-            unrealized = (current_price - position.avg_entry_price) * position.quantity
+            unrealized = (current_price - position.avg_entry_price) * base_qty
         else:
-            unrealized = (position.avg_entry_price - current_price) * position.quantity
+            unrealized = (position.avg_entry_price - current_price) * base_qty
     else:
         unrealized = 0.0
 

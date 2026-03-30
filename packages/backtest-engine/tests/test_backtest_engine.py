@@ -99,3 +99,83 @@ class TestBacktestEngine:
         assert result.start_date is not None
         assert result.end_date is not None
         assert result.created_at > 0
+
+    def test_result_contains_symbol_and_interval(self) -> None:
+        engine = BacktestEngine()
+        klines = _make_klines([100.0, 105.0, 110.0])
+        result = engine.run(AlwaysBuyStrategy(), klines)
+
+        assert result.symbol == "BTC/USDT"
+        assert result.interval == "1h"
+
+    def test_config_overrides_symbol_interval(self) -> None:
+        config = BacktestConfig(symbol="ETH/USDT", interval="4h")
+        engine = BacktestEngine(config=config)
+        klines = _make_klines([100.0, 105.0, 110.0])
+        result = engine.run(AlwaysBuyStrategy(), klines)
+
+        assert result.symbol == "ETH/USDT"
+        assert result.interval == "4h"
+
+
+class AlwaysShortStrategy:
+    """Sells (short) on first bar, buys (cover) on second."""
+
+    def __init__(self) -> None:
+        self._bar_count = 0
+
+    def on_kline(self, event: KlineEvent) -> Signal | None:
+        self._bar_count += 1
+        if self._bar_count == 1:
+            return Signal(
+                strategy_id="test-short",
+                symbol=event.symbol,
+                side=OrderSide.SELL,
+                strength=1.0,
+                timestamp=event.timestamp,
+                reason="open short",
+            )
+        if self._bar_count == 2:
+            return Signal(
+                strategy_id="test-short",
+                symbol=event.symbol,
+                side=OrderSide.BUY,
+                strength=1.0,
+                timestamp=event.timestamp,
+                reason="close short",
+            )
+        return None
+
+    def reset(self) -> None:
+        self._bar_count = 0
+
+
+class TestShortSelling:
+    """P11: Short position support in BacktestEngine."""
+
+    def test_short_profitable_on_decline(self) -> None:
+        """Open short at 100, close at 90 → profitable."""
+        engine = BacktestEngine(config=BacktestConfig(initial_cash=10000.0))
+        klines = _make_klines([100.0, 90.0, 95.0])
+        result = engine.run(AlwaysShortStrategy(), klines)
+
+        assert result.trades_count == 1
+        assert result.metrics.total_return > 0  # shorted at 100, covered at 90
+
+    def test_short_loss_on_increase(self) -> None:
+        """Open short at 100, close at 110 → loss."""
+        engine = BacktestEngine(config=BacktestConfig(initial_cash=10000.0))
+        klines = _make_klines([100.0, 110.0, 105.0])
+        result = engine.run(AlwaysShortStrategy(), klines)
+
+        assert result.trades_count == 1
+        assert result.metrics.total_return < 0
+
+    def test_long_only_backward_compat(self) -> None:
+        """Existing long-only strategies should still work identically."""
+        engine = BacktestEngine(config=BacktestConfig(initial_cash=10000.0))
+        klines = _make_klines([100.0, 110.0, 105.0])
+        result = engine.run(AlwaysBuyStrategy(), klines)
+
+        assert result.trades_count == 1
+        assert result.metrics.total_return > 0

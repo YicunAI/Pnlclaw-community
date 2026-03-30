@@ -50,6 +50,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --animate-spotlight: spotlight 2s ease 0.75s 1 forwards;
+  --animate-logo-glow: logo-glow 2s ease-in-out infinite;
 
   @keyframes spotlight {
     0% {
@@ -61,10 +62,80 @@
       transform: translate(-50%, -40%) scale(1);
     }
   }
+
+  @keyframes logo-glow {
+    0%, 100% {
+      filter: brightness(1) drop-shadow(0 0 2px rgba(0, 0, 0, 0.2));
+    }
+    50% {
+      filter: brightness(0.5) drop-shadow(0 0 8px rgba(0, 0, 0, 0.4));
+    }
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* --- Optimized Custom Scrollbars --- */
+/* For WebKit (Chrome, Edge, Safari, Electron) */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.3); /* Using --primary color with transparency */
+}
+
+/* For Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+/* Hide scrollbar by default and only show on hover (optional enhancement) */
+.hover-scrollbar {
+  scrollbar-width: none;
+}
+.hover-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hover-scrollbar:hover {
+  scrollbar-width: thin;
+}
+.hover-scrollbar:hover::-webkit-scrollbar {
+  display: block;
+}
+
+@keyframes scroll-dot {
+  0%, 100% { transform: translateY(0); opacity: 1; }
+  50% { transform: translateY(8px); opacity: 0.3; }
+}
+.animate-scroll-dot {
+  animation: scroll-dot 1.5s ease-in-out infinite;
+}
+
+@property --border-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes border-spin {
+  to { --border-angle: 360deg; }
+}
+.animate-border-spin {
+  animation: border-spin 4s linear infinite;
 }

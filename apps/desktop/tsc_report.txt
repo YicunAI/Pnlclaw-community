@@ -1,0 +1,9 @@
+﻿app/(dashboard)/strategies/[id]/studio/page.tsx(386,24): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/(dashboard)/strategies/[id]/studio/page.tsx(388,75): error TS18047: 'res.data' is possibly 'null'.
+app/(dashboard)/strategies/[id]/studio/page.tsx(484,28): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/(dashboard)/strategies/[id]/studio/page.tsx(486,79): error TS18047: 'res.data' is possibly 'null'.
+app/(dashboard)/strategies/[id]/studio/page.tsx(487,72): error TS18047: 'res.data' is possibly 'null'.
+components/strategy/ai-sidebar.tsx(562,61): error TS2345: Argument of type 'string' is not assignable to parameter of type '"common.language" | "common.english" | "common.chinese" | "common.loading" | "common.save" | "common.and" | "common.more" | "nav.dashboard" | "nav.markets" | "nav.backtests" | ... 744 more ... | "runner.strategyRunning"'.
+components/strategy/ai-sidebar.tsx(590,29): error TS2345: Argument of type 'string' is not assignable to parameter of type '"common.language" | "common.english" | "common.chinese" | "common.loading" | "common.save" | "common.and" | "common.more" | "nav.dashboard" | "nav.markets" | "nav.backtests" | ... 744 more ... | "runner.strategyRunning"'.

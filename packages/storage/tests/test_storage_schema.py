@@ -31,6 +31,8 @@ EXPECTED_TABLES = [
     "paper_orders",
     "paper_positions",
     "audit_logs",
+    "strategy_versions",
+    "strategy_deployments",
 ]
 
 
@@ -47,7 +49,7 @@ async def test_idempotent_migration(conn: aiosqlite.Connection):
     runner = MigrationRunner(ALL_MIGRATIONS)
     first = await runner.run_pending(conn)
     second = await runner.run_pending(conn)
-    assert len(first) == 1
+    assert len(first) == len(ALL_MIGRATIONS)
     assert len(second) == 0
 
 
@@ -55,11 +57,17 @@ async def test_idempotent_migration(conn: aiosqlite.Connection):
 async def test_strategies_columns(migrated_conn: aiosqlite.Connection):
     cursor = await migrated_conn.execute("PRAGMA table_info(strategies)")
     cols = {row[1] for row in await cursor.fetchall()}
-    assert cols >= {"id", "name", "type", "config_json", "created_at", "updated_at"}
+    assert cols >= {"id", "name", "type", "config_json", "created_at", "updated_at", "version", "lifecycle_state"}
+
+
 
 
 @pytest.mark.asyncio
-async def test_backtests_foreign_key(migrated_conn: aiosqlite.Connection):
+async def test_backtests_columns_include_strategy_version(migrated_conn: aiosqlite.Connection):
+    cursor = await migrated_conn.execute("PRAGMA table_info(backtests)")
+    cols = {row[1] for row in await cursor.fetchall()}
+    assert "strategy_version" in cols
+
     cursor = await migrated_conn.execute("PRAGMA foreign_key_list(backtests)")
     fks = await cursor.fetchall()
     assert any(row[2] == "strategies" for row in fks)

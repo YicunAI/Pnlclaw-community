@@ -4,10 +4,10 @@ from pnlclaw_core.plugin_sdk.api import PnLClawPluginAPI
 
 
 class TestPnLClawPluginAPI:
-    def test_has_12_register_methods(self):
-        """Spec: PnLClawPluginAPI must have 12 register_* methods."""
+    def test_has_14_register_methods(self):
+        """Spec: PnLClawPluginAPI must have 14 register_* methods."""
         methods = [m for m in dir(PnLClawPluginAPI) if m.startswith("register_")]
-        assert len(methods) == 12
+        assert len(methods) == 14
 
     def test_required_methods(self):
         expected = {
@@ -23,6 +23,8 @@ class TestPnLClawPluginAPI:
             "register_health_check",
             "register_command",
             "register_middleware",
+            "register_mcp_server",
+            "register_skill",
         }
         actual = {m for m in dir(PnLClawPluginAPI) if m.startswith("register_")}
         assert actual == expected

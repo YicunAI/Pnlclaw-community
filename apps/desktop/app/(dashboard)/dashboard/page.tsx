@@ -1,9 +1,7 @@
 "use client"
 
-import React, { useEffect, useState, useCallback } from "react"
+import React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -15,23 +13,47 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Activity,
   Wifi,
   WifiOff,
-  Send,
   TrendingUp,
   TrendingDown,
   FlaskConical,
   Wallet,
+  Landmark,
 } from "lucide-react"
 import {
-  checkHealth,
-  getBacktests,
-  getPaperAccounts,
-  sendAgentChat,
-  type BacktestData,
-  type PaperAccountData,
-} from "@/lib/api-client"
+  useHealth,
+  useBacktestList,
+  usePaperAccounts,
+  useTradingModeData,
+  useLiveBalances,
+  useLivePositions,
+} from "@/lib/hooks/use-api"
+import type { BacktestData } from "@/lib/api-client"
+import { useI18n } from "@/components/i18n/use-i18n"
+
+function Sparkline({ curve }: { curve: number[] }) {
+  if (curve.length < 2) return <span className="text-xs text-muted-foreground">—</span>
+  const w = 110
+  const h = 36
+  const min = Math.min(...curve)
+  const max = Math.max(...curve)
+  const range = max - min || 1
+  const pts = curve
+    .map((v, i) => {
+      const x = (i / (curve.length - 1)) * w
+      const y = h - ((v - min) / range) * h
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(" ")
+  const isUp = curve[curve.length - 1] >= curve[0]
+  const stroke = isUp ? "#22c55e" : "#ef4444"
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} style={{ display: "block" }}>
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 function StatusCard({
   label,
@@ -62,91 +84,116 @@ function StatusCard({
 }
 
 export default function DashboardPage() {
-  const [apiOk, setApiOk] = useState<boolean | null>(null)
-  const [backtests, setBacktests] = useState<BacktestData[]>([])
-  const [accounts, setAccounts] = useState<PaperAccountData[]>([])
-  const [loading, setLoading] = useState(true)
+  const { locale, t } = useI18n()
 
-  const [chatInput, setChatInput] = useState("")
-  const [chatMessages, setChatMessages] = useState<
-    { role: "user" | "assistant"; content: string }[]
-  >([])
-  const [chatLoading, setChatLoading] = useState(false)
+  const { data: health } = useHealth()
+  const { data: allBacktests, isLoading: btLoading } = useBacktestList()
+  const { data: accounts, isLoading: accLoading } = usePaperAccounts()
+  const { data: tradingMode } = useTradingModeData()
 
-  useEffect(() => {
-    async function load() {
-      const health = await checkHealth()
-      setApiOk(health.data?.status === "ok" || health.error === null)
+  const apiOk = health === undefined ? null : health ? health.status === "ok" : false
+  const backtests = allBacktests ? allBacktests.slice(0, 5) : []
+  const safeAccounts = accounts ?? []
+  const isLive = tradingMode?.mode === "live"
+  const loading = btLoading || accLoading
 
-      const bt = await getBacktests()
-      if (bt.data) setBacktests(Array.isArray(bt.data) ? bt.data.slice(0, 5) : [])
+  const { data: liveBalances } = useLiveBalances(isLive)
+  const { data: livePositions } = useLivePositions(isLive)
 
-      const acc = await getPaperAccounts()
-      if (acc.data) setAccounts(Array.isArray(acc.data) ? acc.data : [])
+  const safeLiveBalances = liveBalances ?? []
+  const safeLivePositions = livePositions ?? []
 
-      setLoading(false)
-    }
-    load()
-  }, [])
-
-  const handleChat = useCallback(async () => {
-    if (!chatInput.trim() || chatLoading) return
-    const msg = chatInput.trim()
-    setChatInput("")
-    setChatMessages((prev) => [...prev, { role: "user", content: msg }])
-    setChatLoading(true)
-
-    let response = ""
-    await sendAgentChat(msg, (event) => {
-      if (event.type === "text" || event.type === "content") {
-        response += event.data
-        setChatMessages((prev) => {
-          const updated = [...prev]
-          const last = updated[updated.length - 1]
-          if (last?.role === "assistant") {
-            updated[updated.length - 1] = { ...last, content: response }
-          } else {
-            updated.push({ role: "assistant", content: response })
-          }
-          return updated
-        })
-      }
-    })
-
-    if (!response) {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "API not reachable. Start the local API server to use the AI assistant." },
-      ])
-    }
-    setChatLoading(false)
-  }, [chatInput, chatLoading])
-
-  const totalPnl = accounts.reduce(
-    (sum, a) => sum + (a.realized_pnl ?? 0) + (a.unrealized_pnl ?? 0),
+  const paperTotalPnl = safeAccounts.reduce(
+    (sum, a) => sum + (a.realized_pnl ?? a.total_realized_pnl ?? 0) + (a.unrealized_pnl ?? 0),
     0
   )
-  const totalBalance = accounts.reduce((sum, a) => sum + (a.balance ?? 0), 0)
+  const paperTotalBalance = safeAccounts.reduce(
+    (sum, a) => sum + (a.equity ?? (a.initial_balance + (a.total_realized_pnl ?? 0) - (a.total_fee ?? 0) + (a.unrealized_pnl ?? 0))),
+    0
+  )
+
+  const liveTotalBalance = safeLiveBalances.reduce(
+    (sum, b) => sum + (b.free ?? 0) + (b.locked ?? 0),
+    0
+  )
+  const liveTotalPnl = safeLivePositions.reduce(
+    (sum, p) => sum + (p.unrealized_pnl ?? 0) + (p.realized_pnl ?? 0),
+    0
+  )
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          System overview and quick actions
-        </p>
+        <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{t("dashboard.subtitle")}</p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <StatusCard
-          label="API Server"
-          value={apiOk === null ? "Checking..." : apiOk ? "Connected" : "Offline"}
+          label={t("dashboard.apiServer")}
+          value={
+            apiOk === null
+              ? t("dashboard.checking")
+              : apiOk
+                ? t("dashboard.connected")
+                : t("dashboard.offline")
+          }
           ok={apiOk}
         />
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div>
-              <p className="text-xs text-muted-foreground">Backtests</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.liveBalance")}</p>
+              <p className="text-sm font-medium mt-1">
+                {loading
+                  ? "..."
+                  : isLive
+                  ? `$${liveTotalBalance.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : t("dashboard.offline")}
+              </p>
+            </div>
+            <Landmark className="h-5 w-5 text-amber-400" />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-muted-foreground">{t("dashboard.livePnl")}</p>
+              {loading ? (
+                <p className="text-sm font-medium mt-1">...</p>
+              ) : isLive ? (
+                <p
+                  className={`text-sm font-medium mt-1 ${
+                    liveTotalPnl >= 0 ? "text-emerald-400" : "text-red-400"
+                  }`}
+                >
+                  {liveTotalPnl >= 0 ? "+" : ""}${liveTotalPnl.toFixed(2)}
+                </p>
+              ) : (
+                <p className="text-sm font-medium mt-1 text-muted-foreground">
+                  {t("dashboard.offline")}
+                </p>
+              )}
+            </div>
+            {isLive ? (
+              liveTotalPnl >= 0 ? (
+                <TrendingUp className="h-5 w-5 text-emerald-400" />
+              ) : (
+                <TrendingDown className="h-5 w-5 text-red-400" />
+              )
+            ) : (
+              <TrendingDown className="h-5 w-5 text-muted-foreground" />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="flex items-center justify-between p-4">
+            <div>
+              <p className="text-xs text-muted-foreground">{t("dashboard.backtests")}</p>
               <p className="text-sm font-medium mt-1">
                 {loading ? "..." : backtests.length}
               </p>
@@ -154,32 +201,34 @@ export default function DashboardPage() {
             <FlaskConical className="h-5 w-5 text-primary" />
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div>
-              <p className="text-xs text-muted-foreground">Paper Balance</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.paperBalance")}</p>
               <p className="text-sm font-medium mt-1">
-                {loading ? "..." : `$${totalBalance.toLocaleString()}`}
+                {loading ? "..." : `$${paperTotalBalance.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </p>
             </div>
             <Wallet className="h-5 w-5 text-primary" />
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="flex items-center justify-between p-4">
             <div>
-              <p className="text-xs text-muted-foreground">Total PnL</p>
+              <p className="text-xs text-muted-foreground">{t("dashboard.paperPnl")}</p>
               <p
                 className={`text-sm font-medium mt-1 ${
-                  totalPnl >= 0 ? "text-emerald-400" : "text-red-400"
+                  paperTotalPnl >= 0 ? "text-emerald-400" : "text-red-400"
                 }`}
               >
                 {loading
                   ? "..."
-                  : `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`}
+                  : `${paperTotalPnl >= 0 ? "+" : ""}$${paperTotalPnl.toFixed(2)}`}
               </p>
             </div>
-            {totalPnl >= 0 ? (
+            {paperTotalPnl >= 0 ? (
               <TrendingUp className="h-5 w-5 text-emerald-400" />
             ) : (
               <TrendingDown className="h-5 w-5 text-red-400" />
@@ -191,7 +240,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 gap-6">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Recent Backtests</CardTitle>
+            <CardTitle className="text-base">{t("dashboard.recentBacktests")}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -202,20 +251,27 @@ export default function DashboardPage() {
               </div>
             ) : backtests.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No backtests yet. Run your first one!
+                {t("dashboard.noBacktests")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Strategy</TableHead>
-                    <TableHead>Return</TableHead>
-                    <TableHead>Sharpe</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t("dashboard.strategy")}</TableHead>
+                    <TableHead>{t("dashboard.return")}</TableHead>
+                    <TableHead>{t("dashboard.sharpe")}</TableHead>
+                    <TableHead className="w-[120px]">{t("dashboard.equityCurve") || "收益曲线"}</TableHead>
+                    <TableHead>{t("dashboard.status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {backtests.map((bt) => (
+                  {backtests.map((bt: BacktestData) => {
+                    const curve: number[] = Array.isArray(bt.result?.equity_curve)
+                      ? bt.result!.equity_curve!
+                      : Array.isArray(bt.equity_curve)
+                        ? bt.equity_curve
+                        : []
+                    return (
                     <TableRow key={bt.id}>
                       <TableCell className="font-medium text-xs">
                         {bt.strategy_name}
@@ -232,6 +288,13 @@ export default function DashboardPage() {
                       <TableCell className="text-xs">
                         {bt.sharpe_ratio?.toFixed(2) ?? "-"}
                       </TableCell>
+                      <TableCell className="py-1">
+                        {curve.length >= 2 ? (
+                          <Sparkline curve={curve} />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -242,7 +305,8 @@ export default function DashboardPage() {
                         </Badge>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    )
+                  })}
                 </TableBody>
               </Table>
             )}
@@ -251,7 +315,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Paper Accounts</CardTitle>
+            <CardTitle className="text-base">{t("dashboard.paperAccounts")}</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -260,33 +324,34 @@ export default function DashboardPage() {
                   <Skeleton key={i} className="h-10 w-full" />
                 ))}
               </div>
-            ) : accounts.length === 0 ? (
+            ) : safeAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No paper accounts. Create one to start!
+                {t("dashboard.noAccounts")}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Balance</TableHead>
-                    <TableHead>PnL</TableHead>
+                    <TableHead>{t("dashboard.name")}</TableHead>
+                    <TableHead>{t("dashboard.balance")}</TableHead>
+                    <TableHead>{t("dashboard.pnl")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accounts.map((acc) => {
+                  {safeAccounts.map((acc) => {
                     const pnl =
-                      (acc.realized_pnl ?? 0) + (acc.unrealized_pnl ?? 0)
+                      (acc.realized_pnl ?? acc.total_realized_pnl ?? 0) + (acc.unrealized_pnl ?? 0)
+                    const equity = acc.equity ?? (acc.initial_balance + (acc.total_realized_pnl ?? 0) - (acc.total_fee ?? 0) + (acc.unrealized_pnl ?? 0))
                     return (
                       <TableRow key={acc.id}>
                         <TableCell className="font-medium text-xs">
                           {acc.name}
                         </TableCell>
-                        <TableCell className="text-xs">
-                          ${acc.balance?.toLocaleString()}
+                        <TableCell className="text-xs font-mono">
+                          ${equity.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell
-                          className={`text-xs ${
+                          className={`text-xs font-mono ${
                             pnl >= 0 ? "text-emerald-400" : "text-red-400"
                           }`}
                         >
@@ -302,60 +367,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            AI Assistant
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3 max-h-60 overflow-y-auto mb-3">
-            {chatMessages.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Ask about strategies, markets, or backtests...
-              </p>
-            )}
-            {chatMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={`text-sm px-3 py-2 rounded-lg ${
-                  msg.role === "user"
-                    ? "bg-primary/10 text-primary ml-12"
-                    : "bg-muted mr-12"
-                }`}
-              >
-                {msg.content}
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex gap-1 px-3 py-2">
-                <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce" />
-                <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
-                <span className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
-              </div>
-            )}
-          </div>
-          <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              handleChat()
-            }}
-          >
-            <Input
-              placeholder="Ask something..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              disabled={chatLoading}
-              className="flex-1"
-            />
-            <Button type="submit" size="icon" disabled={chatLoading}>
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
     </div>
   )
 }

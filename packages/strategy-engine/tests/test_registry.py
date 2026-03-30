@@ -63,9 +63,9 @@ class TestIndicatorRegistry:
 class TestDefaultRegistry:
     """Test the module-level default registry."""
 
-    def test_has_four_builtins(self) -> None:
+    def test_has_five_builtins(self) -> None:
         names = indicator_registry.list()
-        assert names == ["ema", "macd", "rsi", "sma"]
+        assert names == ["bbands", "ema", "macd", "rsi", "sma"]
 
     def test_get_sma(self) -> None:
         assert indicator_registry.get("sma") is SMA

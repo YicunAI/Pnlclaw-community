@@ -72,7 +72,12 @@ class _PresetMockLLM:
         self._i = 0
 
     async def chat(self, messages: list[Any], **kwargs: Any) -> str:
-        return ""
+        import json
+        if self._i >= len(self._responses):
+            return json.dumps({"response": "done", "tool_calls": []})
+        r = self._responses[self._i]
+        self._i += 1
+        return json.dumps(r)
 
     async def chat_stream(self, messages: list[Any], **kwargs: Any) -> AsyncIterator[str]:
         async def _empty() -> AsyncIterator[str]:
@@ -80,6 +85,23 @@ class _PresetMockLLM:
                 yield ""
 
         return _empty()
+
+    async def chat_with_tools(
+        self, messages: list[Any], tools: list[dict[str, Any]] | None = None, **kwargs: Any
+    ) -> Any:
+        from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+
+        if self._i >= len(self._responses):
+            return ToolCallResult(text="done")
+        r = self._responses[self._i]
+        self._i += 1
+        raw_calls = r.get("tool_calls", [])
+        parsed = [
+            ToolCall(id=f"int_call_{i}", name=tc.get("tool", ""), arguments=tc.get("arguments", {}))
+            for i, tc in enumerate(raw_calls) if isinstance(tc, dict)
+        ]
+        text = r.get("response", "") or None
+        return ToolCallResult(tool_calls=parsed, text=text, usage=TokenUsage())
 
     async def generate_structured(
         self, messages: list[Any], output_schema: dict[str, Any], **kwargs: Any

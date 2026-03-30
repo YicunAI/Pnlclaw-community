@@ -122,3 +122,23 @@ class PnLClawPluginAPI(Protocol):
             middleware: ASGI middleware factory.
         """
         ...
+
+    def register_mcp_server(self, name: str, config: Any) -> None:
+        """Register an MCP server from a plugin.
+
+        Args:
+            name: Unique MCP server name.
+            config: McpServerConfig instance or dict with server configuration.
+        """
+        ...
+
+    def register_skill(self, name: str, skill_dir: str) -> None:
+        """Register a skill directory from a plugin.
+
+        The directory should contain subdirectories with SKILL.md files.
+
+        Args:
+            name: Identifier for this skill source.
+            skill_dir: Absolute path to a directory containing skills.
+        """
+        ...

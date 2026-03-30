@@ -15,6 +15,73 @@ import numpy as np
 
 from pnlclaw_types.strategy import BacktestMetrics
 
+# Mapping from interval strings to the number of periods per year.
+_INTERVAL_TO_ANNUAL: dict[str, int] = {
+    "1m": 525_600,
+    "5m": 105_120,
+    "15m": 35_040,
+    "30m": 17_520,
+    "1h": 8_760,
+    "4h": 2_190,
+    "1d": 365,
+    "1w": 52,
+}
+
+
+def infer_annualization_factor(interval: str) -> int:
+    """Return the annualization factor for a given kline interval.
+
+    Args:
+        interval: Kline interval string (e.g. ``"1h"``, ``"1d"``).
+
+    Returns:
+        Number of periods in one year.  Falls back to 365 for unknown intervals.
+    """
+    return _INTERVAL_TO_ANNUAL.get(interval.lower().strip(), 365)
+
+
+def _calmar(annual_return: float, max_drawdown: float) -> float:
+    """Calmar ratio: annual return / abs(max drawdown)."""
+    if abs(max_drawdown) < 1e-15:
+        return 0.0
+    return annual_return / abs(max_drawdown)
+
+
+def _sortino(returns: np.ndarray, annualization_factor: int) -> float:
+    """Sortino ratio: mean return / downside deviation."""
+    if len(returns) < 2:
+        return 0.0
+    mean_ret = float(np.mean(returns))
+    downside = returns[returns < 0]
+    if len(downside) < 2:
+        return 0.0
+    dd = float(np.std(downside, ddof=1))
+    if dd < 1e-15:
+        return 0.0
+    return mean_ret / dd * np.sqrt(annualization_factor)
+
+
+def _expectancy(trades: list[dict]) -> float:
+    """Expectancy: (win_rate * avg_win) - (loss_rate * avg_loss)."""
+    if not trades:
+        return 0.0
+    pnls = [t["pnl"] for t in trades]
+    wins = [p for p in pnls if p > 0]
+    losses = [abs(p) for p in pnls if p < 0]
+    n = len(pnls)
+    wr = len(wins) / n if n > 0 else 0
+    lr = len(losses) / n if n > 0 else 0
+    avg_w = sum(wins) / len(wins) if wins else 0
+    avg_l = sum(losses) / len(losses) if losses else 0
+    return wr * avg_w - lr * avg_l
+
+
+def _recovery_factor(total_return: float, max_drawdown: float) -> float:
+    """Recovery factor: total return / abs(max drawdown)."""
+    if abs(max_drawdown) < 1e-15:
+        return 0.0
+    return total_return / abs(max_drawdown)
+
 
 def compute_metrics(
     equity_curve: list[float],
@@ -88,6 +155,10 @@ def compute_metrics(
         win_rate=round(win_rate, 4),
         profit_factor=round(profit_factor, 4),
         total_trades=total_trades,
+        calmar_ratio=round(_calmar(annual_return, max_drawdown), 4),
+        sortino_ratio=round(_sortino(returns, annualization_factor), 4),
+        expectancy=round(_expectancy(trades), 4),
+        recovery_factor=round(_recovery_factor(total_return, max_drawdown), 4),
     )
 
 

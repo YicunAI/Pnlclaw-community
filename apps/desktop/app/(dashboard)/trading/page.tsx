@@ -1,100 +1,33 @@
 "use client"
 
-import { ModeToggle } from "@/components/trading/mode-toggle"
-import { OrderForm } from "@/components/trading/order-form"
-import { OrderTable } from "@/components/trading/order-table"
-import { PositionPanel } from "@/components/trading/position-panel"
-import { BalanceCard } from "@/components/trading/balance-card"
-import { TradeHistory } from "@/components/trading/trade-history"
-import { useTradingWS } from "@/lib/use-trading-ws"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Wifi, WifiOff } from "lucide-react"
+import React from "react"
+import { useI18n } from "@/components/i18n/use-i18n"
+import { AlertTriangle } from "lucide-react"
 
 export default function TradingPage() {
-  const { connected, orders, positions, balances, fills } = useTradingWS()
+  const { t } = useI18n()
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Trading</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("trading.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Place orders, track positions, and manage your portfolio
+            {t("trading.subtitle")}
           </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-xs">
-            {connected ? (
-              <>
-                <Wifi className="h-3 w-3 text-green-500" />
-                <span className="text-green-500">Connected</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-3 w-3 text-muted-foreground" />
-                <span className="text-muted-foreground">Disconnected</span>
-              </>
-            )}
-          </div>
-          <ModeToggle />
         </div>
       </div>
 
-      <Separator />
-
-      {/* Main grid */}
-      <div className="grid grid-cols-12 gap-6">
-        {/* Left column — Order Form + Balance + Positions */}
-        <div className="col-span-4 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Place Order</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <OrderForm />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Balance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <BalanceCard wsBalances={balances} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Positions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PositionPanel wsPositions={positions} />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column — Orders + History */}
-        <div className="col-span-8 space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <OrderTable wsOrders={orders} />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Trade History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TradeHistory wsFills={fills} />
-            </CardContent>
-          </Card>
+      {/* ⚠️ 实盘交易暂未开放提示 */}
+      <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+        <div className="space-y-1 text-sm">
+          <p className="font-semibold text-amber-400">
+            🚧 因涉及资产安全、网络攻防等安全问题，秉持用户资产第一的原则，当前版本暂不支持实盘交易
+          </p>
+          <p className="text-amber-300/80">
+            实盘交易功能正在紧锣密鼓地开发中，将会在后续版本推出。
+          </p>
         </div>
       </div>
     </div>

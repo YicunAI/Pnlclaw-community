@@ -89,6 +89,9 @@ def sample_binance_ticker() -> dict[str, Any]:
         "b": "66999.50",
         "a": "67000.50",
         "v": "12345.67",
+        "q": "827160490.00",
+        "h": "68000.00",
+        "l": "66000.00",
         "P": "2.35",
     }
 
@@ -115,6 +118,8 @@ def sample_binance_kline() -> dict[str, Any]:
         "E": 1711000000000,
         "s": "BTCUSDT",
         "k": {
+            "t": 1710997200000,
+            "T": 1711000799999,
             "s": "BTCUSDT",
             "i": "1h",
             "o": "66800.00",
@@ -138,6 +143,60 @@ def sample_binance_depth_update() -> dict[str, Any]:
         "u": 100002,
         "b": [["66999.00", "2.50"], ["66998.00", "1.00"]],
         "a": [["67001.00", "1.50"], ["67002.00", "3.00"]],
+    }
+
+
+@pytest.fixture
+def sample_binance_agg_trade() -> dict[str, Any]:
+    """Sample Binance aggTrade WebSocket message."""
+    return {
+        "e": "aggTrade",
+        "E": 1711000000000,
+        "s": "BTCUSDT",
+        "a": 164053398,
+        "p": "68000.00",
+        "q": "2.500",
+        "f": 362090727,
+        "l": 362090730,
+        "T": 1711000000000,
+        "m": False,
+    }
+
+
+@pytest.fixture
+def sample_binance_force_order() -> dict[str, Any]:
+    """Sample Binance forceOrder (liquidation) WebSocket message."""
+    return {
+        "e": "forceOrder",
+        "E": 1711000000000,
+        "o": {
+            "s": "BTCUSDT",
+            "S": "SELL",
+            "o": "LIMIT",
+            "f": "IOC",
+            "q": "0.500",
+            "p": "67000.00",
+            "ap": "66950.00",
+            "X": "FILLED",
+            "l": "0.500",
+            "z": "0.500",
+            "T": 1711000000000,
+        },
+    }
+
+
+@pytest.fixture
+def sample_binance_mark_price() -> dict[str, Any]:
+    """Sample Binance markPriceUpdate WebSocket message."""
+    return {
+        "e": "markPriceUpdate",
+        "E": 1711000000000,
+        "s": "BTCUSDT",
+        "p": "67500.12345678",
+        "i": "67490.00000000",
+        "P": "67495.00000000",
+        "r": "0.00010000",
+        "T": 1711036800000,
     }
 
 

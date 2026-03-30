@@ -16,6 +16,47 @@ from pnlclaw_llm.base import LLMError
 T = TypeVar("T", bound=BaseModel)
 
 
+# ---------------------------------------------------------------------------
+# Native Function Calling schemas (v0.1.1)
+# ---------------------------------------------------------------------------
+
+
+class ToolCall(BaseModel):
+    """A single tool invocation returned by the LLM via native function calling."""
+
+    id: str = Field(..., description="Unique identifier for this tool call")
+    name: str = Field(..., description="Name of the tool to invoke")
+    arguments: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arguments to pass to the tool",
+    )
+
+
+class TokenUsage(BaseModel):
+    """Token usage statistics from the LLM response.
+
+    PRO RESERVED: Community edition populates these fields but does not
+    expose a cost-tracking dashboard.
+    """
+
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+
+
+class ToolCallResult(BaseModel):
+    """Result of a chat_with_tools() invocation.
+
+    Wraps both tool calls and optional text content into a single
+    structured response, allowing callers to handle both paths uniformly.
+    """
+
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    text: str | None = None
+    model: str = ""  # PRO RESERVED: used for cost tracking
+    usage: TokenUsage = Field(default_factory=TokenUsage)  # PRO RESERVED
+
+
 def get_json_schema(model: type[BaseModel]) -> dict[str, Any]:
     """Extract a JSON Schema dict from a Pydantic model class.
 

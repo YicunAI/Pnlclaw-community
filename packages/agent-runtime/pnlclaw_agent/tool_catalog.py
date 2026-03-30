@@ -45,6 +45,29 @@ class ToolCatalog:
         for tool in tools:
             self.register(tool)
 
+    def unregister(self, name: str) -> bool:
+        """Unregister a tool by name.
+
+        Used when an MCP server disconnects and its tools should be removed.
+
+        Args:
+            name: Canonical tool name.
+
+        Returns:
+            True if the tool was found and removed, False otherwise.
+        """
+        return self._tools.pop(name, None) is not None
+
+    def register_or_replace(self, tool: BaseTool) -> None:
+        """Register a tool, replacing any existing tool with the same name.
+
+        Used when an MCP server reconnects and re-registers its tools.
+
+        Args:
+            tool: Tool instance to register.
+        """
+        self._tools[tool.name] = tool
+
     # -- lookup --------------------------------------------------------------
 
     def get(self, name: str) -> BaseTool | None:

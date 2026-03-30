@@ -1,34 +1,38 @@
-"""Market data main service: manages subscriptions, caching, and data access.
+"""Market data main service: multi-source manager for exchange data.
 
-Orchestrates exchange WS clients, stream lifecycle, caching, snapshot storage,
-and event dispatch for multiple symbols.
+Manages multiple ``ExchangeSource`` instances (one per exchange/market_type
+combination) and provides a unified query and event bus interface.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Callable
 from typing import Any
 
-from pnlclaw_exchange import (
-    BinanceL2Manager,
-    BinanceNormalizer,
-    BinanceWSClient,
-    ReconnectManager,
-)
-from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
-from pnlclaw_market.cache import MarketDataCache
+from pnlclaw_market.aggregators.large_order import LargeOrderDetector
+from pnlclaw_market.aggregators.large_trade import LargeTradeDetector
+from pnlclaw_market.aggregators.liquidation import LiquidationAggregator
 from pnlclaw_market.event_bus import EventBus
-from pnlclaw_market.snapshot_store import SnapshotStore
-from pnlclaw_market.stream_manager import StreamManager, StreamType
+from pnlclaw_market.source import ExchangeSource
+from pnlclaw_types.derivatives import (
+    FundingRateEvent,
+    LargeOrderEvent,
+    LargeTradeEvent,
+    LiquidationEvent,
+    LiquidationStats,
+    OpenInterestSnapshot,
+)
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Snapshot,
     TickerEvent,
+    TradeEvent,
 )
 
 logger = logging.getLogger(__name__)
+
+SourceKey = tuple[str, str]  # (exchange, market_type)
 
 
 class MarketDataServiceError(Exception):
@@ -40,50 +44,79 @@ class MarketDataServiceNotRunning(MarketDataServiceError):
 
 
 class MarketDataService:
-    """Central market data service managing multi-symbol subscriptions.
+    """Central multi-source market data service.
 
-    Responsibilities:
-        - Start/stop exchange WS connections via ReconnectManager.
-        - Add/remove symbol subscriptions (ticker, kline, L2 depth).
-        - Cache ticker and kline data for fast retrieval.
-        - Maintain L2 orderbook snapshots.
-        - Publish events to the internal event bus.
+    Each source is an ``ExchangeSource`` keyed by ``(exchange, market_type)``.
+    The service delegates all data operations to the appropriate source and
+    aggregates events onto a single ``EventBus``.
 
-    Args:
-        ws_url: Binance WebSocket endpoint.
-        rest_url: Binance REST endpoint for L2 snapshot recovery.
-        kline_interval: Default kline interval for subscriptions.
-        cache_ttl: Cache TTL in seconds.
-        cache_max_size: Maximum cache entries.
+    Backward-compatible: methods without explicit ``exchange``/``market_type``
+    default to ``("binance", "spot")``.
     """
 
     def __init__(
         self,
         *,
-        ws_url: str = "wss://data-stream.binance.vision/ws",
-        rest_url: str = "https://data-api.binance.vision/api/v3/depth",
-        kline_interval: str = "1h",
-        cache_ttl: float = 60.0,
-        cache_max_size: int = 1000,
+        large_trade_threshold_usd: float = 50_000.0,
+        large_order_threshold_usd: float = 100_000.0,
     ) -> None:
-        self._ws_url = ws_url
-        self._rest_url = rest_url
-        self._kline_interval = kline_interval
+        self._sources: dict[SourceKey, ExchangeSource] = {}
+        self._event_bus = EventBus()
         self._running = False
 
-        # Internal components
-        self._event_bus = EventBus()
-        self._cache = MarketDataCache(ttl_seconds=cache_ttl, max_size=cache_max_size)
-        self._snapshot_store = SnapshotStore()
-        self._symbol_normalizer = SymbolNormalizer()
-        self._normalizer = BinanceNormalizer(self._symbol_normalizer)
+        # --- Tactical dashboard aggregators ---
+        self._large_trade_detector = LargeTradeDetector(threshold_usd=large_trade_threshold_usd)
+        self._large_order_detector = LargeOrderDetector(threshold_usd=large_order_threshold_usd)
+        self._liquidation_aggregator = LiquidationAggregator()
+        self._funding_rate_store: dict[str, FundingRateEvent] = {}
+        self._open_interest_store: dict[str, OpenInterestSnapshot] = {}
 
-        # Exchange clients — created on start()
-        self._ws_client: BinanceWSClient | None = None
-        self._l2_manager: BinanceL2Manager | None = None
-        self._reconnect_manager: ReconnectManager | None = None
-        self._stream_manager: StreamManager | None = None
-        self._reconnect_task: asyncio.Task[None] | None = None
+        # --- Kline batch cache (key → klines, avoids re-fetching) ---
+        self._kline_cache: dict[str, list[KlineEvent]] = {}
+        self._kline_cache_max = 20
+
+    # ------------------------------------------------------------------
+    # Source registration
+    # ------------------------------------------------------------------
+
+    def register_source(self, source: ExchangeSource) -> None:
+        """Register an exchange source.
+
+        Must be called **before** :meth:`start`.  If a source with the
+        same key already exists it is replaced (the old one is not stopped).
+        """
+        key: SourceKey = (source.config.exchange, source.config.market_type)
+        self._sources[key] = source
+
+        # Bridge per-source events into the unified EventBus
+        source.on_ticker(lambda e: self._event_bus.publish(e))
+        source.on_kline(lambda e: self._event_bus.publish(e))
+        source.on_orderbook(lambda e: self._event_bus.publish(e))
+
+        # Bridge trade events → large trade detector
+        if hasattr(source, "on_trade"):
+            source.on_trade(self._on_trade_event)  # type: ignore[attr-defined]
+
+        # Bridge orderbook → large order detector
+        source.on_orderbook(self._on_orderbook_for_detection)
+
+        # Bridge derivatives events if source supports them
+        if hasattr(source, "on_liquidation"):
+            source.on_liquidation(self._on_liquidation_event)  # type: ignore[attr-defined]
+        if hasattr(source, "on_funding_rate"):
+            source.on_funding_rate(self._on_funding_rate_event)  # type: ignore[attr-defined]
+
+        logger.info("Registered source: %s/%s", *key)
+
+    def get_source(
+        self, exchange: str = "binance", market_type: str = "spot"
+    ) -> ExchangeSource | None:
+        """Return the source for *exchange*/*market_type*, or None."""
+        return self._sources.get((exchange, market_type))
+
+    @property
+    def sources(self) -> dict[SourceKey, ExchangeSource]:
+        return dict(self._sources)
 
     # ------------------------------------------------------------------
     # Properties
@@ -91,12 +124,10 @@ class MarketDataService:
 
     @property
     def is_running(self) -> bool:
-        """Whether the service is currently running."""
         return self._running
 
     @property
     def event_bus(self) -> EventBus:
-        """Access the internal event bus for subscribing to market events."""
         return self._event_bus
 
     # ------------------------------------------------------------------
@@ -104,61 +135,33 @@ class MarketDataService:
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Start the market data service: connect to exchange WS."""
+        """Start all registered sources."""
         if self._running:
             return
 
-        self._l2_manager = BinanceL2Manager(
-            symbol_normalizer=self._symbol_normalizer,
-            on_snapshot=self._on_l2_snapshot,
-            rest_url=self._rest_url,
-        )
-
-        self._ws_client = BinanceWSClient(
-            url=self._ws_url,
-            symbol_normalizer=self._symbol_normalizer,
-            on_ticker=self._on_ticker,
-            on_kline=self._on_kline,
-            on_depth_update=self._on_depth_update,
-        )
-
-        self._stream_manager = StreamManager(
-            ws_client=self._ws_client,
-            l2_manager=self._l2_manager,
-            kline_interval=self._kline_interval,
-        )
-
-        self._reconnect_manager = ReconnectManager(self._ws_client)
-        self._reconnect_task = asyncio.create_task(
-            self._reconnect_manager.run(), name="market-data-reconnect"
-        )
+        for key, source in self._sources.items():
+            try:
+                await source.start()
+                logger.info("Source started: %s/%s", *key)
+            except Exception:
+                logger.error("Failed to start source %s/%s", *key, exc_info=True)
 
         self._running = True
-        logger.info("MarketDataService started")
+        logger.info(
+            "MarketDataService started with %d source(s)", len(self._sources)
+        )
 
     async def stop(self) -> None:
-        """Gracefully stop the market data service."""
+        """Stop all sources."""
         if not self._running:
             return
-
         self._running = False
 
-        if self._reconnect_manager is not None:
-            await self._reconnect_manager.stop()
-
-        if self._reconnect_task is not None:
-            self._reconnect_task.cancel()
+        for key, source in self._sources.items():
             try:
-                await self._reconnect_task
-            except asyncio.CancelledError:
-                pass
-            self._reconnect_task = None
-
-        if self._l2_manager is not None:
-            await self._l2_manager.close()
-
-        self._cache.clear()
-        self._snapshot_store.clear()
+                await source.stop()
+            except Exception:
+                logger.error("Error stopping source %s/%s", *key, exc_info=True)
 
         logger.info("MarketDataService stopped")
 
@@ -170,140 +173,256 @@ class MarketDataService:
         self,
         symbol: str,
         *,
+        exchange: str = "binance",
+        market_type: str = "spot",
         ticker: bool = True,
         kline: bool = True,
         depth: bool = True,
     ) -> None:
-        """Subscribe to market data streams for *symbol*.
+        """Subscribe to streams on a specific source."""
+        source = self._require_source(exchange, market_type)
+        await source.subscribe(symbol, ticker=ticker, kline=kline, depth=depth)
+
+    async def remove_symbol(
+        self,
+        symbol: str,
+        *,
+        exchange: str = "binance",
+        market_type: str = "spot",
+    ) -> None:
+        """Unsubscribe from a specific source."""
+        source = self._require_source(exchange, market_type)
+        await source.unsubscribe(symbol)
+
+    # ------------------------------------------------------------------
+    # Data access (source-routed)
+    # ------------------------------------------------------------------
+
+    def get_ticker(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+    ) -> TickerEvent | None:
+        source = self._sources.get((exchange, market_type))
+        return source.get_ticker(symbol) if source else None
+
+    def get_kline(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+    ) -> KlineEvent | None:
+        source = self._sources.get((exchange, market_type))
+        return source.get_kline(symbol) if source else None
+
+    def get_klines(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+        limit: int = 100,
+    ) -> list[KlineEvent]:
+        source = self._sources.get((exchange, market_type))
+        if source and hasattr(source, "get_klines"):
+            return source.get_klines(symbol, limit)
+        return []
+
+    async def fetch_klines_rest(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+        interval: str = "1h",
+        limit: int = 200,
+        end_time: int | None = None,
+    ) -> list[KlineEvent]:
+        """On-demand REST fetch for any interval (bypasses WS buffer).
 
         Args:
-            symbol: Normalized trading pair, e.g. ``"BTC/USDT"``.
-            ticker: Subscribe to ticker stream.
-            kline: Subscribe to kline stream.
-            depth: Subscribe to L2 depth stream.
+            end_time: If provided, fetch candles *before* this timestamp (ms).
+                      Enables historical pagination (infinite scroll).
         """
-        self._ensure_running()
-        assert self._stream_manager is not None
+        source = self._sources.get((exchange, market_type))
+        if source and hasattr(source, "fetch_klines_rest"):
+            return await source.fetch_klines_rest(symbol, interval, limit, end_time=end_time)
+        return []
 
-        stream_types: list[StreamType] = []
-        if ticker:
-            stream_types.append(StreamType.TICKER)
-        if kline:
-            stream_types.append(StreamType.KLINE)
-        if depth:
-            stream_types.append(StreamType.DEPTH)
+    async def fetch_klines_batch(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+        interval: str = "1h",
+        total: int = 1000,
+    ) -> list[KlineEvent]:
+        """Paginated batch fetch: pull *total* klines by walking backwards.
 
-        for st in stream_types:
-            await self._stream_manager.start_stream(symbol, st)
+        Automatically paginates using ``end_time`` from the oldest kline
+        in each batch until the desired count is reached or no more data
+        is returned.  Results are cached to avoid redundant REST calls.
 
-        # Initialize L2 book if depth requested — gracefully degrade on failure
-        l2_active = False
-        if depth and self._l2_manager is not None:
-            binance_symbol = symbol.replace("/", "").upper()
-            try:
-                await self._l2_manager.initialize(binance_symbol)
-                l2_active = True
-            except Exception:
-                logger.warning(
-                    "L2 depth init failed for %s (REST snapshot unavailable). "
-                    "Ticker/kline will still work.",
-                    symbol,
-                    exc_info=True,
-                )
+        Args:
+            total: Target number of klines to fetch.
 
+        Returns:
+            List of KlineEvent sorted oldest→newest, up to *total* items.
+        """
+        cache_key = f"{exchange}:{market_type}:{symbol}:{interval}:{total}"
+        cached = self._kline_cache.get(cache_key)
+        if cached is not None and len(cached) >= total:
+            logger.info("Kline cache hit: %s (%d candles)", cache_key, len(cached))
+            return cached[:total]
+
+        source = self._sources.get((exchange, market_type))
+        if source is None or not hasattr(source, "fetch_klines_rest"):
+            return []
+
+        page_size = 200
+        if "binance" in exchange:
+            page_size = 1000
+        elif "okx" in exchange:
+            page_size = 100
+
+        all_klines: list[KlineEvent] = []
+        cursor: int | None = None
+        pages = 0
+        empty_streak = 0
+
+        while len(all_klines) < total:
+            batch_limit = min(page_size, total - len(all_klines))
+            batch = await source.fetch_klines_rest(
+                symbol, interval, batch_limit, end_time=cursor,
+            )
+            if not batch:
+                empty_streak += 1
+                if empty_streak >= 2:
+                    break
+                continue
+
+            empty_streak = 0
+            all_klines = batch + all_klines
+            pages += 1
+            oldest_ts = getattr(batch[0], "timestamp", None)
+            if oldest_ts is None or oldest_ts <= 0:
+                break
+            cursor = oldest_ts - 1
+
+            if len(batch) < max(batch_limit // 2, 1):
+                break
+
+        seen: set[int] = set()
+        deduped: list[KlineEvent] = []
+        for k in all_klines:
+            ts = getattr(k, "timestamp", 0)
+            if ts not in seen:
+                seen.add(ts)
+                deduped.append(k)
+
+        deduped.sort(key=lambda k: getattr(k, "timestamp", 0))
+        result = deduped[:total]
+
+        if len(self._kline_cache) >= self._kline_cache_max:
+            oldest_key = next(iter(self._kline_cache))
+            del self._kline_cache[oldest_key]
+        self._kline_cache[cache_key] = result
         logger.info(
-            "Added symbol %s (ticker=%s, kline=%s, depth=%s, l2_active=%s)",
-            symbol, ticker, kline, depth, l2_active,
+            "Kline batch fetched: %s → %d candles in %d pages (cached)",
+            cache_key, len(result), pages,
         )
 
-    async def remove_symbol(self, symbol: str) -> None:
-        """Unsubscribe from all streams for *symbol*."""
-        self._ensure_running()
-        assert self._stream_manager is not None
+        return result
 
-        for st in StreamType:
-            await self._stream_manager.stop_stream(symbol, st)
+    def get_orderbook(
+        self,
+        symbol: str,
+        exchange: str = "binance",
+        market_type: str = "spot",
+    ) -> OrderBookL2Snapshot | None:
+        source = self._sources.get((exchange, market_type))
+        return source.get_orderbook(symbol) if source else None
 
-        self._snapshot_store.remove(symbol)
-        logger.info("Removed symbol %s", symbol)
-
-    # ------------------------------------------------------------------
-    # Data access
-    # ------------------------------------------------------------------
-
-    def get_ticker(self, symbol: str) -> TickerEvent | None:
-        """Return the latest cached ticker for *symbol*, or None."""
-        self._ensure_running()
-        return self._cache.get_ticker(symbol)
-
-    def get_kline(self, symbol: str) -> KlineEvent | None:
-        """Return the latest cached kline for *symbol*, or None."""
-        self._ensure_running()
-        return self._cache.get_kline(symbol)
-
-    def get_orderbook(self, symbol: str) -> OrderBookL2Snapshot | None:
-        """Return the latest L2 orderbook snapshot for *symbol*, or None."""
-        self._ensure_running()
-        return self._snapshot_store.get_snapshot(symbol)
-
-    def get_symbols(self) -> list[str]:
-        """Return list of currently subscribed symbols."""
-        if self._stream_manager is None:
-            return []
-        return self._stream_manager.active_symbols()
+    def get_symbols(
+        self,
+        exchange: str = "binance",
+        market_type: str = "spot",
+    ) -> list[str]:
+        source = self._sources.get((exchange, market_type))
+        return source.get_symbols() if source else []
 
     # ------------------------------------------------------------------
-    # Event subscription convenience
+    # Unified event subscription
     # ------------------------------------------------------------------
 
     def on_ticker(self, callback: Callable[[TickerEvent], Any]) -> None:
-        """Register a callback for ticker events."""
         self._event_bus.subscribe(TickerEvent, callback)
 
     def on_kline(self, callback: Callable[[KlineEvent], Any]) -> None:
-        """Register a callback for kline events."""
         self._event_bus.subscribe(KlineEvent, callback)
 
     def on_orderbook(self, callback: Callable[[OrderBookL2Snapshot], Any]) -> None:
-        """Register a callback for orderbook snapshot events."""
         self._event_bus.subscribe(OrderBookL2Snapshot, callback)
 
     # ------------------------------------------------------------------
-    # Internal callbacks
+    # Derivatives event subscriptions
     # ------------------------------------------------------------------
 
-    def _on_ticker(self, event: TickerEvent) -> None:
-        """Handle incoming ticker event from WS client."""
-        self._cache.put_ticker(event.symbol, event)
+    def on_trade(self, callback: Callable[[TradeEvent], Any]) -> None:
+        self._event_bus.subscribe(TradeEvent, callback)
+
+    def on_large_trade(self, callback: Callable[[LargeTradeEvent], Any]) -> None:
+        self._event_bus.subscribe(LargeTradeEvent, callback)
+
+    def on_large_order(self, callback: Callable[[LargeOrderEvent], Any]) -> None:
+        self._event_bus.subscribe(LargeOrderEvent, callback)
+
+    def on_liquidation(self, callback: Callable[[LiquidationEvent], Any]) -> None:
+        self._event_bus.subscribe(LiquidationEvent, callback)
+
+    def on_liquidation_stats(self, callback: Callable[[LiquidationStats], Any]) -> None:
+        self._event_bus.subscribe(LiquidationStats, callback)
+
+    def on_funding_rate(self, callback: Callable[[FundingRateEvent], Any]) -> None:
+        self._event_bus.subscribe(FundingRateEvent, callback)
+
+    # ------------------------------------------------------------------
+    # Internal aggregation handlers
+    # ------------------------------------------------------------------
+
+    def _on_trade_event(self, trade: TradeEvent) -> None:
+        """Process a trade through the large-trade detector and publish."""
+        self._event_bus.publish(trade)
+        large = self._large_trade_detector.process(trade)
+        if large:
+            self._event_bus.publish(large)
+
+    def _on_orderbook_for_detection(self, snapshot: OrderBookL2Snapshot) -> None:
+        """Run large-order detection on each orderbook snapshot."""
+        events = self._large_order_detector.process(snapshot)
+        for ev in events:
+            self._event_bus.publish(ev)
+
+    def _on_liquidation_event(self, event: LiquidationEvent) -> None:
+        """Process a liquidation event and publish stats."""
         self._event_bus.publish(event)
+        self._liquidation_aggregator.process(event)
+        for stats in self._liquidation_aggregator.get_all_stats().values():
+            self._event_bus.publish(stats)
 
-    def _on_kline(self, event: KlineEvent) -> None:
-        """Handle incoming kline event from WS client."""
-        self._cache.put_kline(event.symbol, event)
+    def _on_funding_rate_event(self, event: FundingRateEvent) -> None:
+        """Cache funding rate event and publish."""
+        key = f"{event.exchange}:{event.symbol}"
+        self._funding_rate_store[key] = event
         self._event_bus.publish(event)
-
-    async def _on_depth_update(self, delta: Any) -> None:
-        """Handle incoming depth delta from WS client."""
-        if self._l2_manager is None:
-            return
-        binance_symbol = delta.delta.symbol.replace("/", "").upper()
-        snapshot = await self._l2_manager.apply_delta(binance_symbol, delta)
-        if snapshot is not None:
-            self._snapshot_store.update(snapshot.symbol, snapshot)
-            self._event_bus.publish(snapshot)
-
-    def _on_l2_snapshot(self, snapshot: OrderBookL2Snapshot) -> None:
-        """Handle L2 snapshot callback from BinanceL2Manager."""
-        self._snapshot_store.update(snapshot.symbol, snapshot)
-        self._event_bus.publish(snapshot)
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def _ensure_running(self) -> None:
-        """Raise if service is not running."""
-        if not self._running:
-            raise MarketDataServiceNotRunning(
-                "MarketDataService is not running. Call start() first."
+    def _require_source(self, exchange: str, market_type: str) -> ExchangeSource:
+        source = self._sources.get((exchange, market_type))
+        if source is None:
+            raise MarketDataServiceError(
+                f"No source registered for {exchange}/{market_type}"
             )
+        return source

@@ -1,3 +1,13 @@
+---
+name: risk-report
+description: Generates a risk assessment for current or hypothetical positions using engine rules and paper state
+version: 0.1.0
+tags: [risk, assessment, portfolio]
+user_invocable: true
+model_invocable: true
+requires_tools: [risk_check, risk_report, paper_positions]
+---
+
 # Risk Report
 
 ## Description

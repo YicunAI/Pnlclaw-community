@@ -82,12 +82,22 @@ class ReconnectManager:
                 # Successful connection — reset backoff.
                 self._attempt = 0
 
-                # Hand control to the caller's listen loop.
+                # Hand control to the caller's listen loop or wait for
+                # disconnect/shutdown so we can reconnect.
                 if self._listen is not None:
                     await self._listen()
                 else:
-                    # Wait until shutdown or disconnection.
-                    await self._shutdown_event.wait()
+                    done, pending = await asyncio.wait(
+                        [
+                            asyncio.create_task(self._shutdown_event.wait()),
+                            asyncio.create_task(self._client.wait_disconnected()),
+                        ],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for t in pending:
+                        t.cancel()
+                    if self._shutdown_event.is_set():
+                        break
 
             except Exception as exc:
                 category = classify_error(exc)

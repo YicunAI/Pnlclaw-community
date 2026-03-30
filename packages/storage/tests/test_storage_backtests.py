@@ -34,6 +34,9 @@ def _make_result(id: str = "bt-001", strategy_id: str = "strat-001") -> Backtest
     return BacktestResult(
         id=id,
         strategy_id=strategy_id,
+        strategy_version=2,
+        symbol="BTC/USDT",
+        interval="1h",
         start_date=datetime(2025, 1, 1, tzinfo=UTC),
         end_date=datetime(2025, 3, 31, tzinfo=UTC),
         metrics=_METRICS,
@@ -74,6 +77,9 @@ async def test_save_and_get(repos):
     assert loaded is not None
     assert loaded.strategy_id == "strat-001"
     assert loaded.metrics.sharpe_ratio == 1.8
+    assert loaded.strategy_version == 2
+    assert loaded.symbol == "BTC/USDT"
+    assert loaded.interval == "1h"
     assert loaded.equity_curve == [10000.0, 10050.0, 10200.0, 10500.0]
     assert loaded.trades_count == 42
     assert loaded.created_at == result.created_at
@@ -85,8 +91,17 @@ async def test_get_nonexistent(repos):
     assert await bt_repo.get("nonexistent") is None
 
 
+
+
 @pytest.mark.asyncio
-async def test_list_by_strategy(repos):
+async def test_list_all(repos):
+    _, bt_repo = repos
+    await bt_repo.save(_make_result("bt-001"))
+    await bt_repo.save(_make_result("bt-002"))
+
+    results = await bt_repo.list_all(limit=10, offset=0)
+    assert len(results) == 2
+
     _, bt_repo = repos
     await bt_repo.save(_make_result("bt-001"))
     await bt_repo.save(_make_result("bt-002"))
@@ -146,3 +161,82 @@ async def test_created_at_roundtrip(repos):
     loaded = await bt_repo.get("bt-created-at")
     assert loaded is not None
     assert loaded.created_at == original.created_at
+
+
+@pytest.mark.asyncio
+async def test_curves_and_trades_roundtrip(repos):
+    """buy_hold_curve, drawdown_curve, and trades should persist and reload."""
+    _, bt_repo = repos
+    result = BacktestResult(
+        id="bt-curves",
+        strategy_id="strat-001",
+        strategy_version=1,
+        start_date=datetime(2025, 1, 1, tzinfo=UTC),
+        end_date=datetime(2025, 3, 31, tzinfo=UTC),
+        metrics=_METRICS,
+        equity_curve=[10000.0, 10200.0, 10500.0, 10100.0],
+        buy_hold_curve=[10000.0, 10100.0, 10300.0, 10400.0],
+        drawdown_curve=[0.0, 0.0, 0.0, -0.038],
+        trades=[{"side": "long", "entry_price": 100, "exit_price": 105, "pnl": 50}],
+        trades_count=1,
+        created_at=1711000000000,
+    )
+    await bt_repo.save(result)
+
+    loaded = await bt_repo.get("bt-curves")
+    assert loaded is not None
+    assert loaded.equity_curve == [10000.0, 10200.0, 10500.0, 10100.0]
+    assert loaded.buy_hold_curve == [10000.0, 10100.0, 10300.0, 10400.0]
+    assert loaded.drawdown_curve == [0.0, 0.0, 0.0, -0.038]
+    assert len(loaded.trades) == 1
+    assert loaded.trades[0]["pnl"] == 50
+
+
+@pytest.mark.asyncio
+async def test_symbol_interval_roundtrip(repos):
+    """symbol and interval should persist and reload correctly."""
+    _, bt_repo = repos
+    result = BacktestResult(
+        id="bt-sym",
+        strategy_id="strat-001",
+        strategy_version=1,
+        symbol="ETH/USDT",
+        interval="4h",
+        start_date=datetime(2025, 1, 1, tzinfo=UTC),
+        end_date=datetime(2025, 3, 31, tzinfo=UTC),
+        metrics=_METRICS,
+        equity_curve=[10000.0, 10200.0],
+        trades_count=0,
+        created_at=1711000000000,
+    )
+    await bt_repo.save(result)
+
+    loaded = await bt_repo.get("bt-sym")
+    assert loaded is not None
+    assert loaded.symbol == "ETH/USDT"
+    assert loaded.interval == "4h"
+
+
+@pytest.mark.asyncio
+async def test_empty_curves_recomputed(repos):
+    """When buy_hold_curve and drawdown_curve are empty, they should be recomputed from equity_curve."""
+    _, bt_repo = repos
+    result = BacktestResult(
+        id="bt-recompute",
+        strategy_id="strat-001",
+        strategy_version=1,
+        start_date=datetime(2025, 1, 1, tzinfo=UTC),
+        end_date=datetime(2025, 3, 31, tzinfo=UTC),
+        metrics=_METRICS,
+        equity_curve=[10000.0, 10200.0, 10500.0, 10100.0],
+        trades_count=0,
+        created_at=1711000000000,
+    )
+    await bt_repo.save(result)
+
+    loaded = await bt_repo.get("bt-recompute")
+    assert loaded is not None
+    assert len(loaded.drawdown_curve) == 4
+    assert loaded.drawdown_curve[0] == 0.0
+    assert loaded.drawdown_curve[3] < 0
+    assert len(loaded.buy_hold_curve) == 4

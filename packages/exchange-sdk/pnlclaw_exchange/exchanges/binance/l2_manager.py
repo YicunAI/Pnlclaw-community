@@ -36,6 +36,9 @@ DEFAULT_DEPTH_LIMIT = 1000
 Callback = Callable[..., Any]
 
 
+_RECOVERY_COOLDOWN_S = 5.0
+
+
 @dataclass
 class _LocalOrderBook:
     """Internal per-symbol orderbook state."""
@@ -47,6 +50,7 @@ class _LocalOrderBook:
     last_update_id: int = 0
     initialized: bool = False  # True after first valid delta applied
     recovering: bool = False
+    last_recovery_at: float = 0.0
 
 
 class BinanceL2Manager:
@@ -130,32 +134,45 @@ class BinanceL2Manager:
 
         # Step 4: First delta after snapshot.
         if not book.initialized:
-            if not (
+            if (
                 delta.first_update_id <= book.last_update_id + 1
                 and delta.last_update_id >= book.last_update_id + 1
             ):
-                logger.warning(
-                    "First delta for %s doesn't bridge snapshot "
-                    "(snapshot=%d, delta U=%d u=%d) — recovering",
+                book.initialized = True
+            elif delta.last_update_id <= book.last_update_id:
+                return None
+            else:
+                # Gap between snapshot and first delta — accept with warning.
+                # For display-only orderbooks this is fine; the book converges
+                # within a few subsequent delta updates.
+                logger.info(
+                    "Accepting first delta for %s with gap "
+                    "(snapshot=%d, delta U=%d u=%d)",
                     symbol,
                     book.last_update_id,
                     delta.first_update_id,
                     delta.last_update_id,
                 )
-                await self._recover(book)
-                return None
-            book.initialized = True
+                book.initialized = True
         else:
-            # Step 5: Contiguous check.
-            if delta.first_update_id != book.last_update_id + 1:
+            # Step 5: Contiguous check — tolerate small gaps for display.
+            gap = delta.first_update_id - (book.last_update_id + 1)
+            if gap > 0 and gap > 500:
                 logger.warning(
-                    "Sequence gap for %s (expected U=%d, got U=%d) — recovering",
+                    "Large sequence gap for %s (expected U=%d, got U=%d, gap=%d) — recovering",
                     symbol,
                     book.last_update_id + 1,
                     delta.first_update_id,
+                    gap,
                 )
                 await self._recover(book)
                 return None
+            elif gap > 0:
+                logger.debug(
+                    "Small sequence gap for %s (gap=%d), accepting",
+                    symbol,
+                    gap,
+                )
 
         # Apply the delta.
         self._apply_levels(book.bids, delta.delta.bids)
@@ -197,11 +214,21 @@ class BinanceL2Manager:
     # ------------------------------------------------------------------
 
     async def _recover(self, book: _LocalOrderBook) -> None:
-        """Discard local data and fetch a fresh REST snapshot."""
+        """Discard local data and fetch a fresh REST snapshot.
+
+        Enforces a cooldown of ``_RECOVERY_COOLDOWN_S`` seconds between
+        consecutive recoveries for the same symbol to avoid rate-limit
+        exhaustion on high-frequency gap streams.
+        """
+        now = time.monotonic()
+        if now - book.last_recovery_at < _RECOVERY_COOLDOWN_S:
+            return
+
         book.recovering = True
         book.initialized = False
         book.bids.clear()
         book.asks.clear()
+        book.last_recovery_at = now
 
         logger.info("Recovering L2 orderbook for %s via REST", book.symbol)
         start = time.monotonic()

@@ -36,6 +36,10 @@ class LLMAuthError(LLMError):
     """Authentication or authorization failure (401 / 403)."""
 
 
+class LLMContextLengthError(LLMError):
+    """Request exceeded the model's context window limit (400)."""
+
+
 # ---------------------------------------------------------------------------
 # LLMMessage
 # ---------------------------------------------------------------------------
@@ -109,6 +113,11 @@ class LLMProvider(abc.ABC):
     - ``chat_stream``: Streaming variant yielding text chunks.
     - ``generate_structured``: Constrained generation returning parsed JSON dict.
 
+    Optional method (v0.1.1):
+
+    - ``chat_with_tools``: Native function calling (tool use). Providers that
+      support it should override; default falls back to ``chat()``.
+
     Implementations should raise the appropriate ``LLMError`` subclass on failure.
     """
 
@@ -152,6 +161,31 @@ class LLMProvider(abc.ABC):
         # Make this a proper async generator for type-checking purposes
         yield ""  # pragma: no cover
         raise NotImplementedError  # pragma: no cover
+
+    async def chat_with_tools(
+        self,
+        messages: list[LLMMessage],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> "ToolCallResult":
+        """Native function calling (tool use).
+
+        Providers that support native tool calling should override this method.
+        Default implementation falls back to ``chat()`` and returns the text
+        response as a ``ToolCallResult`` with no tool calls.
+
+        Args:
+            messages: Conversation history.
+            tools: Tool definitions in OpenAI function calling format.
+            **kwargs: Provider-specific overrides.
+
+        Returns:
+            Structured ``ToolCallResult`` containing tool calls and/or text.
+        """
+        from pnlclaw_llm.schemas import ToolCallResult
+
+        response = await self.chat(messages, **kwargs)
+        return ToolCallResult(text=response)
 
     @abc.abstractmethod
     async def generate_structured(

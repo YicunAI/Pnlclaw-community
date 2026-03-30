@@ -2,13 +2,22 @@
 
 Detects when AI references prices or indicators that deviate significantly
 from actual market data. Source: distillation-plan-supplement-3 gap 20.
+Extended in v0.1.1 with financial claim scanning, investment promise
+detection, and output secret redaction.
 """
 
 from __future__ import annotations
 
+import logging
+import re
+from dataclasses import dataclass, field
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from pnlclaw_types import RiskLevel
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Alert model
@@ -162,3 +171,226 @@ class HallucinationDetector:
         Returns ``True`` if reasonable, ``False`` if suspiciously high.
         """
         return 0.0 <= confidence <= max_confidence
+
+    # ------------------------------------------------------------------
+    # v0.1.1: Financial output scanning
+    # ------------------------------------------------------------------
+
+    def scan_text_for_unverified_claims(
+        self,
+        text: str,
+        tool_results: list[dict[str, Any]],
+    ) -> ScanResult:
+        """Detect numeric claims in text not supported by tool results.
+
+        Extracts price-like numbers ($1,234.56), percentages (23.5%),
+        and named metrics (Sharpe 1.8) from the AI output, then cross-
+        references them against ``tool_results`` data.
+        """
+        result = ScanResult()
+        claims = _extract_numeric_claims(text)
+
+        if not claims:
+            return result
+
+        tool_text = _flatten_tool_results(tool_results)
+
+        for claim in claims:
+            if not _claim_supported_by_tools(claim, tool_text):
+                result.warnings.append(f"⚠️ 此数据未经工具验证: {claim}")
+                result.triggered = True
+                logger.warning("hallucination_detected", extra={
+                    "type": "unverified_claim",
+                    "matched_text": claim,
+                    "action": "appended_warning",
+                })
+
+        return result
+
+    def scan_for_investment_promises(self, text: str) -> ScanResult:
+        """Detect investment promise language (Chinese and English)."""
+        result = ScanResult()
+
+        for pattern in _INVESTMENT_PROMISE_PATTERNS:
+            match = pattern.search(text)
+            if match:
+                result.warnings.append(
+                    "⚠️ 投资有风险，过往表现不预示未来收益 / "
+                    "Investment involves risk; past performance does not guarantee future results."
+                )
+                result.triggered = True
+                logger.warning("hallucination_detected", extra={
+                    "type": "investment_promise",
+                    "matched_text": match.group(0),
+                    "action": "appended_disclaimer",
+                })
+                break  # One disclaimer is enough
+
+        return result
+
+    def redact_secrets_in_output(self, text: str) -> str:
+        """Strip secrets from AI output using the redaction engine."""
+        from pnlclaw_security.redaction import redact_text
+
+        redacted = redact_text(text)
+        if redacted != text:
+            logger.warning("hallucination_detected", extra={
+                "type": "secret_leak",
+                "matched_text": "[redacted content]",
+                "action": "redacted",
+            })
+        return redacted
+
+    def scan_output(
+        self,
+        text: str,
+        tool_results: list[dict[str, Any]] | None = None,
+    ) -> tuple[str, ScanResult]:
+        """Run all scans on AI output and return annotated text + result.
+
+        This is the single entry-point used by the ReAct Answer stage.
+
+        Scan tiers:
+        1. Secret redaction — always applied (mutates text)
+        2. Unverified numeric claims — logged internally only, NOT shown to users
+           (derived calculations like spread%, change% are expected analyst behavior)
+        3. Investment promises — appended as visible disclaimer
+        """
+        combined = ScanResult()
+
+        # 1. Secret redaction (always first, mutates text)
+        text = self.redact_secrets_in_output(text)
+
+        # 2. Unverified claims — internal logging only
+        if tool_results is not None:
+            claim_result = self.scan_text_for_unverified_claims(text, tool_results)
+            if claim_result.triggered:
+                combined.triggered = True
+
+        # 3. Investment promises — user-visible disclaimer
+        promise_result = self.scan_for_investment_promises(text)
+        if promise_result.triggered:
+            combined.merge(promise_result)
+
+        if combined.warnings:
+            text = text + "\n\n" + "\n".join(combined.warnings)
+
+        return text, combined
+
+
+# ---------------------------------------------------------------------------
+# ScanResult
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ScanResult:
+    """Result of a hallucination scan pass."""
+
+    triggered: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+    def merge(self, other: ScanResult) -> None:
+        if other.triggered:
+            self.triggered = True
+        self.warnings.extend(other.warnings)
+
+
+# ---------------------------------------------------------------------------
+# Numeric claim extraction
+# ---------------------------------------------------------------------------
+
+_PRICE_RE = re.compile(r"\$[\d,]+(?:\.\d+)?")
+_PERCENTAGE_RE = re.compile(r"\d+(?:\.\d+)?%")
+_METRIC_RE = re.compile(
+    r"\b(?:Sharpe|Sortino|Calmar|drawdown|max drawdown|volatility|APY|APR)"
+    r"\s*(?:ratio|of)?\s*[:=]?\s*([\d.]+)",
+    re.IGNORECASE,
+)
+
+
+def _extract_numeric_claims(text: str) -> list[str]:
+    """Extract price, percentage, and metric claims from text."""
+    claims: list[str] = []
+    claims.extend(m.group(0) for m in _PRICE_RE.finditer(text))
+    claims.extend(m.group(0) for m in _PERCENTAGE_RE.finditer(text))
+    claims.extend(m.group(0) for m in _METRIC_RE.finditer(text))
+    return claims
+
+
+def _flatten_tool_results(tool_results: list[dict[str, Any]]) -> str:
+    """Flatten tool results into a single string for matching."""
+    import json
+
+    parts: list[str] = []
+    for tr in tool_results:
+        output = tr.get("output", "")
+        result = tr.get("result", "")
+        if isinstance(output, str):
+            parts.append(output)
+        elif isinstance(output, dict):
+            parts.append(json.dumps(output))
+        if isinstance(result, str):
+            parts.append(result)
+        elif isinstance(result, dict):
+            parts.append(json.dumps(result))
+    return " ".join(parts)
+
+
+def _claim_supported_by_tools(claim: str, tool_text: str) -> bool:
+    """Check if a numeric claim is supported by tool result data.
+
+    Uses three tiers:
+    1. Exact match in tool text → supported
+    2. Small percentages (< 10%) → assumed derived calculation, supported
+    3. Price-like values → fuzzy match within 1% of any price in tool text
+    """
+    cleaned = claim.replace("$", "").replace(",", "").replace("%", "").strip()
+
+    if cleaned in tool_text or claim in tool_text:
+        return True
+
+    if claim.endswith("%"):
+        try:
+            pct_val = float(cleaned)
+            if abs(pct_val) < 10.0:
+                return True
+        except ValueError:
+            pass
+
+    if claim.startswith("$") or (cleaned.replace(".", "", 1).isdigit() and float(cleaned) > 100):
+        try:
+            claimed_val = float(cleaned)
+            for num_match in re.finditer(r"[\d,]+(?:\.\d+)?", tool_text):
+                try:
+                    tool_val = float(num_match.group(0).replace(",", ""))
+                    if tool_val > 0 and abs(claimed_val - tool_val) / tool_val < 0.01:
+                        return True
+                except ValueError:
+                    continue
+        except ValueError:
+            pass
+
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Investment promise patterns
+# ---------------------------------------------------------------------------
+
+_INVESTMENT_PROMISE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(p, re.IGNORECASE)
+    for p in [
+        r"保证盈利",
+        r"稳赚",
+        r"零风险",
+        r"必涨",
+        r"翻倍",
+        r"保本",
+        r"guarantee[sd]?\s+returns?",
+        r"risk[\s-]*free",
+        r"sure\s+profit",
+        r"can'?t\s+lose",
+        r"guarantee[sd]?\s+profits?",
+    ]
+]

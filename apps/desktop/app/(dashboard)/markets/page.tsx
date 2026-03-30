@@ -4,243 +4,278 @@ import React, { useEffect, useState, useMemo, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Activity, Flame } from "lucide-react"
 import {
-  getTicker,
-  getKlines,
-  getOrderbook,
-  type TickerData,
   type KlineData,
   type OrderbookData,
+  type ExchangeProvider,
+  type MarketType,
 } from "@/lib/api-client"
+import { useAppSettings } from "@/lib/hooks/use-api"
+import { useKlineHistory } from "@/lib/hooks/use-klines"
+import { useI18n } from "@/components/i18n/use-i18n"
+import { useDashboardRealtime } from "@/components/providers/dashboard-realtime-provider"
+import { LargeTradeFeed } from "@/components/tactical/large-trade-feed"
+import { LiquidationPanel } from "@/components/tactical/liquidation-panel"
+import { TickerPanel } from "@/components/trading/ticker-panel"
+import { OrderbookPanel } from "@/components/trading/orderbook-panel"
+import dynamic from "next/dynamic"
+
+const CandlestickChart = dynamic(
+  () => import("@/components/trading/candlestick-chart"),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[420px] w-full" />
+  }
+)
 
 const SYMBOLS = [
   { value: "BTC/USDT", label: "BTC/USDT" },
   { value: "ETH/USDT", label: "ETH/USDT" },
+  { value: "SOL/USDT", label: "SOL/USDT" },
 ]
 
 const INTERVALS = [
+  { value: "1m", label: "1m" },
+  { value: "5m", label: "5m" },
+  { value: "15m", label: "15m" },
+  { value: "30m", label: "30m" },
   { value: "1h", label: "1H" },
   { value: "4h", label: "4H" },
   { value: "1d", label: "1D" },
 ]
 
-function KlineChart({ data }: { data: KlineData[] }) {
-  const { width, height, chartH, volH } = {
-    width: 700,
-    height: 360,
-    chartH: 260,
-    volH: 80,
+const INTERVAL_MS: Record<string, number> = {
+  "1m": 60_000,
+  "5m": 300_000,
+  "15m": 900_000,
+  "30m": 1_800_000,
+  "1h": 3_600_000,
+  "2h": 7_200_000,
+  "4h": 14_400_000,
+  "1d": 86_400_000,
+  "1w": 604_800_000,
+}
+
+const RECENT_SYMBOLS_KEY = "pnlclaw-recent-symbols"
+const MAX_RECENT_SYMBOLS = 8
+
+function normalizeSymbolInput(input: string): string {
+  const cleaned = input
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "/")
+    .replace(/\/+/, "/")
+
+  if (!cleaned) return ""
+  if (cleaned.includes("/")) return cleaned
+  if (cleaned.endsWith("USDT") && cleaned.length > 4) {
+    return `${cleaned.slice(0, -4)}/USDT`
   }
-  const padX = 50
-  const padY = 20
-
-  const prices = data.map((d) => d.close)
-  const volumes = data.map((d) => d.volume)
-  const minP = Math.min(...prices)
-  const maxP = Math.max(...prices)
-  const maxV = Math.max(...volumes)
-  const rangeP = maxP - minP || 1
-
-  const barW = Math.max(1, (width - padX * 2) / data.length)
-
-  const pricePath = data
-    .map((d, i) => {
-      const x = padX + (i / (data.length - 1 || 1)) * (width - padX * 2)
-      const y = padY + (1 - (d.close - minP) / rangeP) * (chartH - padY * 2)
-      return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`
-    })
-    .join(" ")
-
-  const [hover, setHover] = useState<number | null>(null)
-  const hovered = hover !== null ? data[hover] : null
-
-  return (
-    <div className="relative">
-      {hovered && (
-        <div className="absolute top-1 left-14 z-10 bg-card border border-border rounded-md px-3 py-2 text-xs space-y-0.5">
-          <div>
-            <span className="text-muted-foreground">O</span>{" "}
-            {hovered.open.toFixed(2)}{" "}
-            <span className="text-muted-foreground">H</span>{" "}
-            {hovered.high.toFixed(2)}{" "}
-            <span className="text-muted-foreground">L</span>{" "}
-            {hovered.low.toFixed(2)}{" "}
-            <span className="text-muted-foreground">C</span>{" "}
-            {hovered.close.toFixed(2)}
-          </div>
-          <div className="text-muted-foreground">
-            Vol {hovered.volume.toLocaleString()}
-          </div>
-        </div>
-      )}
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="w-full"
-        onMouseLeave={() => setHover(null)}
-      >
-        {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
-          const y = padY + pct * (chartH - padY * 2)
-          const price = maxP - pct * rangeP
-          return (
-            <g key={pct}>
-              <line
-                x1={padX}
-                y1={y}
-                x2={width - padX}
-                y2={y}
-                stroke="rgba(255,255,255,0.05)"
-              />
-              <text
-                x={padX - 6}
-                y={y + 4}
-                textAnchor="end"
-                className="fill-muted-foreground"
-                fontSize={10}
-              >
-                {price.toFixed(0)}
-              </text>
-            </g>
-          )
-        })}
-
-        <path d={pricePath} fill="none" stroke="#22d3ee" strokeWidth={1.5} />
-
-        {data.map((d, i) => {
-          const x = padX + (i / (data.length - 1 || 1)) * (width - padX * 2)
-          const volPct = maxV > 0 ? d.volume / maxV : 0
-          const barHeight = volPct * volH * 0.8
-          const barY = chartH + volH - barHeight
-          const isUp = d.close >= d.open
-          return (
-            <g key={i}>
-              <rect
-                x={x - barW / 2}
-                y={barY}
-                width={Math.max(1, barW - 1)}
-                height={barHeight}
-                fill={isUp ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}
-              />
-              <rect
-                x={x - barW / 2}
-                y={padY}
-                width={Math.max(1, barW)}
-                height={height - padY}
-                fill="transparent"
-                onMouseEnter={() => setHover(i)}
-              />
-            </g>
-          )
-        })}
-      </svg>
-    </div>
-  )
+  return cleaned
 }
 
-function OrderbookPanel({ data }: { data: OrderbookData | null }) {
-  if (!data) return <Skeleton className="h-48" />
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
 
-  const bids = data.bids.slice(0, 10)
-  const asks = data.asks.slice(0, 10).reverse()
-  const maxQty = Math.max(
-    ...bids.map((b) => b[1]),
-    ...asks.map((a) => a[1]),
-    1
-  )
 
-  return (
-    <div className="text-xs font-mono space-y-0.5">
-      <div className="flex justify-between text-muted-foreground px-1 mb-1">
-        <span>Price</span>
-        <span>Quantity</span>
-      </div>
-      {asks.map(([price, qty], i) => (
-        <div key={`a-${i}`} className="flex justify-between relative px-1 py-0.5">
-          <div
-            className="absolute inset-0 bg-red-500/10"
-            style={{ width: `${(qty / maxQty) * 100}%`, right: 0, left: "auto" }}
-          />
-          <span className="text-red-400 relative z-10">
-            {price.toFixed(2)}
-          </span>
-          <span className="relative z-10">{qty.toFixed(4)}</span>
-        </div>
-      ))}
-      <div className="border-t border-border my-1" />
-      {bids.map(([price, qty], i) => (
-        <div key={`b-${i}`} className="flex justify-between relative px-1 py-0.5">
-          <div
-            className="absolute inset-0 bg-emerald-500/10"
-            style={{ width: `${(qty / maxQty) * 100}%`, right: 0, left: "auto" }}
-          />
-          <span className="text-emerald-400 relative z-10">
-            {price.toFixed(2)}
-          </span>
-          <span className="relative z-10">{qty.toFixed(4)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 export default function MarketsPage() {
-  const [symbol, setSymbol] = useState("BTC/USDT")
-  const [interval, setInterval] = useState("1h")
-  const [ticker, setTicker] = useState<TickerData | null>(null)
-  const [klines, setKlines] = useState<KlineData[]>([])
-  const [orderbook, setOrderbook] = useState<OrderbookData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const [t, k, o] = await Promise.all([
-      getTicker(symbol),
-      getKlines(symbol, interval, 100),
-      getOrderbook(symbol, 10),
-    ])
-
-    if (t.error && k.error) {
-      setError("Cannot reach API server. Start `pnlclaw` or the local API.")
-      setLoading(false)
-      return
+  const { locale, t } = useI18n()
+  const { market: ws, marketSubscription, setMarketSubscription } = useDashboardRealtime()
+  const [symbol, setSymbol] = useState(marketSubscription.symbol)
+  const [customSymbol, setCustomSymbol] = useState("")
+  const [recentSymbols, setRecentSymbols] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const raw = localStorage.getItem(RECENT_SYMBOLS_KEY)
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => normalizeSymbolInput(item))
+        .filter(Boolean)
+        .slice(0, MAX_RECENT_SYMBOLS)
+    } catch {
+      return []
     }
+  })
+  const [interval, setKlineInterval] = useState("1h")
+  const [exchange, setExchange] = useState<ExchangeProvider>(marketSubscription.exchange)
+  const [marketType, setMarketType] = useState<MarketType>(marketSubscription.marketType)
+  const {
+    klines: historyKlines,
+    error: klineError,
+    isLoading: loading,
+    isLoadingMore,
+    noMoreData,
+    loadMore: loadMoreKlines,
+  } = useKlineHistory(symbol, interval, exchange, marketType)
 
-    if (t.data) setTicker(t.data)
-    if (k.data) setKlines(k.data)
-    if (o.data) setOrderbook(o.data)
-    setLoading(false)
-  }, [symbol, interval])
+  const error = useMemo(() => {
+    if (!klineError) return null
+    if (klineError.includes("not available yet"))
+      return t("markets.sourceUnavailable", { exchange, marketType })
+    if (klineError.startsWith("HTTP "))
+      return t("markets.exchangeNoData", { exchange: exchange.toUpperCase(), marketType })
+    return t("markets.apiUnreachable")
+  }, [klineError, exchange, marketType, t])
+
+  const ticker = ws.ticker
+  const orderbook = ws.orderbook
+  const { stale, streamState } = ws
+
+  const klines = useMemo(() => {
+    if (historyKlines.length === 0) return []
+    const matchingWsKlines = ws.klines.filter(
+      (k) => !k.wsInterval || k.wsInterval === interval
+    )
+    if (matchingWsKlines.length === 0) return historyKlines
+    const map = new Map<number, KlineData>()
+    for (const k of historyKlines) map.set(k.timestamp, k)
+    for (const k of matchingWsKlines) map.set(k.timestamp, k)
+    return Array.from(map.values())
+      .filter((k) => k && typeof k.timestamp === "number" && !isNaN(k.timestamp))
+      .sort((a, b) => a.timestamp - b.timestamp)
+  }, [historyKlines, ws.klines, interval])
+
+  const quickSymbols = useMemo(() => {
+    return [...new Set([...SYMBOLS.map((s) => s.value), ...recentSymbols])]
+  }, [recentSymbols])
+
+  const addRecentSymbol = useCallback((nextSymbol: string) => {
+    setRecentSymbols((prev) => {
+      const next = [nextSymbol, ...prev.filter((s) => s !== nextSymbol)].slice(
+        0,
+        MAX_RECENT_SYMBOLS
+      )
+      localStorage.setItem(RECENT_SYMBOLS_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  const selectSymbol = useCallback((nextSymbol: string) => {
+    setSymbol(nextSymbol)
+    addRecentSymbol(nextSymbol)
+  }, [addRecentSymbol])
 
   useEffect(() => {
-    fetchData()
-  }, [fetchData])
+    setMarketSubscription({ symbol, exchange, marketType })
+  }, [symbol, exchange, marketType, setMarketSubscription])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_SYMBOLS_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return
+      const cleaned = parsed
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => normalizeSymbolInput(item))
+        .filter(Boolean)
+        .slice(0, MAX_RECENT_SYMBOLS)
+      setRecentSymbols(cleaned)
+    } catch {
+      // ignore parse errors
+    }
+  }, [])
+
+  const { data: appSettings } = useAppSettings()
+  useEffect(() => {
+    if (!appSettings) return
+    const provider = appSettings.exchange?.provider
+    const type = appSettings.exchange?.market_type
+    if (provider === "binance" || provider === "okx") setExchange(provider)
+    if (type === "spot" || type === "futures") setMarketType(type)
+  }, [appSettings])
+
+
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Markets</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Live market data and charts
-          </p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">{t("markets.title")}</h1>
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${ws.connected ? (stale ? "bg-yellow-400" : "bg-emerald-400 animate-pulse") : "bg-red-400"}`}
+              title={
+                ws.connected
+                  ? stale
+                    ? (streamState === "recovering" ? "WebSocket recovering" : "Market data stale")
+                    : "WebSocket connected"
+                  : "WebSocket disconnected"
+              }
+            />
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">{t("markets.subtitle")}</p>
         </div>
-        <div className="flex gap-2">
-          {SYMBOLS.map((s) => (
+        <div className="flex gap-2 flex-wrap justify-end">
+          <div className="flex gap-2">
+            <select
+              value={exchange}
+              onChange={(e) => setExchange(e.target.value as ExchangeProvider)}
+              className="h-9 min-w-[110px] rounded-lg border border-input bg-background px-3 text-sm"
+              aria-label={t("markets.exchange")}
+            >
+              <option value="binance">Binance</option>
+              <option value="okx">OKX</option>
+            </select>
+            <select
+              value={marketType}
+              onChange={(e) => setMarketType(e.target.value as MarketType)}
+              className="h-9 min-w-[100px] rounded-lg border border-input bg-background px-3 text-sm"
+              aria-label={t("markets.marketType")}
+            >
+              <option value="spot">{t("markets.spot")}</option>
+              <option value="futures">{t("markets.futures")}</option>
+            </select>
+          </div>
+          {quickSymbols.map((value) => (
             <button
-              key={s.value}
-              onClick={() => setSymbol(s.value)}
+              key={value}
+              onClick={() => selectSymbol(value)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                symbol === s.value
+                symbol === value
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
-              {s.label}
+              {value}
             </button>
           ))}
+          <div className="flex gap-2">
+            <Input
+              value={customSymbol}
+              onChange={(e) => setCustomSymbol(e.target.value)}
+              placeholder={t("markets.customSymbol")}
+              className="h-9 w-48"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const normalized = normalizeSymbolInput(customSymbol)
+                  if (normalized) {
+                    selectSymbol(normalized)
+                    setCustomSymbol("")
+                  }
+                }
+              }}
+            />
+            <button
+              onClick={() => {
+                const normalized = normalizeSymbolInput(customSymbol)
+                if (normalized) {
+                  selectSymbol(normalized)
+                  setCustomSymbol("")
+                }
+              }}
+              className="px-3 py-1.5 text-sm rounded-lg bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >
+              {t("markets.add")}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -251,21 +286,22 @@ export default function MarketsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-[1fr_300px] gap-6">
-          <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Row 1: Chart + Ticker + Orderbook */}
+          <div className="grid grid-cols-[1fr_300px] gap-6">
             <Card>
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base">
-                  {symbol} Price Chart
+                  {t("markets.priceChart", { symbol })}
                 </CardTitle>
-                <div className="flex gap-1">
+                <div className="flex gap-0.5">
                   {INTERVALS.map((iv) => (
                     <button
                       key={iv.value}
-                      onClick={() => setInterval(iv.value)}
+                      onClick={() => { setKlineInterval(iv.value); setMarketSubscription({ interval: iv.value }) }}
                       className={`px-2 py-1 text-xs rounded-md transition-colors ${
                         interval === iv.value
-                          ? "bg-primary/20 text-primary"
+                          ? "bg-primary/20 text-primary font-semibold"
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
@@ -276,85 +312,68 @@ export default function MarketsPage() {
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <Skeleton className="h-[360px] w-full" />
+                  <Skeleton className="h-[650px] w-full" />
                 ) : klines.length > 0 ? (
-                  <KlineChart data={klines} />
+                  <div className="h-[650px] w-full">
+                    <CandlestickChart
+                      data={klines}
+                      interval={interval}
+                      onLoadMore={loadMoreKlines}
+                      isLoadingMore={isLoadingMore}
+                    />
+                  </div>
                 ) : (
-                  <div className="h-[360px] flex items-center justify-center text-sm text-muted-foreground">
-                    No kline data available
+                  <div className="h-[650px] flex items-center justify-center text-sm text-muted-foreground">
+                    {t("markets.noKline")}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{t("markets.ticker")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TickerPanel ticker={ticker} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{t("markets.orderBook")}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <OrderbookPanel data={orderbook} baseCurrency={symbol.split("/")[0]} quoteCurrency={symbol.split("/")[1] || "USDT"} />
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          <div className="space-y-4">
+          {/* Row 2: Large Trades + Liquidation */}
+          <div className="grid grid-cols-2 gap-6">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Ticker</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-blue-400" />
+                  {t("tactical.largeTrades")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {loading || !ticker ? (
-                  <div className="space-y-3">
-                    <Skeleton className="h-8 w-32" />
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-20" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="text-2xl font-bold font-mono">
-                      ${ticker.price?.toLocaleString()}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {(ticker.change_24h ?? 0) >= 0 ? (
-                        <TrendingUp className="h-4 w-4 text-emerald-400" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4 text-red-400" />
-                      )}
-                      <Badge
-                        variant={
-                          (ticker.change_24h ?? 0) >= 0 ? "success" : "destructive"
-                        }
-                      >
-                        {(ticker.change_24h ?? 0) >= 0 ? "+" : ""}
-                        {((ticker.change_24h ?? 0) * 100).toFixed(2)}%
-                      </Badge>
-                    </div>
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <div className="flex justify-between">
-                        <span>24h High</span>
-                        <span className="text-foreground font-mono">
-                          ${ticker.high_24h?.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>24h Low</span>
-                        <span className="text-foreground font-mono">
-                          ${ticker.low_24h?.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>24h Volume</span>
-                        <span className="text-foreground font-mono">
-                          {ticker.volume_24h?.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <LargeTradeFeed />
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Order Book</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-orange-400" />
+                  {t("tactical.liquidationMonitor")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <Skeleton className="h-48" />
-                ) : (
-                  <OrderbookPanel data={orderbook} />
-                )}
+                <LiquidationPanel />
               </CardContent>
             </Card>
           </div>

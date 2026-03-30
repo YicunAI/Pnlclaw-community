@@ -9,7 +9,8 @@ class TestOKXSymbolConversion:
         assert _okx_symbol_to_unified("ETH-USDC") == "ETH/USDC"
 
     def test_triple_part(self) -> None:
-        assert _okx_symbol_to_unified("BTC-USDT-SWAP") == "BTC/USDT/SWAP"
+        # SWAP suffix is stripped — unified format is always BASE/QUOTE
+        assert _okx_symbol_to_unified("BTC-USDT-SWAP") == "BTC/USDT"
 
 
 class TestOKXNormalizeTicker:

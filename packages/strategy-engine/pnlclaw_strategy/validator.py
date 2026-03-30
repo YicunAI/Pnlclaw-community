@@ -143,8 +143,18 @@ def _validate_data_availability(
                 if isinstance(rule.comparator, dict) and "indicator" in rule.comparator:
                     referenced.append((f"{loc}.comparator", rule.comparator["indicator"]))
 
+    # MACD sub-indicators are valid whenever "macd" is available
+    _MACD_ALIASES = {"macd_signal", "macd_histogram"}
+    _BBANDS_ALIASES = {"bbands_upper", "bbands_middle", "bbands_lower"}
+
     for loc, name in referenced:
-        if name not in available_indicators:
+        if name in _MACD_ALIASES:
+            if "macd" not in available_indicators:
+                result.add_error(f"{loc}: '{name}' requires 'macd' indicator")
+        elif name in _BBANDS_ALIASES:
+            if "bbands" not in available_indicators:
+                result.add_error(f"{loc}: '{name}' requires 'bbands' indicator")
+        elif name not in available_indicators:
             available = sorted(available_indicators)
             result.add_error(f"{loc}: unknown indicator '{name}' (available: {available})")
 

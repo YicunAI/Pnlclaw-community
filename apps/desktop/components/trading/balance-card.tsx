@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { getBalances, type TradingBalance } from "@/lib/api-client"
+import { useI18n } from "@/components/i18n/use-i18n"
 
 interface BalanceCardProps {
   wsBalances: TradingBalance[]
 }
 
 export function BalanceCard({ wsBalances }: BalanceCardProps) {
+  const { t } = useI18n()
   const [balances, setBalances] = useState<TradingBalance[]>([])
 
   useEffect(() => {
@@ -21,7 +23,7 @@ export function BalanceCard({ wsBalances }: BalanceCardProps) {
   return (
     <div className="space-y-2">
       {display.length === 0 && (
-        <p className="text-center text-sm text-muted-foreground py-4">No balance data</p>
+        <p className="text-center text-sm text-muted-foreground py-4">{t("trading.noBalance")}</p>
       )}
       {display.map((b) => (
         <div key={b.asset} className="flex items-center justify-between py-1.5">
@@ -32,7 +34,7 @@ export function BalanceCard({ wsBalances }: BalanceCardProps) {
           <div className="text-right">
             <div className="font-mono text-sm">{b.free.toFixed(2)}</div>
             {b.locked > 0 && (
-              <div className="text-xs text-muted-foreground">Locked: {b.locked.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground">{t("trading.locked")}: {b.locked.toFixed(2)}</div>
             )}
           </div>
         </div>

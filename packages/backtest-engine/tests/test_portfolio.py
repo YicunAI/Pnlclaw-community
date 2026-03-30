@@ -6,13 +6,19 @@ from pnlclaw_backtest.portfolio import Portfolio
 from pnlclaw_types.trading import Fill, OrderSide
 
 
-def _make_fill(price: float = 100.0, quantity: float = 1.0, fee: float = 0.0) -> Fill:
+def _make_fill(
+    price: float = 100.0,
+    quantity: float = 1.0,
+    fee: float = 0.0,
+    symbol: str = "BTC/USDT",
+) -> Fill:
     return Fill(
         id="fill-001",
         order_id="ord-001",
         price=price,
         quantity=quantity,
         fee=fee,
+        symbol=symbol,
         timestamp=1711000000000,
     )
 
@@ -66,3 +72,25 @@ class TestPortfolio:
         assert p.cash == 5_000.0
         assert p.positions == {}
         assert p.get_equity_curve() == []
+
+    def test_multi_symbol_fills(self) -> None:
+        """P5: Different symbols should be tracked in separate positions."""
+        p = Portfolio(initial_cash=20_000.0)
+        btc_fill = _make_fill(price=100.0, quantity=2.0, symbol="BTC/USDT")
+        eth_fill = _make_fill(price=50.0, quantity=3.0, symbol="ETH/USDT")
+
+        p.apply_fill(btc_fill, OrderSide.BUY)
+        p.apply_fill(eth_fill, OrderSide.BUY)
+
+        assert p.get_position_quantity("BTC/USDT") == pytest.approx(2.0)
+        assert p.get_position_quantity("ETH/USDT") == pytest.approx(3.0)
+        assert p.cash == pytest.approx(20_000.0 - 200.0 - 150.0)
+
+    def test_fill_symbol_used_not_hardcoded(self) -> None:
+        """P5: Fill.symbol drives the position key, not a hardcoded default."""
+        p = Portfolio(initial_cash=10_000.0)
+        fill = _make_fill(price=100.0, quantity=1.0, symbol="SOL/USDT")
+        p.apply_fill(fill, OrderSide.BUY)
+
+        assert p.get_position_quantity("SOL/USDT") == pytest.approx(1.0)
+        assert p.get_position_quantity("BTC/USDT") == 0.0

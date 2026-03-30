@@ -49,11 +49,17 @@ class StreamManager:
         self,
         ws_client: BinanceWSClient,
         l2_manager: BinanceL2Manager,
-        kline_interval: str = "1h",
+        kline_interval: str | None = None,
+        kline_intervals: list[str] | str = "1h",
     ) -> None:
         self._ws_client = ws_client
         self._l2_manager = l2_manager
-        self._kline_interval = kline_interval
+        if kline_interval is not None:
+            raw: list[str] | str = kline_interval
+        else:
+            raw = kline_intervals
+        self._kline_intervals: list[str] = [raw] if isinstance(raw, str) else list(raw)
+        self._kline_interval = self._kline_intervals[0]
         self._refs: dict[tuple[str, StreamType], _StreamRef] = {}
         self._lock = threading.Lock()
 
@@ -156,7 +162,8 @@ class StreamManager:
         if stream_type == StreamType.TICKER:
             await self._ws_client.subscribe_ticker(binance_symbols)
         elif stream_type == StreamType.KLINE:
-            await self._ws_client.subscribe_kline(binance_symbols, self._kline_interval)
+            for ivl in self._kline_intervals:
+                await self._ws_client.subscribe_kline(binance_symbols, ivl)
         elif stream_type == StreamType.DEPTH:
             await self._ws_client.subscribe_depth(binance_symbols)
 
@@ -165,12 +172,9 @@ class StreamManager:
         binance_symbol = symbol.replace("/", "").lower()
 
         if stream_type == StreamType.TICKER:
-            stream = f"{binance_symbol}@ticker"
+            await self._ws_client.unsubscribe([f"{binance_symbol}@ticker"])
         elif stream_type == StreamType.KLINE:
-            stream = f"{binance_symbol}@kline_{self._kline_interval}"
+            for ivl in self._kline_intervals:
+                await self._ws_client.unsubscribe([f"{binance_symbol}@kline_{ivl}"])
         elif stream_type == StreamType.DEPTH:
-            stream = f"{binance_symbol}@depth@100ms"
-        else:
-            return
-
-        await self._ws_client.unsubscribe([stream])
+            await self._ws_client.unsubscribe([f"{binance_symbol}@depth@100ms"])

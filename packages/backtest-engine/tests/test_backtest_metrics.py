@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from pnlclaw_backtest.metrics import _max_drawdown, compute_metrics
+from pnlclaw_backtest.metrics import _max_drawdown, compute_metrics, infer_annualization_factor
 
 
 class TestMaxDrawdown:
@@ -55,3 +55,31 @@ class TestComputeMetrics:
         assert m.win_rate == 0.0
         assert m.profit_factor == 0.0
         assert m.total_trades == 0
+
+
+class TestInferAnnualizationFactor:
+    """P4: annualization factor must adapt to interval."""
+
+    def test_1h(self) -> None:
+        assert infer_annualization_factor("1h") == 8760
+
+    def test_4h(self) -> None:
+        assert infer_annualization_factor("4h") == 2190
+
+    def test_1d(self) -> None:
+        assert infer_annualization_factor("1d") == 365
+
+    def test_1m(self) -> None:
+        assert infer_annualization_factor("1m") == 525_600
+
+    def test_15m(self) -> None:
+        assert infer_annualization_factor("15m") == 35_040
+
+    def test_1w(self) -> None:
+        assert infer_annualization_factor("1w") == 52
+
+    def test_unknown_defaults_to_365(self) -> None:
+        assert infer_annualization_factor("3d") == 365
+
+    def test_case_insensitive(self) -> None:
+        assert infer_annualization_factor("1H") == 8760

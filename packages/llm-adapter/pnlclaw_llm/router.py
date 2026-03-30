@@ -18,6 +18,7 @@ from pnlclaw_llm.base import (
     LLMProvider,
     LLMRole,
 )
+from pnlclaw_llm.schemas import ToolCallResult
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,30 @@ class LLMRouter:
                 errors.append((entry.name, exc))
                 logger.warning(
                     "Provider '%s' stream failed: %s. Trying next provider.",
+                    entry.name,
+                    exc,
+                )
+                continue
+        raise LLMError(self._format_all_failed(errors))
+
+    # ----- chat_with_tools -----
+
+    async def chat_with_tools(
+        self,
+        messages: list[LLMMessage],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> ToolCallResult:
+        """Route a tool-calling request through the fallback chain."""
+        errors: list[tuple[str, Exception]] = []
+        for entry in self._chain:
+            try:
+                result = await entry.provider.chat_with_tools(messages, tools=tools, **kwargs)
+                return result
+            except LLMError as exc:
+                errors.append((entry.name, exc))
+                logger.warning(
+                    "Provider '%s' chat_with_tools failed: %s. Trying next.",
                     entry.name,
                     exc,
                 )

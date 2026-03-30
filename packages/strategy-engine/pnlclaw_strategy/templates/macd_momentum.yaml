@@ -1,0 +1,54 @@
+# MACD Momentum Strategy
+# Entry: MACD line crosses above signal line (golden cross)
+# Exit: MACD line crosses below signal line (death cross)
+
+id: template-macd-momentum
+name: MACD Momentum
+type: macd
+description: >
+  Trend-following strategy using MACD crossovers.
+  Goes long when MACD line crosses above the signal line,
+  and closes when it crosses below.
+symbols:
+  - BTC/USDT
+interval: 1h
+parameters:
+  fast_period: 12
+  slow_period: 26
+  signal_period: 9
+
+entry_rules:
+  long:
+    - indicator: macd
+      params:
+        fast_period: 12
+        slow_period: 26
+        signal_period: 9
+      operator: crosses_above
+      comparator:
+        indicator: macd_signal
+        params:
+          fast_period: 12
+          slow_period: 26
+          signal_period: 9
+
+exit_rules:
+  close_long:
+    - indicator: macd
+      params:
+        fast_period: 12
+        slow_period: 26
+        signal_period: 9
+      operator: crosses_below
+      comparator:
+        indicator: macd_signal
+        params:
+          fast_period: 12
+          slow_period: 26
+          signal_period: 9
+
+risk_params:
+  stop_loss_pct: 0.03
+  take_profit_pct: 0.08
+  max_position_pct: 0.1
+  max_open_positions: 1

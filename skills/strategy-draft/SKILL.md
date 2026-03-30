@@ -1,3 +1,13 @@
+---
+name: strategy-draft
+description: Helps users create quantitative strategies through guided conversation and validation
+version: 0.1.0
+tags: [strategy, quant, drafting]
+user_invocable: true
+model_invocable: true
+requires_tools: [strategy_validate]
+---
+
 # Strategy Draft
 
 ## Description

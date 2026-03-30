@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { getOrders, cancelOrder, type TradingOrder } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
+import { useI18n } from "@/components/i18n/use-i18n"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
@@ -20,6 +21,7 @@ const statusColor: Record<string, string> = {
 }
 
 export function OrderTable({ wsOrders }: OrderTableProps) {
+  const { t } = useI18n()
   const [orders, setOrders] = useState<TradingOrder[]>([])
 
   useEffect(() => {
@@ -46,13 +48,13 @@ export function OrderTable({ wsOrders }: OrderTableProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-muted-foreground text-xs">
-            <th className="text-left py-2 px-2 font-medium">Symbol</th>
-            <th className="text-left py-2 px-2 font-medium">Side</th>
-            <th className="text-left py-2 px-2 font-medium">Type</th>
-            <th className="text-right py-2 px-2 font-medium">Qty</th>
-            <th className="text-right py-2 px-2 font-medium">Price</th>
-            <th className="text-right py-2 px-2 font-medium">Filled</th>
-            <th className="text-left py-2 px-2 font-medium">Status</th>
+            <th className="text-left py-2 px-2 font-medium">{t("trading.symbol")}</th>
+            <th className="text-left py-2 px-2 font-medium">{t("trading.side")}</th>
+            <th className="text-left py-2 px-2 font-medium">{t("trading.type")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.qty")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.price")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.filled")}</th>
+            <th className="text-left py-2 px-2 font-medium">{t("trading.status")}</th>
             <th className="py-2 px-2"></th>
           </tr>
         </thead>
@@ -60,7 +62,7 @@ export function OrderTable({ wsOrders }: OrderTableProps) {
           {merged.length === 0 && (
             <tr>
               <td colSpan={8} className="py-8 text-center text-muted-foreground text-xs">
-                No orders yet
+                {t("trading.noOrders")}
               </td>
             </tr>
           )}

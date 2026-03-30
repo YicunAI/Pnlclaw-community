@@ -6,6 +6,10 @@ Public API:
     - ``BaseTool`` / ``ToolResult`` — tool ABC and result type
     - ``AgentContext`` / ``build_system_prompt`` — prompt construction
     - ``ContextManager`` — conversation history management
+
+Subpackages:
+    - ``pnlclaw_agent.skills`` — Skill loading, registry, and prompt injection
+    - ``pnlclaw_agent.mcp`` — MCP client, tool wrapping, and server management
 """
 
 from pnlclaw_agent.context.manager import ContextManager

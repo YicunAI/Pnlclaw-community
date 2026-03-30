@@ -139,9 +139,7 @@ class TestBinanceErrorHandling:
         client = _make_client()
         with pytest.raises(InvalidOrderError, match="order_id or client_order_id"):
             import asyncio
-            asyncio.get_event_loop().run_until_complete(
-                client.cancel_order(symbol="BTCUSDT")
-            )
+            asyncio.run(client.cancel_order(symbol="BTCUSDT"))
 
 
 # ---------------------------------------------------------------------------

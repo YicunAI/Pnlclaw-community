@@ -89,7 +89,8 @@ class TestBacktestRunTool:
         # Clear shared results store
         get_results_store().clear()
 
-    def test_run_success(self) -> None:
+    def test_sync_execute_rejects(self) -> None:
+        """Sync execute() is intentionally blocked; backtest_run is async-only."""
         engine = MockBacktestEngine()
         tool = BacktestRunTool(engine)
 
@@ -117,13 +118,8 @@ class TestBacktestRunTool:
         ]
 
         result = tool.execute({"strategy_config": config, "data": data})
-        assert result.error is None
-        assert "bt-test-001" in result.output
-        assert "+15.00%" in result.output
-        assert "2.10" in result.output
-
-        # Result should be stored
-        assert "bt-test-001" in get_results_store()
+        assert result.error is not None
+        assert "async" in result.error.lower()
 
     def test_missing_data(self) -> None:
         tool = BacktestRunTool(MockBacktestEngine())

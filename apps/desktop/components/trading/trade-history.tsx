@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { getTradeHistory, type TradingFill } from "@/lib/api-client"
+import { useI18n } from "@/components/i18n/use-i18n"
 
 interface TradeHistoryProps {
   wsFills: TradingFill[]
 }
 
 export function TradeHistory({ wsFills }: TradeHistoryProps) {
+  const { t } = useI18n()
   const [fills, setFills] = useState<TradingFill[]>([])
 
   useEffect(() => {
@@ -27,18 +29,18 @@ export function TradeHistory({ wsFills }: TradeHistoryProps) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-muted-foreground text-xs">
-            <th className="text-left py-2 px-2 font-medium">Order ID</th>
-            <th className="text-right py-2 px-2 font-medium">Price</th>
-            <th className="text-right py-2 px-2 font-medium">Qty</th>
-            <th className="text-right py-2 px-2 font-medium">Fee</th>
-            <th className="text-right py-2 px-2 font-medium">Time</th>
+            <th className="text-left py-2 px-2 font-medium">{t("trading.orderId")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.price")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.qty")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.fee")}</th>
+            <th className="text-right py-2 px-2 font-medium">{t("trading.time")}</th>
           </tr>
         </thead>
         <tbody>
           {merged.length === 0 && (
             <tr>
               <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">
-                No trade history
+                {t("trading.noHistory")}
               </td>
             </tr>
           )}

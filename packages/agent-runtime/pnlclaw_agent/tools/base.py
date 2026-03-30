@@ -69,7 +69,7 @@ class BaseTool(abc.ABC):
 
     @abc.abstractmethod
     def execute(self, args: dict[str, Any]) -> ToolResult:
-        """Execute the tool with the given arguments.
+        """Execute the tool with the given arguments (sync).
 
         Args:
             args: Dictionary of arguments matching :attr:`parameters`.
@@ -77,6 +77,15 @@ class BaseTool(abc.ABC):
         Returns:
             A :class:`ToolResult` with formatted text output.
         """
+
+    async def async_execute(self, args: dict[str, Any]) -> ToolResult | None:
+        """Optional async execution path for I/O-bound tools.
+
+        If a subclass overrides this, the ReAct loop will ``await`` it
+        directly instead of dispatching via ``asyncio.to_thread(execute)``.
+        Return ``None`` to fall back to sync ``execute()``.
+        """
+        return None
 
     # -- convenience ---------------------------------------------------------
 

@@ -57,12 +57,12 @@ class TestPaperState:
             extra={"fees": {"BTC/USDT": 42.5}},
         )
 
-        extra = ps.load_state(AccountManager(), PaperOrderManager(), PositionManager())
+        _fills, extra = ps.load_state(AccountManager(), PaperOrderManager(), PositionManager())
         assert extra["fees"]["BTC/USDT"] == 42.5
 
     def test_load_empty_dir(self, state_dir: Path) -> None:
         ps = PaperState(state_dir)
-        extra = ps.load_state(AccountManager(), PaperOrderManager(), PositionManager())
+        _fills, extra = ps.load_state(AccountManager(), PaperOrderManager(), PositionManager())
         assert extra == {}
 
     def test_clear_state(self, state_dir: Path) -> None:

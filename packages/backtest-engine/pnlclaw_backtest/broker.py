@@ -61,6 +61,7 @@ class SimulatedBroker:
         return Fill(
             id=f"fill-{uuid.uuid4().hex[:8]}",
             order_id=order.id,
+            symbol=order.symbol,
             price=fill_price,
             quantity=order.quantity,
             fee=fee,
@@ -96,6 +97,7 @@ class SimulatedBroker:
         return Fill(
             id=f"fill-{uuid.uuid4().hex[:8]}",
             order_id=order.id,
+            symbol=order.symbol,
             price=fill_price,
             quantity=order.quantity,
             fee=fee,

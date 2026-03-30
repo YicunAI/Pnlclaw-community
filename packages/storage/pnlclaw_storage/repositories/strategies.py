@@ -57,7 +57,7 @@ class StrategyRepository:
         Returns:
             The strategy config, or ``None`` if not found.
         """
-        rows = await self._db.execute(
+        rows = await self._db.query(
             "SELECT config_json FROM strategies WHERE id = ?",
             (strategy_id,),
         )
@@ -65,21 +65,37 @@ class StrategyRepository:
             return None
         return StrategyConfig.model_validate_json(rows[0]["config_json"])
 
-    async def list(self, limit: int = 50, offset: int = 0) -> list[StrategyConfig]:
-        """List strategies ordered by creation date (newest first).
+    async def list(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        *,
+        tags: list[str] | None = None,
+        source: str | None = None,
+        strategy_type: str | None = None,
+    ) -> list[StrategyConfig]:
+        """List strategies ordered by last update, with minimal filtering.
 
-        Args:
-            limit: Maximum number of results.
-            offset: Number of results to skip.
-
-        Returns:
-            List of strategy configs.
+        Filtering beyond SQL columns is applied after loading the config JSON.
         """
-        rows = await self._db.execute(
-            "SELECT config_json FROM strategies ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        rows = await self._db.query(
+            "SELECT config_json FROM strategies ORDER BY updated_at DESC LIMIT ? OFFSET ?",
             (limit, offset),
         )
-        return [StrategyConfig.model_validate_json(r["config_json"]) for r in rows]
+        strategies = [StrategyConfig.model_validate_json(r["config_json"]) for r in rows]
+
+        if strategy_type is not None:
+            strategies = [s for s in strategies if s.type.value == strategy_type]
+        if source is not None:
+            strategies = [s for s in strategies if s.source == source]
+        if tags:
+            tag_set = {t.strip().lower() for t in tags if t.strip()}
+            strategies = [
+                s for s in strategies
+                if tag_set & {tag.lower() for tag in s.tags}
+            ]
+        return strategies
+
 
     async def delete(self, strategy_id: str) -> bool:
         """Delete a strategy by ID.

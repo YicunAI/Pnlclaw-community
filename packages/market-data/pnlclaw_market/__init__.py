@@ -8,8 +8,15 @@ Public API
 - ``StreamManager``, ``StreamType`` — WS stream lifecycle management.
 - ``SnapshotStore`` — L2 orderbook snapshot storage.
 - ``MarketStateEngine`` — market state classification engine.
+- ``ExchangeSource``, ``ExchangeSourceConfig`` — pluggable source protocol.
+- ``BinanceSource``, ``OKXSource`` — concrete source implementations.
 """
 
+from pnlclaw_market.aggregators import (
+    LargeOrderDetector,
+    LargeTradeDetector,
+    LiquidationAggregator,
+)
 from pnlclaw_market.cache import MarketDataCache, TTLLRUCache
 from pnlclaw_market.event_bus import EventBus
 from pnlclaw_market.service import (
@@ -18,6 +25,8 @@ from pnlclaw_market.service import (
     MarketDataServiceNotRunning,
 )
 from pnlclaw_market.snapshot_store import SnapshotStore
+from pnlclaw_market.source import ExchangeSource, ExchangeSourceConfig
+from pnlclaw_market.sources import BinanceSource, OKXSource
 from pnlclaw_market.state_engine import (
     InsufficientDataError,
     MarketStateEngine,
@@ -25,13 +34,20 @@ from pnlclaw_market.state_engine import (
 from pnlclaw_market.stream_manager import StreamManager, StreamType
 
 __all__ = [
+    "BinanceSource",
+    "LargeOrderDetector",
+    "LargeTradeDetector",
+    "LiquidationAggregator",
     "EventBus",
+    "ExchangeSource",
+    "ExchangeSourceConfig",
     "InsufficientDataError",
     "MarketDataCache",
     "MarketDataService",
     "MarketDataServiceError",
     "MarketDataServiceNotRunning",
     "MarketStateEngine",
+    "OKXSource",
     "SnapshotStore",
     "StreamManager",
     "StreamType",

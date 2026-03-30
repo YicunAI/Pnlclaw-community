@@ -13,7 +13,7 @@ import uuid
 from typing import Any
 
 from pnlclaw_types.common import Symbol
-from pnlclaw_types.trading import Order, OrderSide, OrderStatus, OrderType
+from pnlclaw_types.trading import MarginMode, Order, OrderSide, OrderStatus, OrderType, PositionSide
 
 # ---------------------------------------------------------------------------
 # Legal state transitions
@@ -66,10 +66,15 @@ class PaperOrderManager:
         quantity: float,
         price: float | None = None,
         stop_price: float | None = None,
+        leverage: int = 1,
+        margin_mode: MarginMode = MarginMode.CROSS,
+        pos_side: PositionSide = PositionSide.NET,
+        reduce_only: bool = False,
     ) -> Order:
         """Create and accept a new order.
 
         Order starts as CREATED then immediately transitions to ACCEPTED.
+        Quantity is in USDT (quote currency) for derivatives.
         """
         now_ms = int(time.time() * 1000)
         order_id = f"ord-{uuid.uuid4().hex[:8]}"
@@ -85,6 +90,10 @@ class PaperOrderManager:
             stop_price=stop_price,
             filled_quantity=0.0,
             avg_fill_price=None,
+            leverage=leverage,
+            margin_mode=margin_mode,
+            pos_side=pos_side,
+            reduce_only=reduce_only,
             created_at=now_ms,
             updated_at=now_ms,
         )
@@ -162,6 +171,12 @@ class PaperOrderManager:
         if account_id:
             return [o for o in self.get_orders(account_id) if o.status in open_statuses]
         return [o for o in self._orders.values() if o.status in open_statuses]
+
+    def clear_orders(self, account_id: str) -> None:
+        """Remove all orders for an account."""
+        order_ids = self._account_orders.pop(account_id, [])
+        for oid in order_ids:
+            self._orders.pop(oid, None)
 
     # -- internal --------------------------------------------------------------
 

@@ -222,3 +222,42 @@ def submit_for_backtest(validated: ValidatedStrategy) -> BacktestReadyStrategy:
         config=validated.config,
         compiled=compiled,
     )
+
+
+# ---------------------------------------------------------------------------
+# Valid state transitions
+# ---------------------------------------------------------------------------
+
+_VALID_TRANSITIONS: dict[StrategyState, set[StrategyState]] = {
+    StrategyState.DRAFT: {StrategyState.VALIDATED},
+    StrategyState.VALIDATED: {StrategyState.BACKTESTING, StrategyState.DRAFT},
+    StrategyState.BACKTESTING: {StrategyState.CONFIRMED, StrategyState.DRAFT},
+    StrategyState.CONFIRMED: {StrategyState.RUNNING, StrategyState.DRAFT},
+    StrategyState.RUNNING: {StrategyState.RETIRED, StrategyState.DRAFT},
+    StrategyState.RETIRED: {StrategyState.DRAFT},
+}
+
+
+def can_transition(from_state: StrategyState, to_state: StrategyState) -> bool:
+    """Check whether a state transition is allowed."""
+    return to_state in _VALID_TRANSITIONS.get(from_state, set())
+
+
+def transition(from_state: StrategyState, to_state: StrategyState) -> StrategyState:
+    """Execute a state transition.
+
+    Args:
+        from_state: The current state.
+        to_state: The desired target state.
+
+    Returns:
+        The new state.
+
+    Raises:
+        LifecycleError: If the transition is not allowed.
+    """
+    if not can_transition(from_state, to_state):
+        raise LifecycleError(
+            f"Invalid transition: {from_state.value} → {to_state.value}"
+        )
+    return to_state

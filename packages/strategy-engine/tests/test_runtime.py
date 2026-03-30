@@ -8,6 +8,7 @@ from pnlclaw_strategy.models import (
     EngineStrategyConfig,
     EntryRules,
     ExitRules,
+    RiskParams,
 )
 from pnlclaw_strategy.runtime import StrategyRuntime
 from pnlclaw_types.market import KlineEvent
@@ -214,3 +215,71 @@ class TestStrategyRuntime:
         rt = StrategyRuntime(_sma_cross_compiled())
         signal = rt.on_kline(_make_kline(100.0, timestamp=0))
         assert signal is None
+
+
+class TestRiskControls:
+    """P7: Test stop-loss and take-profit in StrategyRuntime."""
+
+    def test_stop_loss_triggers(self) -> None:
+        """After entering long, if price drops >= stop_loss_pct, emit sell signal."""
+        risk = RiskParams(stop_loss_pct=0.05)  # 5% stop loss
+        compiled = _sma_cross_compiled()
+        rt = StrategyRuntime(compiled, risk_params=risk)
+
+        # Force into long position
+        rt._position = "long"
+        rt._entry_price = 100.0
+
+        # Feed enough bars to have data (need >= 2 bars)
+        rt._bars = [
+            {"timestamp": 0, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+            {"timestamp": 3600000, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+        ]
+
+        # Price drops 6% -> should trigger stop loss
+        signal = rt.on_kline(_make_kline(94.0, timestamp=7200000))
+        assert signal is not None
+        assert signal.side == OrderSide.SELL
+        assert "Stop loss" in signal.reason
+        assert rt.position == "flat"
+
+    def test_take_profit_triggers(self) -> None:
+        """After entering long, if price rises >= take_profit_pct, emit sell signal."""
+        risk = RiskParams(take_profit_pct=0.10)  # 10% take profit
+        compiled = _sma_cross_compiled()
+        rt = StrategyRuntime(compiled, risk_params=risk)
+
+        rt._position = "long"
+        rt._entry_price = 100.0
+        rt._bars = [
+            {"timestamp": 0, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+            {"timestamp": 3600000, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+        ]
+
+        # Price rises 11% -> should trigger take profit
+        signal = rt.on_kline(_make_kline(111.0, timestamp=7200000))
+        assert signal is not None
+        assert signal.side == OrderSide.SELL
+        assert "Take profit" in signal.reason
+        assert rt.position == "flat"
+
+    def test_no_trigger_within_limits(self) -> None:
+        """Price within stop-loss/take-profit range should not trigger."""
+        risk = RiskParams(stop_loss_pct=0.05, take_profit_pct=0.10)
+        compiled = _sma_cross_compiled()
+        rt = StrategyRuntime(compiled, risk_params=risk)
+
+        rt._position = "long"
+        rt._entry_price = 100.0
+        rt._bars = [
+            {"timestamp": 0, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+            {"timestamp": 3600000, "open": 99, "high": 101, "low": 98, "close": 100, "volume": 100},
+        ]
+
+        # Price moves 3% up — within limits
+        signal = rt.on_kline(_make_kline(103.0, timestamp=7200000))
+        # Signal might be None (no condition met) or a condition-based signal
+        # but NOT a risk signal
+        if signal is not None:
+            assert "Stop loss" not in signal.reason
+            assert "Take profit" not in signal.reason

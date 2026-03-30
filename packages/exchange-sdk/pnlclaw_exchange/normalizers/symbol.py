@@ -58,6 +58,9 @@ class _BinanceSymbolRule:
 
     def to_unified(self, raw_symbol: str) -> str:
         upper = raw_symbol.upper()
+        # Strip delivery-date suffix for quarterly contracts (e.g. BTCUSDT_260327)
+        if "_" in upper:
+            upper = upper.split("_", 1)[0]
         for quote in self.KNOWN_QUOTES:
             if upper.endswith(quote):
                 base = upper[: -len(quote)]
@@ -75,6 +78,33 @@ class _BinanceSymbolRule:
         return f"{base}{quote}".upper()
 
 
+class _OKXSymbolRule:
+    """OKX symbol rule: ``BTC-USDT`` -> ``BTC/USDT``.
+
+    Handles spot instIds (``BTC-USDT``) and swap instIds
+    (``BTC-USDT-SWAP``).  For swaps the ``-SWAP`` suffix is stripped
+    during normalization and the caller tracks market_type separately.
+    """
+
+    def to_unified(self, raw_symbol: str) -> str:
+        upper = raw_symbol.upper()
+        # Strip product suffix so unified symbol is always BASE/QUOTE
+        for suffix in ("-SWAP", "-FUTURES"):
+            if upper.endswith(suffix):
+                upper = upper[: -len(suffix)]
+                break
+        parts = upper.split("-")
+        if len(parts) >= 2:
+            return f"{parts[0]}/{parts[1]}"
+        return upper
+
+    def to_exchange(self, unified_symbol: str) -> str:
+        if "/" not in unified_symbol:
+            return unified_symbol.upper()
+        base, quote = unified_symbol.split("/", 1)
+        return f"{base}-{quote}".upper()
+
+
 class SymbolNormalizer:
     """Registry of per-exchange symbol normalization rules.
 
@@ -82,12 +112,13 @@ class SymbolNormalizer:
         - :meth:`to_unified` converts exchange-native to ``BASE/QUOTE``.
         - :meth:`to_exchange` converts ``BASE/QUOTE`` to exchange-native.
         - New exchanges are added via :meth:`register`, without modifying core.
-        - Binance is registered by default.
+        - Binance and OKX are registered by default.
     """
 
     def __init__(self) -> None:
         self._rules: dict[str, ExchangeSymbolRule] = {}
         self.register("binance", _BinanceSymbolRule())
+        self.register("okx", _OKXSymbolRule())
 
     def register(self, exchange: str, rule: ExchangeSymbolRule) -> None:
         """Register a symbol normalization rule for an exchange.

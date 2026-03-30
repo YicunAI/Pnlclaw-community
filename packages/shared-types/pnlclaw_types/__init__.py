@@ -35,6 +35,7 @@ from pnlclaw_types.events import (
 )
 from pnlclaw_types.market import (
     KlineEvent,
+    MarketType,
     OrderBookL2Delta,
     OrderBookL2Snapshot,
     PriceLevel,
@@ -54,18 +55,28 @@ from pnlclaw_types.strategy import (
     StrategyConfig,
     StrategyType,
 )
+from pnlclaw_types.derivatives import (
+    FundingRateEvent,
+    LargeOrderEvent,
+    LargeTradeEvent,
+    LiquidationEvent,
+    LiquidationStats,
+    OpenInterestSnapshot,
+)
 from pnlclaw_types.trading import (
     AccountSnapshot,
     BalanceUpdate,
     ExchangeOrderUpdate,
     ExecutionMode,
     Fill,
+    MarginMode,
     Order,
     OrderSide,
     OrderStatus,
     OrderType,
     PnLRecord,
     Position,
+    PositionSide,
 )
 
 __all__ = [
@@ -78,6 +89,7 @@ __all__ = [
     "Timestamp",
     # market
     "KlineEvent",
+    "MarketType",
     "OrderBookL2Delta",
     "OrderBookL2Snapshot",
     "PriceLevel",
@@ -89,12 +101,14 @@ __all__ = [
     "ExchangeOrderUpdate",
     "ExecutionMode",
     "Fill",
+    "MarginMode",
     "Order",
     "OrderSide",
     "OrderStatus",
     "OrderType",
     "PnLRecord",
     "Position",
+    "PositionSide",
     # strategy
     "BacktestMetrics",
     "BacktestResult",
@@ -114,6 +128,13 @@ __all__ = [
     "MarketRegime",
     "MarketState",
     "TradeIntent",
+    # derivatives
+    "FundingRateEvent",
+    "LargeOrderEvent",
+    "LargeTradeEvent",
+    "LiquidationEvent",
+    "LiquidationStats",
+    "OpenInterestSnapshot",
     # errors
     "ERROR_CODE_HTTP_STATUS",
     "ErrorCode",

@@ -20,13 +20,33 @@ class AccountStatus(str, Enum):
     STOPPED = "stopped"
 
 
+class AccountType(str, Enum):
+    """Distinguishes the purpose of a paper trading account."""
+
+    STRATEGY = "strategy"
+    AGENT = "agent"
+    MANUAL = "manual"
+
+
 class PaperAccount(BaseModel):
-    """A paper trading account with balance tracking."""
+    """A paper trading account with balance, PnL, and fee tracking.
+
+    Mirrors OKX account-level fields: ``realizedPnl``, ``fee``, plus
+    configurable maker/taker fee rates per account.
+    """
 
     id: str = Field(default_factory=lambda: f"pa-{uuid.uuid4().hex[:8]}")
     name: str = Field(..., min_length=1, description="Human-readable account name")
+    account_type: AccountType = Field(AccountType.MANUAL, description="Account purpose: strategy, agent, or manual")
+    strategy_id: str | None = Field(None, description="Linked strategy ID (for strategy accounts)")
+    deployment_id: str | None = Field(None, description="Linked deployment ID (for strategy accounts)")
     initial_balance: float = Field(..., gt=0, description="Starting balance in quote currency")
     current_balance: float = Field(..., description="Current available balance")
+    equity: float = Field(0.0, description="Account equity = balance + unrealized PnL")
+    total_realized_pnl: float = Field(0.0, description="Cumulative realized PnL across all positions")
+    total_fee: float = Field(0.0, description="Cumulative trading fees paid")
+    maker_fee_rate: float = Field(0.0002, description="Maker fee rate (default OKX VIP0: 0.02%)")
+    taker_fee_rate: float = Field(0.0005, description="Taker fee rate (default OKX VIP0: 0.05%)")
     status: AccountStatus = Field(AccountStatus.ACTIVE, description="Account status")
     created_at: int = Field(
         default_factory=lambda: int(time.time() * 1000),
@@ -47,12 +67,28 @@ class AccountManager:
     def __init__(self) -> None:
         self._accounts: dict[str, PaperAccount] = {}
 
-    def create_account(self, name: str, initial_balance: float) -> PaperAccount:
+    def create_account(
+        self,
+        name: str,
+        initial_balance: float,
+        *,
+        account_type: AccountType = AccountType.MANUAL,
+        strategy_id: str | None = None,
+        deployment_id: str | None = None,
+        maker_fee_rate: float = 0.0002,
+        taker_fee_rate: float = 0.0005,
+    ) -> PaperAccount:
         """Create a new paper account."""
         account = PaperAccount(
             name=name,
             initial_balance=initial_balance,
             current_balance=initial_balance,
+            equity=initial_balance,
+            account_type=account_type,
+            strategy_id=strategy_id,
+            deployment_id=deployment_id,
+            maker_fee_rate=maker_fee_rate,
+            taker_fee_rate=taker_fee_rate,
         )
         self._accounts[account.id] = account
         return account
@@ -70,11 +106,14 @@ class AccountManager:
         return self._accounts.pop(account_id, None) is not None
 
     def reset_account(self, account_id: str) -> PaperAccount | None:
-        """Reset an account to its initial balance and ACTIVE status."""
+        """Reset an account to its initial balance, 0 PnL/fees, and ACTIVE status."""
         account = self._accounts.get(account_id)
         if account is None:
             return None
         account.current_balance = account.initial_balance
+        account.equity = account.initial_balance
+        account.total_realized_pnl = 0.0
+        account.total_fee = 0.0
         account.status = AccountStatus.ACTIVE
         account.updated_at = int(time.time() * 1000)
         return account

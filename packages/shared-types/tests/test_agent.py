@@ -13,11 +13,12 @@ from pnlclaw_types.trading import OrderSide, OrderType
 
 
 class TestAgentRole:
-    def test_three_roles(self):
+    def test_four_roles(self):
         assert set(AgentRole) == {
             AgentRole.MARKET_ANALYST,
             AgentRole.STRATEGY_ARCHITECT,
             AgentRole.RISK_GUARDIAN,
+            AgentRole.STRATEGY_CODER,
         }
 
 

@@ -155,6 +155,10 @@ class EngineStrategyConfig(StrategyConfig):
     Inherits all fields from shared-types StrategyConfig (id, name, type,
     description, symbols, interval, parameters, entry_rules, exit_rules,
     risk_params) and adds typed rule parsing for the strategy engine.
+
+    When constructed via ``model_validate``, string-format rules in
+    ``entry_rules`` / ``exit_rules`` are automatically parsed into
+    ``parsed_entry_rules`` / ``parsed_exit_rules`` if those fields are empty.
     """
 
     parsed_entry_rules: EntryRules = Field(
@@ -190,6 +194,27 @@ class EngineStrategyConfig(StrategyConfig):
             ]
         }
     )
+
+    def model_post_init(self, __context: Any) -> None:
+        """Auto-parse string rules from entry_rules/exit_rules if parsed_ variants are empty."""
+        from pnlclaw_strategy.rule_parser import parse_entry_rules, parse_exit_rules
+
+        if not self.parsed_entry_rules.long and not self.parsed_entry_rules.short:
+            if self.entry_rules:
+                parsed = parse_entry_rules(self.entry_rules)
+                object.__setattr__(self, "parsed_entry_rules", parsed)
+
+        if not self.parsed_exit_rules.close_long and not self.parsed_exit_rules.close_short:
+            if self.exit_rules:
+                parsed = parse_exit_rules(self.exit_rules)
+                object.__setattr__(self, "parsed_exit_rules", parsed)
+
+        if self.parsed_risk_params == RiskParams() and self.risk_params:
+            try:
+                parsed_rp = RiskParams.model_validate(self.risk_params)
+                object.__setattr__(self, "parsed_risk_params", parsed_rp)
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------------------------

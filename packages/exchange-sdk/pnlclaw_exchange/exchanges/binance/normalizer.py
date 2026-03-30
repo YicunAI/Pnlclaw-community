@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
+from pnlclaw_types.derivatives import FundingRateEvent, LiquidationEvent
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Delta,
@@ -52,7 +53,7 @@ class BinanceNormalizer:
 
     def normalize(
         self, data: dict[str, Any]
-    ) -> TickerEvent | TradeEvent | KlineEvent | BinanceDepthDelta | None:
+    ) -> TickerEvent | TradeEvent | KlineEvent | BinanceDepthDelta | LiquidationEvent | FundingRateEvent | None:
         """Dispatch normalization based on Binance's ``e`` (event type) field.
 
         Returns:
@@ -64,10 +65,16 @@ class BinanceNormalizer:
             return self._normalize_ticker(data)
         if event_type == "trade":
             return self._normalize_trade(data)
+        if event_type == "aggTrade":
+            return self._normalize_agg_trade(data)
         if event_type == "kline":
             return self._normalize_kline(data)
         if event_type == "depthUpdate":
             return self._normalize_depth(data)
+        if event_type == "forceOrder":
+            return self._normalize_liquidation(data)
+        if event_type == "markPriceUpdate":
+            return self._normalize_funding_rate(data)
 
         logger.debug("Unrecognized Binance event type: %s", event_type)
         return None
@@ -82,9 +89,12 @@ class BinanceNormalizer:
             symbol=self._symbols.to_unified(EXCHANGE, data["s"]),
             timestamp=int(data["E"]),
             last_price=float(data["c"]),
-            bid=float(data["b"]),
-            ask=float(data["a"]),
+            bid=float(data.get("b", 0) or 0),
+            ask=float(data.get("a", 0) or 0),
             volume_24h=float(data["v"]),
+            quote_volume_24h=float(data["q"]),
+            high_24h=float(data["h"]),
+            low_24h=float(data["l"]),
             change_24h_pct=float(data["P"]),
         )
 
@@ -107,7 +117,7 @@ class BinanceNormalizer:
         return KlineEvent(
             exchange=EXCHANGE,
             symbol=self._symbols.to_unified(EXCHANGE, k["s"]),
-            timestamp=int(data["E"]),
+            timestamp=int(k["t"]),
             interval=k["i"],
             open=float(k["o"]),
             high=float(k["h"]),
@@ -115,6 +125,59 @@ class BinanceNormalizer:
             close=float(k["c"]),
             volume=float(k["v"]),
             closed=bool(k["x"]),
+        )
+
+    def _normalize_agg_trade(self, data: dict[str, Any]) -> TradeEvent:
+        """Normalize Binance aggregated trade (``aggTrade``) event.
+
+        Field ``m`` = buyer is market maker → if True the taker was selling.
+        Uses ``a`` (aggregate trade ID) instead of ``t`` (individual trade ID).
+        """
+        side = "sell" if data["m"] else "buy"
+        return TradeEvent(
+            exchange=EXCHANGE,
+            symbol=self._symbols.to_unified(EXCHANGE, data["s"]),
+            timestamp=int(data["E"]),
+            trade_id=str(data["a"]),
+            price=float(data["p"]),
+            quantity=float(data["q"]),
+            side=side,
+        )
+
+    def _normalize_liquidation(self, data: dict[str, Any]) -> LiquidationEvent:
+        """Normalize Binance forced-liquidation (``forceOrder``) event.
+
+        ``o.S`` = "SELL" means a long position was liquidated.
+        ``o.S`` = "BUY" means a short position was liquidated.
+        """
+        o = data["o"]
+        side: str = "long" if o["S"] == "SELL" else "short"
+        qty = float(o["q"])
+        price = float(o["p"])
+        avg_price = float(o.get("ap", 0) or 0)
+        notional = qty * (avg_price if avg_price > 0 else price)
+        return LiquidationEvent(
+            exchange=EXCHANGE,
+            symbol=self._symbols.to_unified(EXCHANGE, o["s"]),
+            side=side,
+            quantity=qty,
+            price=price,
+            avg_price=avg_price,
+            notional_usd=notional,
+            status=o.get("X", "FILLED"),
+            timestamp=int(data["E"]),
+        )
+
+    def _normalize_funding_rate(self, data: dict[str, Any]) -> FundingRateEvent:
+        """Normalize Binance mark price update containing funding rate."""
+        return FundingRateEvent(
+            exchange=EXCHANGE,
+            symbol=self._symbols.to_unified(EXCHANGE, data["s"]),
+            funding_rate=float(data.get("r", 0) or 0),
+            mark_price=float(data.get("p", 0) or 0),
+            index_price=float(data.get("i", 0) or 0),
+            next_funding_time=int(data.get("T", 0) or 0),
+            timestamp=int(data["E"]),
         )
 
     def _normalize_depth(self, data: dict[str, Any]) -> BinanceDepthDelta:

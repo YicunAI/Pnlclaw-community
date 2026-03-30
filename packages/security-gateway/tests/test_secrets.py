@@ -194,6 +194,61 @@ class TestSecretManagerKeyring:
 # ---------------------------------------------------------------------------
 
 
+class TestSecretManagerStoreDelete:
+    @pytest.mark.asyncio
+    async def test_store_and_resolve_keyring_roundtrip(self) -> None:
+        mock_keyring = MagicMock()
+        values: dict[tuple[str, str], str] = {}
+
+        def _set_password(service: str, key: str, value: str) -> None:
+            values[(service, key)] = value
+
+        def _get_password(service: str, key: str) -> str | None:
+            return values.get((service, key))
+
+        def _delete_password(service: str, key: str) -> None:
+            values.pop((service, key), None)
+
+        mock_keyring.set_password.side_effect = _set_password
+        mock_keyring.get_password.side_effect = _get_password
+        mock_keyring.delete_password.side_effect = _delete_password
+
+        manager = SecretManager()
+        ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw", id="llm_api_key")
+
+        with patch.dict("sys.modules", {"keyring": mock_keyring}):
+            await manager.store(ref, "sk-live-key")
+            resolved = await manager.resolve(ref)
+            assert resolved.use() == "sk-live-key"
+            await manager.delete(ref)
+            assert await manager.exists(ref) is False
+
+    @pytest.mark.asyncio
+    async def test_store_requires_keyring_by_default(self, tmp_path: Path) -> None:
+        manager = SecretManager(base_dir=tmp_path)
+        ref = SecretRef(source=SecretSource.FILE, id="fallback_key")
+
+        with pytest.raises(SecretResolutionError, match="requires keyring backend"):
+            await manager.store(ref, "value")
+
+    @pytest.mark.asyncio
+    async def test_store_file_allowed_when_policy_disabled(self, tmp_path: Path) -> None:
+        manager = SecretManager(base_dir=tmp_path, keyring_required_for_store=False)
+        ref = SecretRef(source=SecretSource.FILE, provider="exchange", id="api_key")
+
+        await manager.store(ref, "file-value")
+        resolved = await manager.resolve(ref)
+        assert resolved.use() == "file-value"
+
+        await manager.delete(ref)
+        assert await manager.exists(ref) is False
+
+    def test_keyring_available_false_without_dependency(self) -> None:
+        manager = SecretManager()
+        with patch.dict("sys.modules", {"keyring": None}):
+            assert manager.keyring_available() is False
+
+
 class TestSecretManagerCache:
     @pytest.mark.asyncio
     async def test_cache_hit(self) -> None:

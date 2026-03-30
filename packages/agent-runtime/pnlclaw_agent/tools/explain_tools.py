@@ -157,6 +157,21 @@ class ExplainMarketTool(BaseTool):
                         "exchange, symbol, timestamp, interval, open, high, "
                         "low, close, volume, closed"
                     ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "exchange": {"type": "string"},
+                            "symbol": {"type": "string"},
+                            "timestamp": {"type": "number"},
+                            "interval": {"type": "string"},
+                            "open": {"type": "number"},
+                            "high": {"type": "number"},
+                            "low": {"type": "number"},
+                            "close": {"type": "number"},
+                            "volume": {"type": "number"},
+                            "closed": {"type": "boolean"},
+                        },
+                    },
                 },
             },
             "required": ["symbol"],

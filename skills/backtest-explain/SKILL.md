@@ -1,3 +1,13 @@
+---
+name: backtest-explain
+description: Analyzes backtest results in plain language, connecting metrics to what they mean for the strategy
+version: 0.1.0
+tags: [backtest, explanation, metrics]
+user_invocable: true
+model_invocable: true
+requires_tools: [backtest_result, explain_pnl]
+---
+
 # Backtest Explanation
 
 ## Description
@@ -6,6 +16,8 @@ Analyzes backtest results in plain language, connecting metrics to what they mea
 ## Triggers
 - "Explain my backtest results"
 - "What does this backtest tell me?"
+- "Explain this backtest"
+- "帮我解释这个回测"
 
 ## Steps
 1. Obtain the backtest run id the user cares about (or the latest completed run).

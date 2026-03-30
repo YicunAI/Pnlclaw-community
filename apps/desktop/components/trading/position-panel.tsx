@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { getPositions, type TradingPosition } from "@/lib/api-client"
+import { useI18n } from "@/components/i18n/use-i18n"
 import { cn } from "@/lib/utils"
 
 interface PositionPanelProps {
@@ -9,6 +10,7 @@ interface PositionPanelProps {
 }
 
 export function PositionPanel({ wsPositions }: PositionPanelProps) {
+  const { t } = useI18n()
   const [positions, setPositions] = useState<TradingPosition[]>([])
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function PositionPanel({ wsPositions }: PositionPanelProps) {
   return (
     <div className="space-y-2">
       {merged.length === 0 && (
-        <p className="text-center text-sm text-muted-foreground py-6">No open positions</p>
+        <p className="text-center text-sm text-muted-foreground py-6">{t("trading.noPositions")}</p>
       )}
       {merged.map((p) => (
         <div key={p.symbol} className="rounded-lg border border-border p-3 space-y-1">
@@ -35,21 +37,21 @@ export function PositionPanel({ wsPositions }: PositionPanelProps) {
               "text-xs font-medium uppercase",
               p.side === "buy" ? "text-green-500" : "text-red-500"
             )}>
-              {p.side === "buy" ? "LONG" : "SHORT"}
+              {p.side === "buy" ? t("trading.long") : t("trading.short")}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div>
-              <span>Qty: </span>
+              <span>{t("trading.qty")}: </span>
               <span className="font-mono text-foreground">{p.quantity}</span>
             </div>
             <div>
-              <span>Entry: </span>
+              <span>{t("trading.entry")}: </span>
               <span className="font-mono text-foreground">{p.avg_entry_price.toFixed(2)}</span>
             </div>
           </div>
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Unrealized PnL</span>
+            <span className="text-muted-foreground">{t("trading.unrealizedPnl")}</span>
             <span className={cn(
               "font-mono font-medium",
               p.unrealized_pnl >= 0 ? "text-green-500" : "text-red-500"

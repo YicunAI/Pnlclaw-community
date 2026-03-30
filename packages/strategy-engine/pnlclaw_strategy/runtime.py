@@ -8,8 +8,9 @@ from typing import cast
 import pandas as pd
 
 from pnlclaw_strategy.compiler import CompiledCondition, CompiledStrategy
+from pnlclaw_strategy.models import RiskParams
 from pnlclaw_types.market import KlineEvent
-from pnlclaw_types.strategy import Signal
+from pnlclaw_types.strategy import Signal, StrategyDirection
 from pnlclaw_types.trading import OrderSide
 
 
@@ -25,11 +26,20 @@ class StrategyRuntime:
         max_bars: Maximum number of bars to retain in the internal DataFrame.
     """
 
-    def __init__(self, compiled: CompiledStrategy, max_bars: int = 500) -> None:
+    def __init__(
+        self,
+        compiled: CompiledStrategy,
+        max_bars: int = 500,
+        risk_params: RiskParams | None = None,
+        direction: StrategyDirection = StrategyDirection.LONG_ONLY,
+    ) -> None:
         self._compiled = compiled
         self._max_bars = max_bars
         self._bars: list[dict] = []
         self._position: str = "flat"  # "flat", "long", "short"
+        self._risk_params = risk_params or compiled.config.parsed_risk_params
+        self._entry_price: float = 0.0
+        self._direction = direction
 
     @property
     def config(self) -> CompiledStrategy:
@@ -80,11 +90,40 @@ class StrategyRuntime:
         if len(self._bars) < 2:
             return None
 
+        # P7: Risk controls are price-based and don't need indicators
+        if self._position in ("long", "short"):
+            risk_signal = self._check_risk(event, self._position)
+            if risk_signal is not None:
+                return risk_signal
+
         df = pd.DataFrame(self._bars)
 
         # Compute all indicator columns
         for col_name, indicator in self._compiled.indicators.items():
-            df[col_name] = indicator.calculate(df)
+            if col_name in df.columns:
+                continue  # already computed (e.g. MACD sub-columns)
+            if hasattr(indicator, "calculate_full") and "macd" in col_name:
+                # MACD family — compute all three columns at once
+                result = indicator.calculate_full(df)
+                base = col_name
+                signal_col = base.replace("macd", "macd_signal", 1)
+                hist_col = base.replace("macd", "macd_histogram", 1)
+                df[base] = result.macd_line
+                df[signal_col] = result.signal_line
+                df[hist_col] = result.histogram
+            elif hasattr(indicator, "calculate_full") and "bbands" in col_name:
+                # Bollinger Bands family
+                result = indicator.calculate_full(df)
+                base = col_name
+                upper_col = base.replace("bbands", "bbands_upper", 1)
+                middle_col = base.replace("bbands", "bbands_middle", 1)
+                lower_col = base.replace("bbands", "bbands_lower", 1)
+                df[base] = result.middle
+                df[upper_col] = result.upper
+                df[middle_col] = result.middle
+                df[lower_col] = result.lower
+            else:
+                df[col_name] = indicator.calculate(df)
 
         # Check if we have enough data (last row must have all indicators computed)
         last_idx = len(df) - 1
@@ -92,23 +131,25 @@ class StrategyRuntime:
             if pd.isna(df[col_name].iloc[last_idx]):
                 return None  # Not enough data yet
 
-        # Evaluate conditions based on position state
+        # FX06: Evaluate conditions filtered by strategy direction
         signal = None
+        allow_long = self._direction in (StrategyDirection.LONG_ONLY, StrategyDirection.NEUTRAL)
+        allow_short = self._direction in (StrategyDirection.SHORT_ONLY, StrategyDirection.NEUTRAL)
 
         if self._position == "flat":
-            # Check long entry
-            if self._compiled.long_entry_conditions and self._all_conditions_met(
+            if allow_long and self._compiled.long_entry_conditions and self._all_conditions_met(
                 df, self._compiled.long_entry_conditions
             ):
                 signal = self._make_signal(event, OrderSide.BUY, "Long entry conditions met")
                 self._position = "long"
+                self._entry_price = event.close
 
-            # Check short entry (only if not already entering long)
-            elif self._compiled.short_entry_conditions and self._all_conditions_met(
+            elif allow_short and self._compiled.short_entry_conditions and self._all_conditions_met(
                 df, self._compiled.short_entry_conditions
             ):
                 signal = self._make_signal(event, OrderSide.SELL, "Short entry conditions met")
                 self._position = "short"
+                self._entry_price = event.close
 
         elif self._position == "long":
             if self._compiled.close_long_conditions and self._all_conditions_met(
@@ -132,6 +173,36 @@ class StrategyRuntime:
             if not self._evaluate_condition(df, cond):
                 return False
         return True
+
+    def _check_risk(self, event: KlineEvent, direction: str) -> Signal | None:
+        """Check stop-loss and take-profit risk limits.
+
+        Returns a closing Signal if a risk threshold is breached, None otherwise.
+        """
+        if self._entry_price <= 0:
+            return None
+        rp = self._risk_params
+        if rp is None:
+            return None
+
+        current = event.close
+        if direction == "long":
+            pnl_pct = (current - self._entry_price) / self._entry_price
+            if rp.stop_loss_pct is not None and pnl_pct <= -rp.stop_loss_pct:
+                self._position = "flat"
+                return self._make_signal(event, OrderSide.SELL, f"Stop loss triggered ({pnl_pct:.2%})")
+            if rp.take_profit_pct is not None and pnl_pct >= rp.take_profit_pct:
+                self._position = "flat"
+                return self._make_signal(event, OrderSide.SELL, f"Take profit triggered ({pnl_pct:.2%})")
+        elif direction == "short":
+            pnl_pct = (self._entry_price - current) / self._entry_price
+            if rp.stop_loss_pct is not None and pnl_pct <= -rp.stop_loss_pct:
+                self._position = "flat"
+                return self._make_signal(event, OrderSide.BUY, f"Stop loss triggered ({pnl_pct:.2%})")
+            if rp.take_profit_pct is not None and pnl_pct >= rp.take_profit_pct:
+                self._position = "flat"
+                return self._make_signal(event, OrderSide.BUY, f"Take profit triggered ({pnl_pct:.2%})")
+        return None
 
     def _evaluate_condition(self, df: pd.DataFrame, cond: CompiledCondition) -> bool:
         """Evaluate a single condition against the current DataFrame."""
@@ -189,3 +260,4 @@ class StrategyRuntime:
         """Reset the runtime state (bars, position)."""
         self._bars.clear()
         self._position = "flat"
+        self._entry_price = 0.0

@@ -11,6 +11,7 @@ import stat
 import sys
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -102,16 +103,24 @@ _MAX_FILE_BYTES = 1_048_576
 
 
 class SecretManager:
-    """Resolve secrets from environment variables, files, or OS keychain.
+    """Resolve and persist secrets from environment variables, files, or OS keychain.
 
     Args:
         base_dir: Root directory for file-based secrets.
             Defaults to ``~/.pnlclaw/secrets/``.
+        keyring_required_for_store: If ``True`` (default), ``store``/``delete``
+            operations require keyring backend and do not fallback to plaintext file.
     """
 
-    def __init__(self, base_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        base_dir: Path | None = None,
+        *,
+        keyring_required_for_store: bool = True,
+    ) -> None:
         self._base_dir = base_dir or Path.home() / ".pnlclaw" / "secrets"
         self._cache: dict[str, ResolvedSecret] = {}
+        self._keyring_required_for_store = keyring_required_for_store
 
     async def resolve(self, ref: SecretRef) -> ResolvedSecret:
         """Resolve a secret reference.
@@ -139,6 +148,65 @@ class SecretManager:
     def clear_cache(self) -> None:
         """Clear the resolved secret cache."""
         self._cache.clear()
+
+    def keyring_available(self) -> bool:
+        """Return whether keyring backend is available in this runtime."""
+        try:
+            import keyring  # type: ignore[import-untyped]
+
+            return keyring is not None
+        except ImportError:
+            return False
+
+    async def exists(self, ref: SecretRef) -> bool:
+        """Return True if the secret exists in the referenced source."""
+        try:
+            await self.resolve(ref)
+            return True
+        except SecretResolutionError:
+            return False
+
+    async def store(self, ref: SecretRef, value: str) -> None:
+        """Persist a secret value for the given reference."""
+        if ref.source == SecretSource.KEYRING:
+            await self._store_keyring(ref, value)
+            self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
+            return
+
+        if self._keyring_required_for_store:
+            raise SecretResolutionError(
+                "Secret persistence requires keyring backend; refusing insecure storage."
+            )
+
+        if ref.source == SecretSource.FILE:
+            self._store_file(ref, value)
+            self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
+            return
+
+        raise SecretResolutionError(
+            f"Store operation is not supported for source: {ref.source}"
+        )
+
+    async def delete(self, ref: SecretRef) -> None:
+        """Delete a persisted secret for the given reference."""
+        if ref.source == SecretSource.KEYRING:
+            await self._delete_keyring(ref)
+            self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
+            return
+
+        if self._keyring_required_for_store:
+            raise SecretResolutionError(
+                "Secret deletion requires keyring backend; refusing insecure storage."
+            )
+
+        if ref.source == SecretSource.FILE:
+            self._delete_file(ref)
+            self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
+            return
+
+        raise SecretResolutionError(
+            f"Delete operation is not supported for source: {ref.source}"
+        )
 
     # -- source resolvers ----------------------------------------------------
 
@@ -186,18 +254,54 @@ class SecretManager:
         The ``keyring`` library is an optional dependency. If not installed,
         raises :class:`SecretResolutionError` with a helpful message.
         """
-        try:
-            import keyring  # type: ignore[import-untyped]
-        except ImportError:
-            raise SecretResolutionError(
-                "keyring library not installed. Install with: pip install pnlclaw-security[keyring]"
-            ) from None
+        keyring = self._import_keyring()
 
         service = ref.provider or "pnlclaw"
-        # keyring.get_password is synchronous; run in executor if needed
         value = keyring.get_password(service, ref.id)
         if value is None:
             raise SecretResolutionError(
                 f"No keyring entry found for service={service!r}, key={ref.id!r}"
             )
         return value
+
+    async def _store_keyring(self, ref: SecretRef, value: str) -> None:
+        keyring = self._import_keyring()
+        service = ref.provider or "pnlclaw"
+        keyring.set_password(service, ref.id, value)
+
+    async def _delete_keyring(self, ref: SecretRef) -> None:
+        keyring = self._import_keyring()
+        service = ref.provider or "pnlclaw"
+        try:
+            keyring.delete_password(service, ref.id)
+        except Exception:
+            # Missing key or backend-specific errors are treated as already removed.
+            return
+
+    def _store_file(self, ref: SecretRef, value: str) -> None:
+        file_path = self._file_path(ref)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text(value.strip(), encoding="utf-8")
+        if sys.platform != "win32":
+            file_path.chmod(0o600)
+
+    def _delete_file(self, ref: SecretRef) -> None:
+        file_path = self._file_path(ref)
+        try:
+            file_path.unlink()
+        except FileNotFoundError:
+            return
+
+    def _file_path(self, ref: SecretRef) -> Path:
+        if ref.provider:
+            return self._base_dir / ref.provider / ref.id
+        return self._base_dir / ref.id
+
+    def _import_keyring(self) -> Any:
+        try:
+            import keyring  # type: ignore[import-untyped]
+        except ImportError:
+            raise SecretResolutionError(
+                "keyring library not installed. Install with: pip install pnlclaw-security[keyring]"
+            ) from None
+        return keyring

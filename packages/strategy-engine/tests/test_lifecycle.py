@@ -10,8 +10,10 @@ from pnlclaw_strategy.lifecycle import (
     StrategyDraft,
     StrategyState,
     ValidatedStrategy,
+    can_transition,
     draft_from_config,
     submit_for_backtest,
+    transition,
     validate_draft,
 )
 from pnlclaw_strategy.models import (
@@ -205,3 +207,32 @@ class TestFullLifecycle:
         ready = submit_for_backtest(validated)
         assert ready.state == StrategyState.BACKTESTING
         assert ready.compiled.config.id == config.id
+
+
+class TestStateTransitions:
+    """P9: Test state transition validation."""
+
+    def test_backtesting_to_confirmed(self) -> None:
+        assert can_transition(StrategyState.BACKTESTING, StrategyState.CONFIRMED)
+        result = transition(StrategyState.BACKTESTING, StrategyState.CONFIRMED)
+        assert result == StrategyState.CONFIRMED
+
+    def test_confirmed_to_draft(self) -> None:
+        assert can_transition(StrategyState.CONFIRMED, StrategyState.DRAFT)
+
+    def test_backtesting_to_draft(self) -> None:
+        assert can_transition(StrategyState.BACKTESTING, StrategyState.DRAFT)
+
+    def test_confirmed_to_running(self) -> None:
+        assert can_transition(StrategyState.CONFIRMED, StrategyState.RUNNING)
+
+    def test_invalid_transition_raises(self) -> None:
+        assert not can_transition(StrategyState.DRAFT, StrategyState.CONFIRMED)
+        with pytest.raises(LifecycleError, match="Invalid transition"):
+            transition(StrategyState.DRAFT, StrategyState.CONFIRMED)
+
+    def test_draft_to_validated(self) -> None:
+        assert can_transition(StrategyState.DRAFT, StrategyState.VALIDATED)
+
+    def test_retired_to_draft(self) -> None:
+        assert can_transition(StrategyState.RETIRED, StrategyState.DRAFT)

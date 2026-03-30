@@ -1,3 +1,13 @@
+---
+name: market-analysis
+description: Analyzes current market state and short-term trends using ticker, candle, and narrative context
+version: 0.1.0
+tags: [market, analysis, data]
+user_invocable: true
+model_invocable: true
+requires_tools: [market_ticker, market_kline, explain_market]
+---
+
 # Market Analysis
 
 ## Description

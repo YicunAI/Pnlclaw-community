@@ -18,7 +18,13 @@ from pnlclaw_security.env_security import (
     sanitize_env,
 )
 
-# -- Guardrails (C10-C12) --
+# -- Guardrails (C10-C13) --
+from pnlclaw_security.guardrails.content_scope import (
+    ContentScopeGuard,
+    GuardAction,
+    GuardResult,
+    MessageTopic,
+)
 from pnlclaw_security.guardrails.hallucination import (
     HallucinationDetector,
     PriceDeviationAlert,
@@ -106,6 +112,10 @@ __all__ = [
     "PairingToken",
     "TokenStore",
     # Guardrails
+    "ContentScopeGuard",
+    "GuardAction",
+    "GuardResult",
+    "MessageTopic",
     "HallucinationDetector",
     "OvertradingAlert",
     "OvertradingConfig",

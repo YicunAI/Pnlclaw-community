@@ -25,6 +25,14 @@ class StrategyType(str, Enum):
     CUSTOM = "custom"
 
 
+class StrategyDirection(str, Enum):
+    """Strategy directional bias."""
+
+    LONG_ONLY = "long_only"
+    SHORT_ONLY = "short_only"
+    NEUTRAL = "neutral"
+
+
 # ---------------------------------------------------------------------------
 # StrategyConfig
 # ---------------------------------------------------------------------------
@@ -41,6 +49,9 @@ class StrategyConfig(BaseModel):
         ..., min_length=1, description="Trading pairs this strategy applies to"
     )
     interval: str = Field(..., description="Kline interval, e.g. '1h', '4h', '1d'")
+    direction: StrategyDirection = Field(
+        StrategyDirection.LONG_ONLY, description="Strategy direction: long_only, short_only, neutral"
+    )
     parameters: dict[str, Any] = Field(
         default_factory=dict,
         description="Strategy-specific parameters (e.g. sma_short=10, sma_long=50)",
@@ -55,6 +66,10 @@ class StrategyConfig(BaseModel):
         default_factory=dict,
         description="Risk parameters (stop_loss, take_profit, max_position_size, etc.)",
     )
+    tags: list[str] = Field(default_factory=list, description="User-defined tags for filtering")
+    source: str = Field("user", description="Origin of the strategy: user, ai, template")
+    version: int = Field(1, ge=1, description="Current strategy version")
+    lifecycle_state: str = Field("draft", description="Current lifecycle state")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -74,6 +89,29 @@ class StrategyConfig(BaseModel):
             ]
         }
     )
+
+
+class StrategyVersionSnapshot(BaseModel):
+    """Persisted snapshot of a strategy version."""
+
+    id: str = Field(..., description="Unique snapshot identifier")
+    strategy_id: str = Field(..., description="Parent strategy ID")
+    version: int = Field(..., ge=1, description="Version number")
+    config_snapshot: dict[str, Any] = Field(default_factory=dict)
+    note: str = Field("", description="Short reason or source of the snapshot")
+    created_at: Timestamp = Field(..., description="Snapshot creation time (ms epoch)")
+
+
+class StrategyDeployment(BaseModel):
+    """Minimal strategy-to-paper deployment record."""
+
+    id: str = Field(..., description="Deployment identifier")
+    strategy_id: str = Field(..., description="Deployed strategy ID")
+    strategy_version: int = Field(..., ge=1, description="Deployed strategy version")
+    account_id: str = Field(..., description="Target paper account ID")
+    mode: str = Field("paper", description="Deployment mode")
+    status: str = Field("running", description="Deployment status")
+    created_at: Timestamp = Field(..., description="Deployment time (ms epoch)")
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +164,11 @@ class BacktestMetrics(BaseModel):
     win_rate: float = Field(..., ge=0, le=1, description="Winning trades / total trades")
     profit_factor: float = Field(..., ge=0, description="Gross profit / gross loss")
     total_trades: int = Field(..., ge=0, description="Total number of trades executed")
+    # T5: Extended metrics
+    calmar_ratio: float = Field(0.0, description="Annual return / max drawdown")
+    sortino_ratio: float = Field(0.0, description="Excess return / downside deviation")
+    expectancy: float = Field(0.0, description="(win_rate * avg_win) - (loss_rate * avg_loss)")
+    recovery_factor: float = Field(0.0, description="Net profit / max drawdown")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -154,11 +197,24 @@ class BacktestResult(BaseModel):
 
     id: str = Field(..., description="Unique backtest run identifier")
     strategy_id: str = Field(..., description="Strategy that was backtested")
+    strategy_version: int = Field(1, ge=1, description="Strategy version used for this backtest")
+    symbol: str = Field("", description="Trading pair symbol (e.g. BTC/USDT)")
+    interval: str = Field("1h", description="Kline interval used for this backtest")
     start_date: datetime = Field(..., description="Backtest period start (inclusive)")
     end_date: datetime = Field(..., description="Backtest period end (inclusive)")
     metrics: BacktestMetrics = Field(..., description="Performance metrics")
     equity_curve: list[float] = Field(
         default_factory=list, description="Equity values at each time step"
+    )
+    drawdown_curve: list[float] = Field(
+        default_factory=list, description="Drawdown values at each time step (0 to negative)"
+    )
+    buy_hold_curve: list[float] = Field(
+        default_factory=list,
+        description="Buy & Hold equity curve based on actual close prices during the backtest period",
+    )
+    trades: list[dict[str, Any]] = Field(
+        default_factory=list, description="Individual trade records for analysis"
     )
     trades_count: int = Field(..., ge=0, description="Total trades executed")
     created_at: Timestamp = Field(..., description="When this backtest was run (ms epoch)")

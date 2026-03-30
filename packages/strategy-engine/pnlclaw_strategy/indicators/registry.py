@@ -61,7 +61,8 @@ class IndicatorRegistry:
 
 
 def _create_default_registry() -> IndicatorRegistry:
-    """Create a registry with the 4 built-in indicators pre-registered."""
+    """Create a registry with the built-in indicators pre-registered."""
+    from pnlclaw_strategy.indicators.bbands import BollingerBands
     from pnlclaw_strategy.indicators.ema import EMA
     from pnlclaw_strategy.indicators.macd import MACD
     from pnlclaw_strategy.indicators.rsi import RSI
@@ -72,6 +73,7 @@ def _create_default_registry() -> IndicatorRegistry:
     registry.register("ema", EMA)
     registry.register("rsi", RSI)
     registry.register("macd", MACD)
+    registry.register("bbands", BollingerBands)
     return registry
 
 

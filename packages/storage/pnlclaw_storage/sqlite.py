@@ -32,10 +32,14 @@ class ConnectionError(StorageError):
 
 
 class AsyncSQLiteManager:
-    """Async SQLite manager with WAL mode and connection lifecycle.
+    """Async SQLite manager with WAL mode and read/write connection separation.
 
-    Uses a single persistent aiosqlite connection with WAL journal mode,
-    which allows concurrent reads while a write is in progress.
+    Maintains two connections to properly leverage WAL mode:
+    - A **write** connection (serialized via ``_write_lock``) for INSERT/UPDATE/DELETE
+    - A **read** connection (serialized via ``_read_lock``) for SELECT queries
+
+    Because WAL allows concurrent readers alongside a single writer, read
+    queries no longer block behind slow writes (and vice-versa).
 
     Args:
         db_path: Path to the SQLite database file. Use \":memory:\" for
@@ -51,71 +55,102 @@ class AsyncSQLiteManager:
         self._db_path = str(db_path)
         self._migration_runner = migration_runner or MigrationRunner(ALL_MIGRATIONS)
         self._conn: aiosqlite.Connection | None = None
+        self._read_conn: aiosqlite.Connection | None = None
         self._lock = asyncio.Lock()
+        self._write_lock = asyncio.Lock()
+        self._read_lock = asyncio.Lock()
 
     @property
     def is_connected(self) -> bool:
         """Whether the manager currently holds an open connection."""
         return self._conn is not None
 
+    async def _open_connection(self) -> aiosqlite.Connection:
+        conn = await aiosqlite.connect(self._db_path)
+        conn.row_factory = aiosqlite.Row
+        await conn.execute("PRAGMA journal_mode=WAL")
+        await conn.execute("PRAGMA foreign_keys=ON")
+        await conn.execute("PRAGMA busy_timeout=5000")
+        await conn.execute("PRAGMA synchronous=NORMAL")
+        return conn
+
     async def connect(self) -> None:
-        """Open the database connection and run pending migrations.
+        """Open both read and write connections and run pending migrations.
 
         Creates parent directories if the path is a file (not :memory:).
-        Enables WAL journal mode and foreign keys.
+        Enables WAL journal mode and foreign keys on both connections.
+
+        For ``:memory:`` databases, read and write share the same connection
+        (since each in-memory connection is an isolated database).
         """
         async with self._lock:
             if self._conn is not None:
                 return
 
-            # Ensure parent directory exists for file-based databases
             if self._db_path != ":memory:":
                 Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
 
-            conn = await aiosqlite.connect(self._db_path)
-            conn.row_factory = aiosqlite.Row
+            self._conn = await self._open_connection()
 
-            # Enable WAL mode for concurrent read access
-            await conn.execute("PRAGMA journal_mode=WAL")
-            # Enable foreign key enforcement
-            await conn.execute("PRAGMA foreign_keys=ON")
+            if self._db_path == ":memory:":
+                self._read_conn = self._conn
+                self._read_lock = self._write_lock
+            else:
+                self._read_conn = await self._open_connection()
 
-            self._conn = conn
-
-            # Run pending migrations if a runner is configured
             if self._migration_runner is not None:
-                await self._migration_runner.run_pending(conn)
+                await self._migration_runner.run_pending(self._conn)
 
     async def close(self) -> None:
-        """Close the database connection."""
+        """Close both database connections."""
         async with self._lock:
+            if self._read_conn is not None and self._read_conn is not self._conn:
+                await self._read_conn.close()
+            self._read_conn = None
             if self._conn is not None:
                 await self._conn.close()
                 self._conn = None
 
     def _require_connection(self) -> aiosqlite.Connection:
-        """Return the active connection or raise."""
+        """Return the active write connection or raise."""
         if self._conn is None:
             raise ConnectionError("Database not connected. Call connect() first.")
         return self._conn
 
+    def _require_read_connection(self) -> aiosqlite.Connection:
+        """Return the active read connection or raise."""
+        if self._read_conn is None:
+            raise ConnectionError("Database not connected. Call connect() first.")
+        return self._read_conn
+
+    async def query(
+        self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()
+    ) -> list[aiosqlite.Row]:
+        """Execute a read-only SQL query (SELECT) on the dedicated read connection.
+
+        Runs concurrently with writes thanks to WAL mode, so reads never
+        block behind long-running INSERT/DELETE batches.
+        """
+        async with self._read_lock:
+            conn = self._require_read_connection()
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+            return cast(list[aiosqlite.Row], rows)
+
     async def execute(
         self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()
     ) -> list[aiosqlite.Row]:
-        """Execute a SQL statement and return all result rows.
+        """Execute a SQL statement (INSERT/UPDATE/DELETE) and commit.
 
-        Args:
-            sql: SQL statement (may contain ``?`` or ``:name`` placeholders).
-            params: Positional or named parameters for the statement.
-
-        Returns:
-            List of Row objects (dict-like access by column name).
+        Serialized via ``_write_lock`` to prevent concurrent writes on
+        the same connection.
         """
-        conn = self._require_connection()
-        cursor = await conn.execute(sql, params)
-        rows = await cursor.fetchall()
-        await conn.commit()
-        return cast(list[aiosqlite.Row], rows)
+        async with self._write_lock:
+            conn = self._require_connection()
+            cursor = await conn.execute(sql, params)
+            rows = await cursor.fetchall()
+            await conn.commit()
+            return cast(list[aiosqlite.Row], rows)
 
     async def execute_many(self, sql: str, params_list: list[tuple[Any, ...]]) -> None:
         """Execute a SQL statement against each parameter set.
@@ -124,25 +159,30 @@ class AsyncSQLiteManager:
             sql: SQL statement with ``?`` placeholders.
             params_list: List of parameter tuples.
         """
-        conn = self._require_connection()
-        await conn.executemany(sql, params_list)
-        await conn.commit()
+        async with self._write_lock:
+            conn = self._require_connection()
+            await conn.executemany(sql, params_list)
+            await conn.commit()
 
     @asynccontextmanager
     async def connection(self) -> AsyncIterator[aiosqlite.Connection]:
-        """Yield the underlying aiosqlite connection for advanced use.
+        """Yield the underlying write connection for advanced use.
 
         The connection is committed on successful exit and rolled back on
         exception. Callers should prefer ``execute`` / ``execute_many`` for
         simple operations.
+
+        Acquires ``_write_lock`` for the duration of the block to prevent
+        concurrent writes on the same connection.
         """
-        conn = self._require_connection()
-        try:
-            yield conn
-            await conn.commit()
-        except BaseException:
-            await conn.rollback()
-            raise
+        async with self._write_lock:
+            conn = self._require_connection()
+            try:
+                yield conn
+                await conn.commit()
+            except BaseException:
+                await conn.rollback()
+                raise
 
     async def __aenter__(self) -> AsyncSQLiteManager:
         await self.connect()

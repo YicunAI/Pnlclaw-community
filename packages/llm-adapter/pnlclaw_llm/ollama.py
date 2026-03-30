@@ -21,6 +21,7 @@ from pnlclaw_llm.base import (
     LLMProvider,
     LLMRole,
 )
+from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,80 @@ class OllamaProvider(LLMProvider):
                 f"Cannot connect to Ollama at {self._base_url}. "
                 "Is Ollama running? Start it with: ollama serve"
             ) from exc
+
+    # ----- chat_with_tools -----
+
+    async def chat_with_tools(
+        self,
+        messages: list[LLMMessage],
+        tools: list[dict[str, Any]] | None = None,
+        **kwargs: Any,
+    ) -> ToolCallResult:
+        """Native function calling via Ollama tools API (0.5+).
+
+        Falls back to the base class text-only implementation if the model
+        returns no tool calls (indicating no native support).
+        """
+        if not tools:
+            return await super().chat_with_tools(messages, tools=None, **kwargs)
+
+        payload = self._build_payload(messages, stream=False, **kwargs)
+        payload["tools"] = tools
+        client = await self._get_client()
+
+        try:
+            resp = await client.post(
+                f"{self._base_url}/api/chat",
+                json=payload,
+            )
+        except (httpx.ConnectError, httpx.TimeoutException) as exc:
+            raise LLMConnectionError(
+                f"Cannot connect to Ollama at {self._base_url}. "
+                "Is Ollama running? Start it with: ollama serve"
+            ) from exc
+
+        if resp.status_code != 200:
+            logger.warning(
+                "Ollama tool calling failed (%s), falling back to text mode",
+                resp.status_code,
+            )
+            return await super().chat_with_tools(messages, tools=None, **kwargs)
+
+        data = cast(dict[str, Any], resp.json())
+        message = data.get("message", {})
+        if not isinstance(message, dict):
+            return await super().chat_with_tools(messages, tools=None, **kwargs)
+
+        text_content = message.get("content", "") or None
+        raw_tool_calls = message.get("tool_calls", [])
+        parsed_calls: list[ToolCall] = []
+
+        if isinstance(raw_tool_calls, list):
+            for i, tc in enumerate(raw_tool_calls):
+                if not isinstance(tc, dict):
+                    continue
+                func = tc.get("function", {})
+                if not isinstance(func, dict):
+                    continue
+                parsed_calls.append(ToolCall(
+                    id=f"ollama_call_{i}",
+                    name=func.get("name", ""),
+                    arguments=func.get("arguments", {}),
+                ))
+
+        usage_data = data.get("prompt_eval_count", 0), data.get("eval_count", 0)
+        token_usage = TokenUsage(
+            prompt_tokens=usage_data[0],
+            completion_tokens=usage_data[1],
+            total_tokens=usage_data[0] + usage_data[1],
+        )
+
+        return ToolCallResult(
+            tool_calls=parsed_calls,
+            text=text_content if text_content else None,
+            model=data.get("model", self._config.model),
+            usage=token_usage,
+        )
 
     # ----- generate_structured -----
 

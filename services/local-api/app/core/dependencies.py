@@ -26,7 +26,18 @@ _paper_position_manager: Any | None = None
 _risk_engine: Any | None = None
 _agent_runtime: Any | None = None
 _execution_engine: Any | None = None
+_live_engine: Any | None = None
 _execution_mode: str = "paper"
+_settings_service: Any | None = None
+_key_pair_manager: Any | None = None
+_mcp_registry: Any | None = None
+_skill_registry: Any | None = None
+_strategy_repo: Any | None = None
+_db_manager: Any | None = None
+_tool_catalog: Any | None = None
+_funding_rate_fetcher: Any | None = None
+_chat_session_repo: Any | None = None
+_strategy_runner: Any | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +81,72 @@ def set_execution_engine(engine: Any) -> None:
     _execution_engine = engine
 
 
+def set_live_engine(engine: Any) -> None:
+    global _live_engine
+    _live_engine = engine
+
+
 def set_execution_mode(mode: str) -> None:
     global _execution_mode
     _execution_mode = mode
+
+
+def set_settings_service(service: Any) -> None:
+    global _settings_service
+    _settings_service = service
+
+
+def set_key_pair_manager(manager: Any) -> None:
+    global _key_pair_manager
+    _key_pair_manager = manager
+
+
+def set_mcp_registry(registry: Any) -> None:
+    """Set the McpRegistry instance (called from lifespan)."""
+    global _mcp_registry
+    _mcp_registry = registry
+
+
+def set_skill_registry(registry: Any) -> None:
+    """Set the SkillRegistry instance (called from lifespan)."""
+    global _skill_registry
+    _skill_registry = registry
+
+
+def set_strategy_repo(repo: Any) -> None:
+    """Set the StrategyRepository instance (called from lifespan)."""
+    global _strategy_repo
+    _strategy_repo = repo
+
+
+def set_db_manager(db: Any) -> None:
+    """Set the AsyncSQLiteManager instance (called from lifespan)."""
+    global _db_manager
+    _db_manager = db
+
+
+def set_tool_catalog(catalog: Any) -> None:
+    """Set the ToolCatalog instance (called from lifespan)."""
+    global _tool_catalog
+    _tool_catalog = catalog
+
+
+def set_funding_rate_fetcher(fetcher: Any) -> None:
+    """Set the FundingRateFetcher instance (called from lifespan)."""
+    global _funding_rate_fetcher
+    _funding_rate_fetcher = fetcher
+
+
+def set_chat_session_repo(repo: Any) -> None:
+    """Set the ChatSessionRepository instance (called from lifespan)."""
+    global _chat_session_repo
+    _chat_session_repo = repo
+
+
+def set_strategy_runner(runner: Any) -> None:
+    """Set the StrategyRunner instance (called from lifespan)."""
+    global _strategy_runner
+    _strategy_runner = runner
 
 
 def build_response_meta(
@@ -138,6 +212,70 @@ def get_execution_engine() -> Any:
     return _execution_engine
 
 
+def get_live_engine() -> Any:
+    """Return the LiveExecutionEngine (or None if not configured)."""
+    return _live_engine
+
+
 def get_execution_mode() -> str:
     """Return the current execution mode ('paper' or 'live')."""
     return _execution_mode
+
+
+def get_settings_service() -> Any:
+    """Return the SettingsService instance (or None)."""
+    if _settings_service is None:
+        from app.core.crypto import KeyPairManager
+        from app.core.settings_service import SettingsService
+        from pnlclaw_security.secrets import SecretManager
+
+        return SettingsService(
+            secret_manager=SecretManager(),
+            key_pair_manager=_key_pair_manager,
+        )
+    return _settings_service
+
+
+def get_key_pair_manager() -> Any:
+    """Return the KeyPairManager instance (or None)."""
+    return _key_pair_manager
+
+
+def get_mcp_registry() -> Any:
+    """Return the McpRegistry instance (or None)."""
+    return _mcp_registry
+
+
+def get_skill_registry() -> Any:
+    """Return the SkillRegistry instance (or None)."""
+    return _skill_registry
+
+
+def get_strategy_repo() -> Any:
+    """Return the StrategyRepository instance (or None)."""
+    return _strategy_repo
+
+
+def get_db_manager() -> Any:
+    """Return the AsyncSQLiteManager instance (or None)."""
+    return _db_manager
+
+
+def get_tool_catalog() -> Any:
+    """Return the ToolCatalog instance (or None)."""
+    return _tool_catalog
+
+
+def get_funding_rate_fetcher() -> Any:
+    """Return the FundingRateFetcher instance (or None)."""
+    return _funding_rate_fetcher
+
+
+def get_chat_session_repo() -> Any:
+    """Return the ChatSessionRepository instance (or None)."""
+    return _chat_session_repo
+
+
+def get_strategy_runner() -> Any:
+    """Return the StrategyRunner instance (or None)."""
+    return _strategy_runner

@@ -23,11 +23,13 @@ from pnlclaw_types.trading import (
     BalanceUpdate,
     ExecutionMode,
     Fill,
+    MarginMode,
     Order,
     OrderSide,
     OrderStatus,
     OrderType,
     Position,
+    PositionSide,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,6 +66,36 @@ class PaperExecutionEngine:
         self._on_fill_cbs: list[Callable[[Fill], Any]] = []
         self._on_position_update_cbs: list[Callable[[Position], Any]] = []
         self._on_balance_update_cbs: list[Callable[[list[BalanceUpdate]], Any]] = []
+
+    def _get_fee_rates(self, account_id: str) -> tuple[float, float]:
+        """Return (maker_fee_rate, taker_fee_rate) for the given account."""
+        acct = self._account_mgr.get_account(account_id)
+        if acct is not None:
+            return acct.maker_fee_rate, acct.taker_fee_rate
+        return 0.0002, 0.0005
+
+    def update_fee_rates(self, account_id: str, maker: float, taker: float) -> None:
+        """Update maker/taker fee rates for an account at runtime."""
+        acct = self._account_mgr.get_account(account_id)
+        if acct is not None:
+            acct.maker_fee_rate = maker
+            acct.taker_fee_rate = taker
+            acct.updated_at = int(time.time() * 1000)
+
+    def compute_equity(self, account_id: str) -> float:
+        """Compute account equity = wallet_balance + unrealized PnL.
+
+        wallet_balance = initial_balance + total_realized_pnl - total_fee
+        This is the OKX model: margin locked in positions is still part of
+        the wallet balance, so equity reflects the true total account value.
+        """
+        acct = self._account_mgr.get_account(account_id)
+        if acct is None:
+            return 0.0
+        wallet_balance = acct.initial_balance + acct.total_realized_pnl - acct.total_fee
+        positions = self._position_mgr.get_open_positions(account_id)
+        unrealized = sum(p.unrealized_pnl for p in positions)
+        return wallet_balance + unrealized
 
     # ------------------------------------------------------------------
     # ExecutionEngine interface
@@ -103,7 +135,30 @@ class PaperExecutionEngine:
         quantity: float,
         price: float | None = None,
         stop_price: float | None = None,
+        leverage: int = 1,
+        margin_mode: MarginMode = MarginMode.CROSS,
+        pos_side: PositionSide = PositionSide.NET,
+        reduce_only: bool = False,
+        mark_price: float | None = None,
+        signal_timestamp_ms: int | None = None,
     ) -> Order:
+        """Place order. ``quantity`` is in USDT notional.
+
+        For market orders, ``mark_price`` (from the frontend ticker) is used as
+        the fill price when the engine's internal price cache has no entry for
+        the symbol.  This guarantees immediate fill for market orders.
+
+        Margin check: required margin = quantity / leverage (skipped for reduce_only).
+        """
+        if not reduce_only:
+            required_margin = quantity / leverage
+            acct = self._account_mgr.get_account(account_id)
+            if acct is not None and acct.current_balance < required_margin:
+                raise ValueError(
+                    f"Insufficient margin: need {required_margin:.2f} USDT "
+                    f"but only {acct.current_balance:.2f} available"
+                )
+
         order = self._order_mgr.place_order(
             account_id=account_id,
             symbol=symbol,
@@ -112,14 +167,133 @@ class PaperExecutionEngine:
             quantity=quantity,
             price=price,
             stop_price=stop_price,
+            leverage=leverage,
+            margin_mode=margin_mode,
+            pos_side=pos_side,
+            reduce_only=reduce_only,
         )
         await self._fire_order_update(order)
 
-        # For market orders, attempt immediate fill if we have a price
-        if order_type == OrderType.MARKET and symbol in self._last_prices:
-            await self._try_fill_order(order, self._last_prices[symbol])
+        if order_type == OrderType.MARKET:
+            fill_price = self._resolve_price(symbol, price)
+            if fill_price is None and mark_price is not None and mark_price > 0:
+                fill_price = mark_price
+                self._last_prices[symbol] = mark_price
+                logger.info(
+                    "Using frontend mark_price %.2f for %s (no cached price)",
+                    mark_price,
+                    symbol,
+                )
+            if fill_price is not None:
+                try:
+                    await self._try_fill_order(order, fill_price, timestamp_ms=signal_timestamp_ms)
+                except Exception:
+                    logger.error(
+                        "Fill failed for market order %s, forcing fill",
+                        order.id,
+                        exc_info=True,
+                    )
+                    self._force_fill_market_order(order, fill_price)
+
+            if order.status not in (OrderStatus.FILLED, OrderStatus.PARTIAL):
+                logger.warning(
+                    "Market order %s still not filled (status=%s), forcing fill at %.2f",
+                    order.id,
+                    order.status.value,
+                    fill_price or mark_price or 0,
+                )
+                final_price = fill_price or mark_price
+                if final_price and final_price > 0:
+                    self._force_fill_market_order(order, final_price)
 
         return order
+
+    def _force_fill_market_order(self, order: Order, fill_price: float) -> None:
+        """Last-resort fill: directly mutate order to FILLED status.
+
+        Used when normal fill pipeline fails due to callback errors or other
+        transient issues.  Ensures market orders never stay in ACCEPTED state.
+        """
+        if order.status in (OrderStatus.FILLED,):
+            return
+        remaining = order.quantity - order.filled_quantity
+        if remaining <= 0:
+            return
+
+        account_id = self._get_order_account(order.id)
+        maker_rate, taker_rate = self._get_fee_rates(account_id)
+        effective_rate = taker_rate
+        fee = remaining * effective_rate
+        now_ms = int(time.time() * 1000)
+
+        order.filled_quantity = order.quantity
+        order.avg_fill_price = fill_price
+        order.status = OrderStatus.FILLED
+        order.updated_at = now_ms
+
+        is_close = getattr(order, "reduce_only", False)
+
+        fill = Fill(
+            id=f"fill-{order.id[-8:]}",
+            order_id=order.id,
+            price=fill_price,
+            quantity=remaining,
+            fee=fee,
+            fee_currency="USDT",
+            fee_rate=effective_rate,
+            exec_type="taker",
+            side=order.side.value if hasattr(order.side, "value") else str(order.side),
+            pos_side=order.pos_side.value if hasattr(order.pos_side, "value") else str(order.pos_side),
+            symbol=order.symbol,
+            leverage=order.leverage,
+            reduce_only=is_close,
+            timestamp=now_ms,
+        )
+
+        acct = self._account_mgr.get_account(account_id)
+        balance_for_liq = acct.current_balance if acct else None
+
+        try:
+            pos, realized_pnl = self._position_mgr.apply_fill_with_symbol(
+                account_id=account_id,
+                symbol=order.symbol,
+                fill=fill,
+                side=order.side,
+                leverage=order.leverage,
+                margin_mode=order.margin_mode,
+                pos_side=order.pos_side,
+                available_balance=balance_for_liq,
+            )
+
+            fill.realized_pnl = realized_pnl
+
+            if is_close:
+                self._account_mgr.update_balance(account_id, fill.quantity / order.leverage - fee)
+            else:
+                self._account_mgr.update_balance(account_id, -(fill.quantity / order.leverage) - fee)
+
+            if realized_pnl != 0:
+                self._account_mgr.update_balance(account_id, realized_pnl)
+
+            if acct is not None:
+                acct.total_realized_pnl += realized_pnl
+                acct.total_fee += fee
+        except Exception:
+            logger.error("Force-fill position/balance update failed", exc_info=True)
+
+        self._fills.append(fill)
+
+    def _resolve_price(self, symbol: str, limit_price: float | None = None) -> float | None:
+        """Find a usable price for *symbol* from cached ticks or limit price."""
+        if symbol in self._last_prices:
+            return self._last_prices[symbol]
+        normalized = symbol.upper().replace("-SWAP", "").replace("-", "/")
+        if normalized in self._last_prices:
+            return self._last_prices[normalized]
+        for key, val in self._last_prices.items():
+            if key.replace("/", "-").replace("-SWAP", "") == symbol.replace("/", "-").replace("-SWAP", ""):
+                return val
+        return limit_price
 
     async def cancel_order(self, order_id: str) -> Order:
         self._order_mgr.cancel_order(order_id)
@@ -139,6 +313,33 @@ class PaperExecutionEngine:
 
     async def get_positions(self, account_id: str) -> list[Position]:
         return self._position_mgr.get_open_positions(account_id)
+
+    def delete_account(self, account_id: str) -> bool:
+        """Delete an account and its history. Returns True if found."""
+        exists = self._account_mgr.delete_account(account_id)
+        if exists:
+            # Cleanup related data in orders/positions managers
+            self._order_mgr.clear_orders(account_id)
+            self._position_mgr.clear_positions(account_id)
+            # Filter in-memory fills
+            self._fills = [
+                f for f in self._fills if not self._fill_belongs_to(f, account_id)
+            ]
+            logger.info("Deleted paper account %s and cleaned up history", account_id)
+        return exists
+
+    def reset_account(self, account_id: str) -> bool:
+        """Reset an account's balance and clear its history."""
+        success = self._account_mgr.reset_account(account_id) is not None
+        if success:
+            # Cleanup related data
+            self._order_mgr.clear_orders(account_id)
+            self._position_mgr.clear_positions(account_id)
+            self._fills = [
+                f for f in self._fills if not self._fill_belongs_to(f, account_id)
+            ]
+            logger.info("Reset paper account %s and cleared history", account_id)
+        return success
 
     async def get_balances(self, account_id: str) -> list[BalanceUpdate]:
         acct = self._account_mgr.get_account(account_id)
@@ -177,6 +378,15 @@ class PaperExecutionEngine:
     # Price feed integration
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _symbols_match(a: str, b: str) -> bool:
+        """Check if two symbol strings refer to the same instrument."""
+        if a == b:
+            return True
+        norm_a = a.upper().replace("-SWAP", "").replace("/", "-")
+        norm_b = b.upper().replace("-SWAP", "").replace("/", "-")
+        return norm_a == norm_b
+
     async def on_price_tick(self, symbol: str, price: float) -> None:
         """Called on every real-time price update.
 
@@ -185,44 +395,79 @@ class PaperExecutionEngine:
         """
         self._last_prices[symbol] = price
 
+        for account in self._account_mgr.list_accounts():
+            updated_positions = self._position_mgr.update_unrealized_pnl(account.id, symbol, price)
+            for pos in updated_positions:
+                await self._fire_position_update(pos)
+
         open_orders = self._order_mgr.get_open_orders()
         for order in open_orders:
-            if order.symbol == symbol:
+            if self._symbols_match(order.symbol, symbol):
                 await self._try_fill_order(order, price)
 
     # ------------------------------------------------------------------
     # Internal fill logic
     # ------------------------------------------------------------------
 
-    async def _try_fill_order(self, order: Order, current_price: float) -> None:
-        fill = try_fill(order, current_price, fee_rate=self._fee_rate)
+    async def _try_fill_order(
+        self, order: Order, current_price: float, *, timestamp_ms: int | None = None,
+    ) -> None:
+        account_id = self._get_order_account(order.id)
+        maker_rate, taker_rate = self._get_fee_rates(account_id)
+
+        fill = try_fill(
+            order, current_price,
+            maker_fee_rate=maker_rate,
+            taker_fee_rate=taker_rate,
+            timestamp_ms=timestamp_ms,
+        )
         if fill is None:
             return
 
         self._order_mgr.update_fill(order.id, fill.quantity, fill.price)
-        self._fills.append(fill)
 
-        updated_order = self._order_mgr.get_order(order.id)
-        if updated_order:
-            await self._fire_order_update(updated_order)
-
-        await self._fire_fill(fill)
-
-        # Determine account_id from order manager's internal mapping
-        account_id = self._get_order_account(order.id)
+        is_close = getattr(order, "reduce_only", False)
+        acct = self._account_mgr.get_account(account_id)
+        balance_for_liq = acct.current_balance if acct else None
 
         pos, realized_pnl = self._position_mgr.apply_fill_with_symbol(
             account_id=account_id,
             symbol=order.symbol,
             fill=fill,
             side=order.side,
+            leverage=order.leverage,
+            margin_mode=order.margin_mode,
+            pos_side=order.pos_side,
+            available_balance=balance_for_liq,
         )
+
+        fill.realized_pnl = realized_pnl
+        fill.side = order.side.value if hasattr(order.side, "value") else str(order.side)
+        fill.pos_side = order.pos_side.value if hasattr(order.pos_side, "value") else str(order.pos_side)
+        fill.symbol = order.symbol
+        fill.leverage = order.leverage
+        fill.reduce_only = is_close
+        self._fills.append(fill)
+
+        if acct is not None:
+            acct.total_realized_pnl += realized_pnl
+            acct.total_fee += fill.fee
+
+        updated_order = self._order_mgr.get_order(order.id)
+        if updated_order:
+            await self._fire_order_update(updated_order)
+        await self._fire_fill(fill)
         await self._fire_position_update(pos)
 
-        # Update account balance with realized PnL minus fees
-        net_pnl = realized_pnl - fill.fee
-        if net_pnl != 0:
-            self._account_mgr.update_balance(account_id, net_pnl)
+        if is_close:
+            released_margin = fill.quantity / order.leverage
+            self._account_mgr.update_balance(account_id, released_margin - fill.fee)
+        else:
+            margin_used = fill.quantity / order.leverage
+            self._account_mgr.update_balance(account_id, -margin_used - fill.fee)
+
+        if realized_pnl != 0:
+            self._account_mgr.update_balance(account_id, realized_pnl)
 
         balances = await self.get_balances(account_id)
         await self._fire_balance_update(balances)

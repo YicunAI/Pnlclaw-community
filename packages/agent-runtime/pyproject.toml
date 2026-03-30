@@ -18,12 +18,17 @@ dependencies = [
     "pnlclaw-backtest",
     "pnlclaw-paper",
     "pnlclaw-risk",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "mcp>=1.0",
 ]
 
 [tool.hatch.build.targets.wheel]

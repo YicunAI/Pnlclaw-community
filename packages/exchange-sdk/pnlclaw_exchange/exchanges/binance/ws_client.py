@@ -23,6 +23,7 @@ from pnlclaw_exchange.exchanges.binance.normalizer import (
 )
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 from pnlclaw_exchange.types import WSClientConfig
+from pnlclaw_types.derivatives import FundingRateEvent, LiquidationEvent
 from pnlclaw_types.market import KlineEvent, TickerEvent, TradeEvent
 
 logger = logging.getLogger(__name__)
@@ -46,16 +47,19 @@ class BinanceWSClient(BaseWSClient):
         self,
         *,
         url: str = DEFAULT_BINANCE_WS_URL,
+        proxy_url: str | None = None,
         symbol_normalizer: SymbolNormalizer | None = None,
         stall_timeout_s: float = 30.0,
         on_ticker: Callable[[TickerEvent], Any] | None = None,
         on_trade: Callable[[TradeEvent], Any] | None = None,
         on_kline: Callable[[KlineEvent], Any] | None = None,
         on_depth_update: Callable[[BinanceDepthDelta], Any] | None = None,
+        on_liquidation: Callable[[LiquidationEvent], Any] | None = None,
+        on_funding_rate: Callable[[FundingRateEvent], Any] | None = None,
         on_stall: Callable[[StallTimeoutMeta], Any] | None = None,
         **kwargs: Any,
     ) -> None:
-        config = WSClientConfig(url=url, exchange="binance")
+        config = WSClientConfig(url=url, exchange="binance", proxy_url=proxy_url)
         super().__init__(config, **kwargs)
 
         self._symbol_normalizer = symbol_normalizer or SymbolNormalizer()
@@ -70,11 +74,12 @@ class BinanceWSClient(BaseWSClient):
             label="binance-ws-stall",
         )
 
-        # Typed callbacks for normalized events.
         self.on_ticker = on_ticker
         self.on_trade = on_trade
         self.on_kline = on_kline
         self.on_depth_update = on_depth_update
+        self.on_liquidation = on_liquidation
+        self.on_funding_rate = on_funding_rate
 
     # ------------------------------------------------------------------
     # BaseWSClient implementation
@@ -82,11 +87,13 @@ class BinanceWSClient(BaseWSClient):
 
     async def connect(self) -> None:
         """Open WebSocket connection to Binance."""
-        logger.info("Connecting to Binance WS: %s", self._config.url)
-        self._ws = await websockets.asyncio.client.connect(self._config.url)
+        proxy = self._config.proxy_url or None
+        logger.info("Connecting to Binance WS: %s (proxy=%s)", self._config.url, proxy or "none")
+        self._ws = await websockets.asyncio.client.connect(self._config.url, proxy=proxy)
         await self._dispatch_connect()
         await self._stall_watchdog.start()
-        self._stall_watchdog.arm()
+        if self._subscriptions:
+            self._stall_watchdog.arm()
         self._receive_task = asyncio.create_task(self._receive_loop(), name="binance-ws-recv")
 
     async def subscribe(self, streams: list[str]) -> None:
@@ -96,15 +103,19 @@ class BinanceWSClient(BaseWSClient):
             streams: List of stream names in Binance format, e.g.
                 ``["btcusdt@ticker", "btcusdt@kline_1h"]``.
         """
-        if not streams or self._ws is None:
+        if not streams:
             return
         self._subscriptions.update(streams)
+        if self._ws is None:
+            logger.info("Queued %d Binance streams (WS not connected yet)", len(streams))
+            return
         msg = {
             "method": "SUBSCRIBE",
             "params": streams,
             "id": self._next_id(),
         }
         await self._ws.send(json.dumps(msg))
+        self._stall_watchdog.arm()
         logger.info("Subscribed to %d Binance streams", len(streams))
 
     async def unsubscribe(self, streams: list[str]) -> None:
@@ -169,6 +180,14 @@ class BinanceWSClient(BaseWSClient):
         streams = [self.stream_name(s, "trade") for s in symbols]
         await self.subscribe(streams)
 
+    async def subscribe_agg_trade(self, symbols: list[str]) -> None:
+        """Subscribe to aggregated trade streams (100ms batching).
+
+        Each message groups trades at the same price/side within a 100ms window.
+        """
+        streams = [self.stream_name(s, "aggTrade") for s in symbols]
+        await self.subscribe(streams)
+
     async def subscribe_depth(self, symbols: list[str]) -> None:
         """Subscribe to depth (L2) streams at 100ms update frequency.
 
@@ -177,6 +196,32 @@ class BinanceWSClient(BaseWSClient):
         """
         streams = [self.stream_name(s, "depth@100ms") for s in symbols]
         await self.subscribe(streams)
+
+    async def subscribe_force_order(self, symbols: list[str] | None = None) -> None:
+        """Subscribe to liquidation (forced order) streams.
+
+        Args:
+            symbols: If None, subscribes to all-market liquidation stream
+                     ``!forceOrder@arr``. Otherwise per-symbol streams.
+        """
+        if symbols is None:
+            await self.subscribe(["!forceOrder@arr"])
+        else:
+            streams = [self.stream_name(s, "forceOrder") for s in symbols]
+            await self.subscribe(streams)
+
+    async def subscribe_mark_price(self, symbols: list[str] | None = None) -> None:
+        """Subscribe to mark price streams (includes funding rate).
+
+        Args:
+            symbols: If None, subscribes to all-market ``!markPrice@arr@1s``.
+                     Otherwise per-symbol ``<symbol>@markPrice@1s``.
+        """
+        if symbols is None:
+            await self.subscribe(["!markPrice@arr@1s"])
+        else:
+            streams = [self.stream_name(s, "markPrice@1s") for s in symbols]
+            await self.subscribe(streams)
 
     # ------------------------------------------------------------------
     # Static helpers
@@ -214,7 +259,14 @@ class BinanceWSClient(BaseWSClient):
                     logger.warning("Invalid JSON from Binance: %s", raw[:200])
                     continue
 
-                await self._route_message(data)
+                try:
+                    await self._route_message(data)
+                except Exception as route_exc:
+                    logger.debug(
+                        "Skipping unprocessable Binance message: %s",
+                        route_exc,
+                    )
+                    continue
         except websockets.ConnectionClosed as exc:
             logger.info("Binance WS connection closed: %s", exc)
             await self._dispatch_disconnect(
@@ -227,22 +279,37 @@ class BinanceWSClient(BaseWSClient):
             logger.error("Error in Binance receive loop: %s", exc)
             await self._dispatch_error(exc)
 
-    async def _route_message(self, data: dict[str, Any]) -> None:
+    async def _route_message(self, data: dict[str, Any] | list[Any]) -> None:
         """Route a parsed message to the appropriate callback."""
         self._stall_watchdog.touch()
 
+        # !markPrice@arr and !forceOrder@arr push JSON arrays
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict):
+                    await self._route_single(item)
+            return
+
         # Handle combined stream format: {"stream": "...", "data": {...}}
         if "stream" in data and "data" in data:
-            data = data["data"]
+            payload = data["data"]
+            if isinstance(payload, list):
+                for item in payload:
+                    if isinstance(item, dict):
+                        await self._route_single(item)
+                return
+            data = payload
 
+        await self._route_single(data)
+
+    async def _route_single(self, data: dict[str, Any]) -> None:
+        """Route a single parsed message to the appropriate callback."""
         # Skip subscription response messages.
         if "result" in data and "id" in data:
             return
 
-        # Dispatch to raw callback.
         await self._dispatch_message(data)
 
-        # Normalize and dispatch typed callback.
         event = self._normalizer.normalize(data)
         if event is None:
             return
@@ -255,6 +322,10 @@ class BinanceWSClient(BaseWSClient):
             await self._invoke(self.on_kline, event)
         elif isinstance(event, BinanceDepthDelta):
             await self._invoke(self.on_depth_update, event)
+        elif isinstance(event, LiquidationEvent):
+            await self._invoke(self.on_liquidation, event)
+        elif isinstance(event, FundingRateEvent):
+            await self._invoke(self.on_funding_rate, event)
 
     def _next_id(self) -> int:
         """Return an auto-incrementing request ID."""

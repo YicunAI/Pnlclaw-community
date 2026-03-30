@@ -55,12 +55,7 @@ class Portfolio:
             side: Direction of the original order.
         """
         cost = fill.price * fill.quantity
-        symbol = "BTC/USDT"  # default for single-symbol backtests
-
-        # Infer symbol from order_id is impractical; use a well-known default
-        # In multi-symbol scenarios the engine should pass symbol explicitly.
-        # For now, we track via the fill — the engine calls update_equity
-        # with the correct symbol after each bar.
+        symbol = fill.symbol if fill.symbol else "BTC/USDT"
 
         if side == OrderSide.BUY:
             self._cash -= cost + fill.fee
@@ -68,8 +63,8 @@ class Portfolio:
         else:
             self._cash += cost - fill.fee
             self._positions[symbol] = self._positions.get(symbol, 0.0) - fill.quantity
-            # Clamp to zero to avoid floating-point negative dust
-            if self._positions[symbol] < 1e-12:
+            # Clamp near-zero to zero to avoid floating-point dust
+            if abs(self._positions[symbol]) < 1e-12:
                 self._positions[symbol] = 0.0
 
     def update_equity(self, symbol: str, current_price: float) -> None:

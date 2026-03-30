@@ -95,7 +95,7 @@ class AuditLogRepository:
             where = "WHERE " + " AND ".join(clauses)
 
         params.append(limit)
-        rows = await self._db.execute(
+        rows = await self._db.query(
             f"""
             SELECT id, timestamp, event_type, severity, actor,
                    action, resource, outcome, details_json

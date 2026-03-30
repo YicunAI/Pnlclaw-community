@@ -1,0 +1,9 @@
+components/trading/candlestick-chart.tsx(136,5): error TS2322: Type 'ISeriesMarkersPluginApi<Time>' is not assignable to type 'ISeriesMarkersPluginApi<unknown>'.
+  Types of property 'setMarkers' are incompatible.
+    Type '(markers: SeriesMarker<Time>[]) => void' is not assignable to type '(markers: SeriesMarker<unknown>[]) => void'.
+      Types of parameters 'markers' and 'markers' are incompatible.
+        Type 'SeriesMarker<unknown>[]' is not assignable to type 'SeriesMarker<Time>[]'.
+          Type 'SeriesMarker<unknown>' is not assignable to type 'SeriesMarker<Time>'.
+            Type 'SeriesMarkerBar<unknown>' is not assignable to type 'SeriesMarker<Time>'.
+              Type 'SeriesMarkerBar<unknown>' is not assignable to type 'SeriesMarkerBar<Time>'.
+                Type 'unknown' is not assignable to type 'Time'.

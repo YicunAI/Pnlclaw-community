@@ -117,6 +117,18 @@ _STATEMENTS: list[str] = [
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp  ON audit_logs (timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_event_type ON audit_logs (event_type)",
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_severity   ON audit_logs (severity)",
+    # 7. paper_equity_history
+    """
+    CREATE TABLE IF NOT EXISTS paper_equity_history (
+        id          TEXT PRIMARY KEY,
+        account_id  TEXT NOT NULL,
+        timestamp   TEXT NOT NULL DEFAULT (datetime('now')),
+        equity      REAL NOT NULL,
+        FOREIGN KEY (account_id) REFERENCES paper_accounts (id) ON DELETE CASCADE
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_paper_equity_history_account_id ON paper_equity_history (account_id)",
+    "CREATE INDEX IF NOT EXISTS idx_paper_equity_history_timestamp  ON paper_equity_history (timestamp)",
 ]
 
 

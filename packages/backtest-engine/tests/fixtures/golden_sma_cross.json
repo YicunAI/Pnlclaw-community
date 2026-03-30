@@ -5,8 +5,8 @@
   "trades_count": 2,
   "metrics": {
     "total_return": -0.10237988,
-    "annual_return": -0.127833,
-    "sharpe_ratio": -1.1034,
+    "annual_return": -0.99138747,
+    "sharpe_ratio": -6.5053,
     "max_drawdown": -0.15217445,
     "win_rate": 0.0,
     "profit_factor": 0.0,

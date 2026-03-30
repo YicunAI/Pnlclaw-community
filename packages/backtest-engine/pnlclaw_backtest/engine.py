@@ -17,7 +17,7 @@ import pandas as pd
 
 from pnlclaw_backtest.broker import SimulatedBroker
 from pnlclaw_backtest.commissions import CommissionModel, NoCommission
-from pnlclaw_backtest.metrics import compute_metrics
+from pnlclaw_backtest.metrics import compute_metrics, infer_annualization_factor
 from pnlclaw_backtest.portfolio import Portfolio
 from pnlclaw_backtest.protocols import StrategyRunner
 from pnlclaw_backtest.slippage import NoSlippage, SlippageModel
@@ -47,6 +47,8 @@ class BacktestConfig:
     slippage: SlippageModel = field(default_factory=NoSlippage)
     trade_on_close: bool = True
     strategy_id: str = ""
+    symbol: str = ""
+    interval: str = ""
 
 
 def _klines_from_dataframe(df: pd.DataFrame) -> list[KlineEvent]:
@@ -135,13 +137,13 @@ class BacktestEngine:
         _entry_fee: float = 0.0
 
         strategy_id = self._config.strategy_id or "backtest"
+        strategy_version = int(getattr(getattr(strategy, "config", None), "version", 1))
 
         # --- Event loop -----------------------------------------------------
         for kline in klines:
             signal = strategy.on_kline(kline)
 
             if signal is not None:
-                # Determine if this signal closes an existing position or opens new
                 current_qty = portfolio.get_position_quantity(kline.symbol)
 
                 if current_qty > 0 and signal.side == OrderSide.SELL:
@@ -160,6 +162,7 @@ class BacktestEngine:
                         portfolio.apply_fill(fill, OrderSide.SELL)
                         trades.append(
                             {
+                                "symbol": kline.symbol,
                                 "side": "long",
                                 "entry_price": _entry_price,
                                 "exit_price": fill.price,
@@ -175,10 +178,43 @@ class BacktestEngine:
                         )
                         _open_side = None
 
+                elif current_qty < 0 and signal.side == OrderSide.BUY:
+                    # Close short position
+                    short_qty = abs(current_qty)
+                    order = Order(
+                        id=f"ord-{uuid.uuid4().hex[:8]}",
+                        symbol=kline.symbol,
+                        side=OrderSide.BUY,
+                        type=OrderType.MARKET,
+                        quantity=short_qty,
+                        created_at=kline.timestamp,
+                        updated_at=kline.timestamp,
+                    )
+                    fill = broker.execute(order, kline)
+                    if fill is not None:
+                        portfolio.apply_fill(fill, OrderSide.BUY)
+                        trades.append(
+                            {
+                                "symbol": kline.symbol,
+                                "side": "short",
+                                "entry_price": _entry_price,
+                                "exit_price": fill.price,
+                                "quantity": fill.quantity,
+                                "pnl": (
+                                    (_entry_price - fill.price) * fill.quantity
+                                    - _entry_fee
+                                    - fill.fee
+                                ),
+                                "entry_time": _entry_ts,
+                                "exit_time": kline.timestamp,
+                            }
+                        )
+                        _open_side = None
+
                 elif current_qty == 0 and signal.side == OrderSide.BUY:
-                    # Open long position — size = fraction of available cash
+                    # Open long position
                     price_est = kline.close
-                    affordable_qty = portfolio.cash / price_est * 0.95  # keep 5% buffer
+                    affordable_qty = portfolio.cash / price_est * 0.95
                     if affordable_qty > 0:
                         order = Order(
                             id=f"ord-{uuid.uuid4().hex[:8]}",
@@ -197,23 +233,76 @@ class BacktestEngine:
                             _entry_ts = kline.timestamp
                             _entry_fee = fill.fee
 
+                elif current_qty == 0 and signal.side == OrderSide.SELL:
+                    # Open short position
+                    price_est = kline.close
+                    affordable_qty = portfolio.cash / price_est * 0.95
+                    if affordable_qty > 0:
+                        order = Order(
+                            id=f"ord-{uuid.uuid4().hex[:8]}",
+                            symbol=kline.symbol,
+                            side=OrderSide.SELL,
+                            type=OrderType.MARKET,
+                            quantity=affordable_qty,
+                            created_at=kline.timestamp,
+                            updated_at=kline.timestamp,
+                        )
+                        fill = broker.execute(order, kline)
+                        if fill is not None:
+                            portfolio.apply_fill(fill, OrderSide.SELL)
+                            _open_side = OrderSide.SELL
+                            _entry_price = fill.price
+                            _entry_ts = kline.timestamp
+                            _entry_fee = fill.fee
+
             # Update equity at end of each bar
             portfolio.update_equity(kline.symbol, kline.close)
 
         # --- Build result ----------------------------------------------------
         equity_curve = portfolio.get_equity_curve()
-        metrics = compute_metrics(equity_curve, trades)
+        interval = klines[0].interval if klines else "1d"
+        ann_factor = infer_annualization_factor(interval)
+        metrics = compute_metrics(equity_curve, trades, annualization_factor=ann_factor)
+
+        # Compute drawdown curve
+        drawdown_curve: list[float] = []
+        if len(equity_curve) >= 2:
+            import numpy as np
+            eq = np.asarray(equity_curve, dtype=np.float64)
+            peak = np.maximum.accumulate(eq)
+            dd = ((eq - peak) / peak).tolist()
+            drawdown_curve = [round(v, 8) for v in dd]
+
+        # Compute Buy & Hold curve from actual close prices
+        buy_hold_curve: list[float] = []
+        if klines and equity_curve:
+            initial_equity = equity_curve[0]
+            first_close = klines[0].close
+            if first_close > 0:
+                buy_hold_curve = [
+                    round(initial_equity * (k.close / first_close), 2)
+                    for k in klines
+                ]
 
         start_dt = datetime.fromtimestamp(klines[0].timestamp / 1000, tz=UTC)
         end_dt = datetime.fromtimestamp(klines[-1].timestamp / 1000, tz=UTC)
 
+        resolved_symbol = self._config.symbol or (klines[0].symbol if klines else "")
+        resolved_interval = self._config.interval or interval
+
         return BacktestResult(
             id=f"bt-{uuid.uuid4().hex[:8]}",
             strategy_id=strategy_id,
+            strategy_version=strategy_version,
+            symbol=resolved_symbol,
+            interval=resolved_interval,
             start_date=start_dt,
             end_date=end_dt,
             metrics=metrics,
             equity_curve=equity_curve,
+            drawdown_curve=drawdown_curve,
+            buy_hold_curve=buy_hold_curve,
+            trades=trades,
             trades_count=len(trades),
             created_at=int(time.time() * 1000),
         )

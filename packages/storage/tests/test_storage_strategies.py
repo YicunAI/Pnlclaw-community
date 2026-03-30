@@ -20,6 +20,10 @@ def _make_strategy(id: str = "strat-001", name: str = "Test SMA") -> StrategyCon
         symbols=["BTC/USDT"],
         interval="1h",
         parameters={"sma_short": 10, "sma_long": 50},
+        tags=["trend", "btc"],
+        source="user",
+        version=1,
+        lifecycle_state="draft",
     )
 
 
@@ -81,8 +85,46 @@ async def test_list_with_offset(repo: StrategyRepository):
     assert len(page2) == 1
 
 
+
+
 @pytest.mark.asyncio
-async def test_delete(repo: StrategyRepository):
+async def test_list_filter_by_tags(repo: StrategyRepository):
+    await repo.save(_make_strategy("s1", "BTC Trend"))
+    await repo.save(
+        StrategyConfig(
+            id="s2",
+            name="ETH Reversal",
+            type=StrategyType.RSI_REVERSAL,
+            symbols=["ETH/USDT"],
+            interval="1h",
+            tags=["mean-reversion", "eth"],
+            source="ai_agent",
+        )
+    )
+
+    results = await repo.list(tags=["btc"])
+    assert len(results) == 1
+    assert results[0].id == "s1"
+
+
+@pytest.mark.asyncio
+async def test_list_filter_by_source(repo: StrategyRepository):
+    await repo.save(_make_strategy("s1", "Manual"))
+    await repo.save(
+        StrategyConfig(
+            id="s2",
+            name="Generated",
+            type=StrategyType.RSI_REVERSAL,
+            symbols=["ETH/USDT"],
+            interval="1h",
+            source="ai_agent",
+        )
+    )
+
+    results = await repo.list(source="ai_agent")
+    assert len(results) == 1
+    assert results[0].id == "s2"
+
     await repo.save(_make_strategy())
     assert await repo.delete("strat-001") is True
     assert await repo.get("strat-001") is None
@@ -106,6 +148,10 @@ async def test_roundtrip_preserves_all_fields(repo: StrategyRepository):
         entry_rules={"condition": "rsi < 30"},
         exit_rules={"condition": "rsi > 70"},
         risk_params={"stop_loss_pct": 0.03},
+        tags=["mean-reversion"],
+        source="ai_agent",
+        version=3,
+        lifecycle_state="confirmed",
     )
     await repo.save(strategy)
     loaded = await repo.get("full-001")
@@ -114,3 +160,7 @@ async def test_roundtrip_preserves_all_fields(repo: StrategyRepository):
     assert loaded.symbols == ["ETH/USDT", "BTC/USDT"]
     assert loaded.entry_rules == {"condition": "rsi < 30"}
     assert loaded.risk_params == {"stop_loss_pct": 0.03}
+    assert loaded.tags == ["mean-reversion"]
+    assert loaded.source == "ai_agent"
+    assert loaded.version == 3
+    assert loaded.lifecycle_state == "confirmed"

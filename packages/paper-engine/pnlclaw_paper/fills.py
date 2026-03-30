@@ -20,24 +20,24 @@ def try_fill(
     current_price: float,
     *,
     fee_rate: float = DEFAULT_FEE_RATE,
+    maker_fee_rate: float | None = None,
+    taker_fee_rate: float | None = None,
+    timestamp_ms: int | None = None,
 ) -> Fill | None:
     """Attempt to fill an order at the current price.
 
-    For market orders: fill immediately at current_price.
-    For limit orders: fill only if price condition is met:
-      - BUY limit: current_price <= order.price
-      - SELL limit: current_price >= order.price
+    For market orders: fill immediately at current_price (taker fee).
+    For limit orders: fill only if price condition is met (maker fee).
+
+    When ``maker_fee_rate`` and ``taker_fee_rate`` are provided, the fee
+    is determined by order type: market/stop -> taker, limit -> maker.
+    Otherwise falls back to the single ``fee_rate``.
+
+    ``timestamp_ms``: when provided (e.g. kline close time for strategy-driven
+    fills), used as fill timestamp instead of wall-clock time.
 
     Returns a Fill object if the order can be executed, None otherwise.
-    Does NOT mutate the order — caller is responsible for updating order state.
-
-    Args:
-        order: The order to attempt filling.
-        current_price: Current market price.
-        fee_rate: Fee as a fraction of trade value (default 0.1%).
-
-    Returns:
-        Fill if executable, None otherwise.
+    Does NOT mutate the order -- caller is responsible for updating order state.
     """
     if order.status not in (OrderStatus.ACCEPTED, OrderStatus.PARTIAL):
         return None
@@ -50,9 +50,14 @@ def try_fill(
     if remaining <= 0:
         return None
 
+    is_taker = order.type in (OrderType.MARKET, OrderType.STOP_MARKET)
+    if maker_fee_rate is not None and taker_fee_rate is not None:
+        effective_rate = taker_fee_rate if is_taker else maker_fee_rate
+    else:
+        effective_rate = fee_rate
+
     fill_quantity = remaining
-    trade_value = fill_price * fill_quantity
-    fee = trade_value * fee_rate
+    fee = fill_quantity * effective_rate
 
     return Fill(
         id=f"fill-{uuid.uuid4().hex[:8]}",
@@ -61,7 +66,9 @@ def try_fill(
         quantity=fill_quantity,
         fee=fee,
         fee_currency="USDT",
-        timestamp=int(time.time() * 1000),
+        fee_rate=effective_rate,
+        exec_type="taker" if is_taker else "maker",
+        timestamp=timestamp_ms if timestamp_ms is not None else int(time.time() * 1000),
     )
 
 

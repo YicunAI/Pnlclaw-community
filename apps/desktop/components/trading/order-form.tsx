@@ -5,16 +5,12 @@ import { placeOrder } from "@/lib/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select } from "@/components/ui/select"
+import { useI18n } from "@/components/i18n/use-i18n"
 import { cn } from "@/lib/utils"
 
 export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
+  const { t } = useI18n()
   const [symbol, setSymbol] = useState("BTC/USDT")
   const [side, setSide] = useState<"buy" | "sell">("buy")
   const [orderType, setOrderType] = useState<"market" | "limit" | "stop_market" | "stop_limit">("market")
@@ -58,7 +54,7 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs">Symbol</Label>
+          <Label className="text-xs">{t("trading.symbol")}</Label>
           <Input
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
@@ -68,23 +64,23 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Type</Label>
-          <Select value={orderType} onValueChange={(v) => setOrderType(v as typeof orderType)}>
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="market">Market</SelectItem>
-              <SelectItem value="limit">Limit</SelectItem>
-              <SelectItem value="stop_market">Stop Market</SelectItem>
-              <SelectItem value="stop_limit">Stop Limit</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label className="text-xs">{t("trading.type")}</Label>
+          <Select
+            className="h-9"
+            value={orderType}
+            onChange={(e) => setOrderType(e.target.value as typeof orderType)}
+            options={[
+              { value: "market", label: t("trading.market") },
+              { value: "limit", label: t("trading.limit") },
+              { value: "stop_market", label: t("trading.stopMarket") },
+              { value: "stop_limit", label: t("trading.stopLimit") },
+            ]}
+          />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs">Quantity</Label>
+        <Label className="text-xs">{t("trading.quantity")}</Label>
         <Input
           type="number"
           step="any"
@@ -99,7 +95,7 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
 
       {showPrice && (
         <div className="space-y-1.5">
-          <Label className="text-xs">Price</Label>
+          <Label className="text-xs">{t("trading.price")}</Label>
           <Input
             type="number"
             step="any"
@@ -114,7 +110,7 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
 
       {showStopPrice && (
         <div className="space-y-1.5">
-          <Label className="text-xs">Stop Price</Label>
+          <Label className="text-xs">{t("trading.stopPrice")}</Label>
           <Input
             type="number"
             step="any"
@@ -138,7 +134,7 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
           )}
           variant={side === "buy" ? "default" : "outline"}
         >
-          Buy
+          {t("trading.buy")}
         </Button>
         <Button
           type="submit"
@@ -150,7 +146,7 @@ export function OrderForm({ onOrderPlaced }: { onOrderPlaced?: () => void }) {
           )}
           variant={side === "sell" ? "default" : "outline"}
         >
-          Sell
+          {t("trading.sell")}
         </Button>
       </div>
 

@@ -1,21 +1,25 @@
 """Integration test: market data flow from exchange WS to cache/events.
 
 Tests the full pipeline:
-  BinanceWSClient callbacks → MarketDataService → Cache + EventBus
+  ExchangeSource callbacks → MarketDataService EventBus → consumers
   without requiring a real exchange connection.
+
+Also tests Binance normalization directly.
 """
 
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from collections.abc import Callable
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from pnlclaw_exchange.exchanges.binance.normalizer import BinanceDepthDelta, BinanceNormalizer
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 from pnlclaw_market.service import MarketDataService
-from pnlclaw_types.market import KlineEvent, OrderBookL2Delta, TickerEvent
+from pnlclaw_market.source import ExchangeSourceConfig
+from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, PriceLevel, TickerEvent
 
 
 @pytest.fixture
@@ -28,9 +32,10 @@ def normalizer(symbol_normalizer: SymbolNormalizer) -> BinanceNormalizer:
     return BinanceNormalizer(symbol_normalizer)
 
 
-def _make_ticker_event() -> TickerEvent:
+def _make_ticker_event(exchange: str = "binance", market_type: str = "spot") -> TickerEvent:
     return TickerEvent(
-        exchange="binance",
+        exchange=exchange,
+        market_type=market_type,
         symbol="BTC/USDT",
         timestamp=1700000000000,
         last_price=42000.0,
@@ -41,9 +46,10 @@ def _make_ticker_event() -> TickerEvent:
     )
 
 
-def _make_kline_event() -> KlineEvent:
+def _make_kline_event(exchange: str = "binance", market_type: str = "spot") -> KlineEvent:
     return KlineEvent(
-        exchange="binance",
+        exchange=exchange,
+        market_type=market_type,
         symbol="BTC/USDT",
         timestamp=1700000000000,
         interval="1h",
@@ -56,69 +62,140 @@ def _make_kline_event() -> KlineEvent:
     )
 
 
-class TestMarketDataServiceCallbacks:
-    """Test that callbacks properly populate cache and event bus."""
+class FakeSource:
+    """In-memory ExchangeSource for integration testing."""
 
-    def test_ticker_callback_populates_cache(self) -> None:
-        svc = MarketDataService.__new__(MarketDataService)
-        svc._running = True
-        from pnlclaw_market.cache import MarketDataCache
-        from pnlclaw_market.event_bus import EventBus
+    def __init__(self, exchange: str = "binance", market_type: str = "spot") -> None:
+        self._config = ExchangeSourceConfig(exchange=exchange, market_type=market_type)
+        self._running = False
+        self._symbols: set[str] = set()
+        self._tickers: dict[str, TickerEvent] = {}
+        self._klines: dict[str, KlineEvent] = {}
+        self._books: dict[str, OrderBookL2Snapshot] = {}
+        self._ticker_cbs: list[Callable] = []
+        self._kline_cbs: list[Callable] = []
+        self._book_cbs: list[Callable] = []
 
-        svc._cache = MarketDataCache()
-        svc._event_bus = EventBus()
-        svc._snapshot_store = MagicMock()
-        svc._stream_manager = MagicMock()
-        svc._stream_manager.active_symbols.return_value = ["BTC/USDT"]
+    @property
+    def config(self) -> ExchangeSourceConfig:
+        return self._config
 
-        ticker = _make_ticker_event()
-        svc._on_ticker(ticker)
+    @property
+    def is_running(self) -> bool:
+        return self._running
 
-        cached = svc.get_ticker("BTC/USDT")
-        assert cached is not None
-        assert cached.last_price == 42000.0
-        assert cached.symbol == "BTC/USDT"
+    async def start(self) -> None:
+        self._running = True
 
-    def test_kline_callback_populates_cache(self) -> None:
-        svc = MarketDataService.__new__(MarketDataService)
-        svc._running = True
-        from pnlclaw_market.cache import MarketDataCache
-        from pnlclaw_market.event_bus import EventBus
+    async def stop(self) -> None:
+        self._running = False
 
-        svc._cache = MarketDataCache()
-        svc._event_bus = EventBus()
-        svc._snapshot_store = MagicMock()
-        svc._stream_manager = MagicMock()
+    async def subscribe(self, symbol: str, *, ticker: bool = True, kline: bool = True, depth: bool = True) -> None:
+        self._symbols.add(symbol)
 
-        kline = _make_kline_event()
-        svc._on_kline(kline)
+    async def unsubscribe(self, symbol: str) -> None:
+        self._symbols.discard(symbol)
 
-        cached = svc.get_kline("BTC/USDT")
-        assert cached is not None
-        assert cached.close == 42000.0
+    def get_ticker(self, symbol: str) -> TickerEvent | None:
+        return self._tickers.get(symbol)
 
-    def test_event_bus_receives_ticker(self) -> None:
-        svc = MarketDataService.__new__(MarketDataService)
-        svc._running = True
-        from pnlclaw_market.cache import MarketDataCache
-        from pnlclaw_market.event_bus import EventBus
+    def get_kline(self, symbol: str) -> KlineEvent | None:
+        return self._klines.get(symbol)
 
-        svc._cache = MarketDataCache()
-        svc._event_bus = EventBus()
-        svc._snapshot_store = MagicMock()
+    def get_orderbook(self, symbol: str) -> OrderBookL2Snapshot | None:
+        return self._books.get(symbol)
+
+    def get_symbols(self) -> list[str]:
+        return sorted(self._symbols)
+
+    def on_ticker(self, callback: Callable[[TickerEvent], Any]) -> None:
+        self._ticker_cbs.append(callback)
+
+    def on_kline(self, callback: Callable[[KlineEvent], Any]) -> None:
+        self._kline_cbs.append(callback)
+
+    def on_orderbook(self, callback: Callable[[OrderBookL2Snapshot], Any]) -> None:
+        self._book_cbs.append(callback)
+
+    def inject_ticker(self, symbol: str, event: TickerEvent) -> None:
+        self._tickers[symbol] = event
+        for cb in self._ticker_cbs:
+            cb(event)
+
+    def inject_kline(self, symbol: str, event: KlineEvent) -> None:
+        self._klines[symbol] = event
+        for cb in self._kline_cbs:
+            cb(event)
+
+
+class TestMultiSourceEventFlow:
+    """Test that events from individual sources bridge to the unified EventBus."""
+
+    def test_ticker_from_source_reaches_service_event_bus(self) -> None:
+        svc = MarketDataService()
+        src = FakeSource("binance", "spot")
+        svc.register_source(src)
 
         received: list[TickerEvent] = []
-        svc._event_bus.subscribe(TickerEvent, received.append)
+        svc.on_ticker(received.append)
 
         ticker = _make_ticker_event()
-        svc._on_ticker(ticker)
+        src.inject_ticker("BTC/USDT", ticker)
 
         assert len(received) == 1
         assert received[0].last_price == 42000.0
+        assert received[0].exchange == "binance"
+
+    def test_kline_from_source_reaches_service_event_bus(self) -> None:
+        svc = MarketDataService()
+        src = FakeSource("okx", "futures")
+        svc.register_source(src)
+
+        received: list[KlineEvent] = []
+        svc.on_kline(received.append)
+
+        kline = _make_kline_event("okx", "futures")
+        src.inject_kline("BTC/USDT", kline)
+
+        assert len(received) == 1
+        assert received[0].close == 42000.0
+        assert received[0].exchange == "okx"
+
+    def test_events_from_multiple_sources_arrive_on_same_bus(self) -> None:
+        svc = MarketDataService()
+        bs = FakeSource("binance", "spot")
+        of = FakeSource("okx", "futures")
+        svc.register_source(bs)
+        svc.register_source(of)
+
+        received: list[TickerEvent] = []
+        svc.on_ticker(received.append)
+
+        bs.inject_ticker("BTC/USDT", _make_ticker_event("binance", "spot"))
+        of.inject_ticker("BTC/USDT", _make_ticker_event("okx", "futures"))
+
+        assert len(received) == 2
+        exchanges = {r.exchange for r in received}
+        assert exchanges == {"binance", "okx"}
+
+    @pytest.mark.asyncio
+    async def test_add_symbol_routes_to_correct_source(self) -> None:
+        svc = MarketDataService()
+        bs = FakeSource("binance", "spot")
+        of = FakeSource("okx", "futures")
+        svc.register_source(bs)
+        svc.register_source(of)
+        await svc.start()
+
+        await svc.add_symbol("ETH/USDT", exchange="okx", market_type="futures")
+
+        assert "ETH/USDT" in of.get_symbols()
+        assert "ETH/USDT" not in bs.get_symbols()
+        await svc.stop()
 
 
 class TestBinanceNormalization:
-    """Test raw Binance JSON → typed events."""
+    """Test raw Binance JSON -> typed events."""
 
     def test_normalize_ticker(self, normalizer: BinanceNormalizer) -> None:
         raw = {
@@ -175,52 +252,3 @@ class TestBinanceNormalization:
         assert event.last_update_id == 101
         assert len(event.delta.bids) == 1
         assert len(event.delta.asks) == 1
-
-
-class TestEndToEndDataFlow:
-    """Test data flowing through the full pipeline with mocks."""
-
-    @pytest.mark.asyncio
-    async def test_add_symbol_subscribes_streams(self) -> None:
-        """add_symbol should drive StreamManager subscriptions."""
-        svc = MarketDataService.__new__(MarketDataService)
-        svc._running = True
-        from pnlclaw_market.cache import MarketDataCache
-        from pnlclaw_market.event_bus import EventBus
-        from pnlclaw_market.snapshot_store import SnapshotStore
-
-        svc._cache = MarketDataCache()
-        svc._event_bus = EventBus()
-        svc._snapshot_store = SnapshotStore()
-        svc._stream_manager = MagicMock()
-        svc._stream_manager.start_stream = AsyncMock()
-        svc._l2_manager = MagicMock()
-        svc._l2_manager.initialize = AsyncMock()
-
-        await svc.add_symbol("BTC/USDT")
-
-        assert svc._stream_manager.start_stream.call_count == 3
-        svc._l2_manager.initialize.assert_awaited_once_with("BTCUSDT")
-
-    @pytest.mark.asyncio
-    async def test_ticker_to_event_bus_flow(self) -> None:
-        """Ticker callback → cache + event bus delivery."""
-        svc = MarketDataService.__new__(MarketDataService)
-        svc._running = True
-        from pnlclaw_market.cache import MarketDataCache
-        from pnlclaw_market.event_bus import EventBus
-
-        svc._cache = MarketDataCache()
-        svc._event_bus = EventBus()
-        svc._snapshot_store = MagicMock()
-        svc._stream_manager = MagicMock()
-
-        events: list[TickerEvent] = []
-        svc.on_ticker(events.append)
-
-        ticker = _make_ticker_event()
-        svc._on_ticker(ticker)
-
-        assert len(events) == 1
-        assert events[0].last_price == 42000.0
-        assert svc.get_ticker("BTC/USDT") is not None

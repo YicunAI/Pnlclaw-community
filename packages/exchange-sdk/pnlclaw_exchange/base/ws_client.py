@@ -10,6 +10,7 @@ restore them after a reconnection.
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 from abc import ABC, abstractmethod
@@ -50,6 +51,7 @@ class BaseWSClient(ABC):
         self._config = config
         self._subscriptions: set[str] = set()
         self._is_connected: bool = False
+        self._disconnected_event: asyncio.Event = asyncio.Event()
 
         # Public callbacks – may be reassigned after construction.
         self.on_message = on_message
@@ -123,12 +125,14 @@ class BaseWSClient(ABC):
     async def _dispatch_connect(self) -> None:
         """Mark the client as connected and invoke ``on_connect``."""
         self._is_connected = True
+        self._disconnected_event.clear()
         logger.info("WebSocket connected to %s (%s)", self._config.url, self._config.exchange)
         await self._invoke(self.on_connect)
 
     async def _dispatch_disconnect(self, code: int = 1000, reason: str = "") -> None:
         """Mark the client as disconnected and invoke ``on_disconnect``."""
         self._is_connected = False
+        self._disconnected_event.set()
         logger.info(
             "WebSocket disconnected from %s (code=%d, reason=%s)",
             self._config.url,
@@ -136,6 +140,10 @@ class BaseWSClient(ABC):
             reason,
         )
         await self._invoke(self.on_disconnect, code, reason)
+
+    async def wait_disconnected(self) -> None:
+        """Block until the WebSocket connection is lost."""
+        await self._disconnected_event.wait()
 
     # ------------------------------------------------------------------
     # Internal helpers
