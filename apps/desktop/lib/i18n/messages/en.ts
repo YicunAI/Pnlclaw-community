@@ -573,6 +573,7 @@ export const enMessages = {
   "settings.availableModels": "Available models",
   "settings.modelSelection": "Model Selection",
   "settings.smartMode": "Smart Mode",
+  "settings.current": "Current",
   "settings.currentModel": "Current model",
   "settings.smartModeDesc": "Smart mode automatically selects the best model based on task type:",
   "settings.strategyDrafting": "Strategy Drafting",

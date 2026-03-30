@@ -577,6 +577,7 @@ export const zhCNMessages: MessageMap = {
   "settings.availableModels": "可用模型",
   "settings.modelSelection": "模型选择",
   "settings.smartMode": "智能模式",
+  "settings.current": "当前",
   "settings.currentModel": "当前模型",
   "settings.smartModeDesc": "智能模式将根据任务类型自动选择最佳模型：",
   "settings.strategyDrafting": "策略起草",
