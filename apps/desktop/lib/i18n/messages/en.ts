@@ -214,6 +214,7 @@ export const enMessages = {
   "strategies.trades.unrealizedPnl": "Unrealized PnL",
   "strategies.trades.realizedPnl": "Realized PnL",
   "strategies.studio.noSignals": "No signals derived from trades",
+  "strategies.studio.loadVersion": "Load",
   "strategies.studio.status": "Status",
   "strategies.studio.createdAt": "Created",
   "strategies.studio.entryRules": "Entry Rules",
@@ -580,6 +581,8 @@ export const enMessages = {
   "settings.marketAnalysis": "Market Analysis",
   "settings.quickQueries": "Quick Queries",
   "settings.autoSelectEnabled": "Auto-select enabled",
+  "settings.selectModel": "Select model...",
+  "settings.noModelSelected": "Fetch the model list and select a model first",
 
   "settings.network": "Network",
   "settings.networkTitle": "Network Settings",

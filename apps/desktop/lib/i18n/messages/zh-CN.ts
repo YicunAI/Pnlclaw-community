@@ -225,6 +225,7 @@ export const zhCNMessages: MessageMap = {
   "strategies.trades.unrealizedPnl": "浮动盈亏",
   "strategies.trades.realizedPnl": "已实现盈亏",
   "strategies.studio.noSignals": "无法从成交记录推导信号",
+  "strategies.studio.loadVersion": "加载",
   "strategies.studio.status": "状态",
   "strategies.studio.createdAt": "创建时间",
   "strategies.card.sharpe": "夏普",
@@ -584,6 +585,8 @@ export const zhCNMessages: MessageMap = {
   "settings.marketAnalysis": "市场分析",
   "settings.quickQueries": "快速查询",
   "settings.autoSelectEnabled": "已启用自动选择",
+  "settings.selectModel": "选择模型...",
+  "settings.noModelSelected": "请先获取模型列表并选择模型",
 
   "settings.network": "网络",
   "settings.networkTitle": "网络设置",
