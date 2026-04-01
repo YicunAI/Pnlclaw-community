@@ -27,6 +27,16 @@ class StubSecretManager:
         key = f"{ref.provider}:{ref.id}"
         return key in self._store
 
+    async def resolve(self, ref):
+        from pnlclaw_security.secrets import ResolvedSecret, SecretResolutionError, SecretSource
+        key = f"{ref.provider}:{ref.id}"
+        if key not in self._store:
+            raise SecretResolutionError(f"not found: {key}")
+        class _R:
+            def use(self_):
+                return self._store[key]
+        return _R()
+
     async def store(self, ref, value: str) -> None:
         if not self._available:
             raise SecretResolutionError("keyring unavailable")

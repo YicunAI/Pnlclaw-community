@@ -14,6 +14,7 @@ out/
 dist/
 build/
 *.tsbuildinfo
+lint_errors.json
 
 # Python
 __pycache__/
@@ -23,6 +24,7 @@ __pycache__/
 venv/
 ENV/
 env/
+.mypy_cache/
 
 # Databases
 *.db
@@ -80,3 +82,6 @@ cache/
 
 # Local docs
 docs/
+
+# Claude AI instructions (local only)
+CLAUDE.md

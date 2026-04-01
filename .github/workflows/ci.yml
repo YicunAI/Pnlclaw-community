@@ -7,7 +7,7 @@ on:
     branches: [main, master]
 
 jobs:
-  lint:
+  python-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,21 +21,7 @@ jobs:
       - name: Format check
         run: ruff format --check .
 
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - name: Install dependencies
-        run: |
-          pip install -e ".[dev]"
-          pip install -e packages/shared-types
-      - name: Mypy
-        run: mypy packages/
-
-  test:
+  python-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,3 +34,22 @@ jobs:
           pip install -e packages/shared-types
       - name: Run tests
         run: pytest packages/ tests/ -q --tb=short
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install dependencies
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Type check
+        working-directory: apps/desktop
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: apps/desktop
+        run: npm run build

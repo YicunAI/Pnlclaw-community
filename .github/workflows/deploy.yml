@@ -1,0 +1,54 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  ci-gate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci-gate
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+
+            cd /opt/pnlclaw
+
+            echo "=== Pulling latest code ==="
+            git pull origin main
+
+            echo "=== Installing Python dependencies ==="
+            source /opt/pnlclaw/venv/bin/activate
+            pip install -e ".[dev]" -q
+            for pkg in packages/*/; do
+              if [ -f "$pkg/pyproject.toml" ]; then
+                pip install -e "$pkg" -q
+              fi
+            done
+
+            echo "=== Building frontend ==="
+            cd apps/desktop
+            npm ci --prefer-offline
+            npm run build
+            cd /opt/pnlclaw
+
+            echo "=== Restarting services ==="
+            systemctl restart pnlclaw-api
+            systemctl restart pnlclaw-web
+
+            echo "=== Verifying services ==="
+            sleep 3
+            systemctl is-active pnlclaw-api
+            systemctl is-active pnlclaw-web
+
+            echo "=== Deploy complete ==="

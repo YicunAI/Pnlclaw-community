@@ -12,6 +12,11 @@ from app.core.crypto import KeyPairManager, decrypt_if_encrypted
 
 logger = logging.getLogger(__name__)
 
+# Fields moved from settings.json into Keyring for privacy.
+# These reveal which LLM service and proxy the user is using.
+_LLM_KEYRING_FIELDS = ("base_url", "model", "provider")
+_LLM_SMART_KEYRING_FIELDS = ("strategy", "analysis", "quick")
+
 
 class SettingsService:
     """Persist non-sensitive settings and handle secret state in keyring."""
@@ -42,11 +47,40 @@ class SettingsService:
 
         settings["exchange"]["api_key_configured"] = exchange_key
         settings["exchange"]["api_secret_configured"] = exchange_secret
-        settings["exchange"]["api_key_masked"] = "••••••••" if exchange_key else ""
-        settings["exchange"]["api_secret_masked"] = "••••••••" if exchange_secret else ""
+        settings["exchange"]["api_key_masked"] = "\u2022" * 8 if exchange_key else ""
+        settings["exchange"]["api_secret_masked"] = "\u2022" * 8 if exchange_secret else ""
 
         settings["llm"]["api_key_configured"] = llm_key
-        settings["llm"]["api_key_masked"] = "••••••••" if llm_key else ""
+        settings["llm"]["api_key_masked"] = "\u2022" * 8 if llm_key else ""
+
+        # Restore keyring-stored LLM fields for the UI
+        for field in _LLM_KEYRING_FIELDS:
+            ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id=field)
+            try:
+                resolved = await self._secret_manager.resolve(ref)
+                settings["llm"][field] = resolved.use()
+            except Exception:
+                settings["llm"].setdefault(field, "")
+
+        # Restore smart_models from keyring
+        smart_models: dict[str, str] = {}
+        for sm_field in _LLM_SMART_KEYRING_FIELDS:
+            ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm.smart", id=sm_field)
+            try:
+                resolved = await self._secret_manager.resolve(ref)
+                smart_models[sm_field] = resolved.use()
+            except Exception:
+                smart_models[sm_field] = ""
+        settings["llm"]["smart_models"] = smart_models
+
+        # Restore proxy_url from keyring
+        try:
+            resolved = await self._secret_manager.resolve(
+                SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.network", id="proxy_url")
+            )
+            settings["network"]["proxy_url"] = resolved.use()
+        except Exception:
+            settings["network"].setdefault("proxy_url", "")
 
         settings["security"] = {
             "secret_backend": "keyring",
@@ -92,18 +126,27 @@ class SettingsService:
 
         if "llm" in payload and isinstance(payload["llm"], dict):
             llm = payload["llm"]
-            for key in ("provider", "base_url", "model"):
-                if key in llm:
-                    non_sensitive["llm"][key] = str(llm[key])
+
+            # Store provider-identifying fields in keyring, not settings.json
+            for field in _LLM_KEYRING_FIELDS:
+                if field in llm:
+                    await self._upsert_secret(
+                        SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id=field),
+                        value=str(llm[field]),
+                        clear=False,
+                    )
 
             if "smart_mode" in llm:
                 non_sensitive["llm"]["smart_mode"] = bool(llm["smart_mode"])
 
             if "smart_models" in llm and isinstance(llm["smart_models"], dict):
-                non_sensitive["llm"]["smart_models"] = {
-                    str(k): str(v) for k, v in llm["smart_models"].items()
-                    if k in ("strategy", "analysis", "quick")
-                }
+                for sm_field in _LLM_SMART_KEYRING_FIELDS:
+                    if sm_field in llm["smart_models"]:
+                        await self._upsert_secret(
+                            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm.smart", id=sm_field),
+                            value=str(llm["smart_models"][sm_field]),
+                            clear=False,
+                        )
 
             await self._upsert_secret(
                 SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id="api_key"),
@@ -123,7 +166,12 @@ class SettingsService:
         if "network" in payload and isinstance(payload["network"], dict):
             network = payload["network"]
             if "proxy_url" in network:
-                non_sensitive["network"]["proxy_url"] = str(network["proxy_url"]).strip()
+                # Store proxy_url in keyring — reveals network topology
+                await self._upsert_secret(
+                    SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.network", id="proxy_url"),
+                    value=str(network["proxy_url"]).strip(),
+                    clear=not str(network["proxy_url"]).strip(),
+                )
 
         if "skills" in payload and isinstance(payload["skills"], dict):
             skills = payload["skills"]
@@ -138,10 +186,12 @@ class SettingsService:
 
         if "ai" in payload and isinstance(payload["ai"], dict):
             ai_cfg = payload["ai"]
-            _AI_BOOL_KEYS = ("react_enabled", "show_thinking", "hallucination_check")
-            for key in _AI_BOOL_KEYS:
-                if key in ai_cfg:
-                    non_sensitive["ai"][key] = bool(ai_cfg[key])
+            if "react_enabled" in ai_cfg:
+                non_sensitive["ai"]["react_enabled"] = bool(ai_cfg["react_enabled"])
+            if "show_thinking" in ai_cfg:
+                non_sensitive["ai"]["show_thinking"] = bool(ai_cfg["show_thinking"])
+            if "hallucination_check" in ai_cfg:
+                non_sensitive["ai"]["hallucination_check"] = bool(ai_cfg["hallucination_check"])
             if "max_tool_rounds" in ai_cfg:
                 non_sensitive["ai"]["max_tool_rounds"] = max(1, int(ai_cfg["max_tool_rounds"]))
             if "compaction_threshold" in ai_cfg:
@@ -158,7 +208,7 @@ class SettingsService:
 
         if isinstance(value, str):
             candidate = value.strip()
-            if candidate and candidate != "••••••••":
+            if candidate and candidate != "\u2022" * 8:
                 try:
                     plaintext = decrypt_if_encrypted(self._key_pair_manager, candidate)
                 except ValueError:
@@ -178,15 +228,8 @@ class SettingsService:
                 "market_type": "spot",
             },
             "llm": {
-                "provider": "openai",
-                "base_url": "",
-                "model": "",
+                # provider/base_url/model/smart_models now stored in keyring
                 "smart_mode": False,
-                "smart_models": {
-                    "strategy": "",
-                    "analysis": "",
-                    "quick": "",
-                },
             },
             "risk": {
                 "max_position_pct": "10",
@@ -195,7 +238,7 @@ class SettingsService:
                 "cooldown_seconds": "300",
             },
             "network": {
-                "proxy_url": "",
+                # proxy_url now stored in keyring
             },
             "skills": {
                 "extra_dirs": [],
@@ -216,59 +259,46 @@ class SettingsService:
         try:
             loaded = json.loads(self._config_path.read_text(encoding="utf-8-sig"))
         except Exception:
+            logger.warning("Failed to load settings from %s, using defaults", self._config_path)
             return defaults
 
-        skills_data = loaded.get("skills")
-        if isinstance(skills_data, dict):
-            if isinstance(skills_data.get("extra_dirs"), list):
-                defaults["skills"]["extra_dirs"] = skills_data["extra_dirs"]
-            if isinstance(skills_data.get("enabled"), dict):
-                defaults["skills"]["enabled"] = skills_data["enabled"]
-
-        for section in ("general", "exchange", "risk", "network"):
-            data = loaded.get(section)
-            if isinstance(data, dict):
-                defaults[section].update({k: str(v) for k, v in data.items()})
-
-        llm_data = loaded.get("llm")
-        if isinstance(llm_data, dict):
-            for k, v in llm_data.items():
-                if k == "smart_mode":
-                    defaults["llm"]["smart_mode"] = bool(v) if not isinstance(v, str) else v.lower() == "true"
-                elif k == "smart_models" and isinstance(v, dict):
-                    defaults["llm"]["smart_models"] = {str(mk): str(mv) for mk, mv in v.items()}
-                else:
-                    defaults["llm"][k] = str(v) if not isinstance(v, (bool, dict, list)) else v
-
-        ai_data = loaded.get("ai")
-        if isinstance(ai_data, dict):
-            for k in ("react_enabled", "show_thinking", "hallucination_check"):
-                if k in ai_data:
-                    defaults["ai"][k] = bool(ai_data[k])
-            if "max_tool_rounds" in ai_data:
-                defaults["ai"]["max_tool_rounds"] = int(ai_data["max_tool_rounds"])
-            if "compaction_threshold" in ai_data:
-                defaults["ai"]["compaction_threshold"] = float(ai_data["compaction_threshold"])
+        # Deep merge loaded over defaults
+        for section, section_defaults in defaults.items():
+            if section in loaded and isinstance(loaded[section], dict) and isinstance(section_defaults, dict):
+                merged = dict(section_defaults)
+                merged.update(loaded[section])
+                defaults[section] = merged
+            elif section in loaded:
+                defaults[section] = loaded[section]
 
         return defaults
 
-    def _save_non_sensitive(self, settings: dict[str, Any]) -> None:
-        payload = {
-            "general": settings["general"],
-            "exchange": settings["exchange"],
-            "llm": settings["llm"],
-            "risk": settings["risk"],
-            "network": settings["network"],
-            "skills": settings.get("skills", {"extra_dirs": [], "enabled": {}}),
-            "ai": settings.get("ai", {
-                "react_enabled": True,
-                "max_tool_rounds": 10,
-                "show_thinking": True,
-                "hallucination_check": True,
-                "compaction_threshold": 0.8,
-            }),
-        }
-        atomic_write(self._config_path, json.dumps(payload, ensure_ascii=False, indent=2))
+    def _save_non_sensitive(self, data: dict[str, Any]) -> None:
+        # Strip any sensitive fields that should not be persisted to disk
+        safe = {}
+        for section, values in data.items():
+            if not isinstance(values, dict):
+                safe[section] = values
+                continue
+            if section == "llm":
+                # Only persist non-identifying flags
+                safe[section] = {k: v for k, v in values.items() if k == "smart_mode"}
+            elif section == "network":
+                # proxy_url is in keyring; nothing to persist here
+                safe[section] = {}
+            else:
+                safe[section] = values
+        atomic_write(self._config_path, json.dumps(safe, ensure_ascii=False, indent=2))
+
+    def get_llm_config(self) -> dict[str, Any]:
+        """Return LLM config for internal use — not exposed via API."""
+        data = self._load_non_sensitive()
+        return data.get("llm", {})
+
+    def get_mcp_config(self) -> dict[str, Any]:
+        """Return only the MCP configuration section."""
+        data = self._load_non_sensitive()
+        return data.get("mcp", {"servers": {}})
 
     def get_skills_config(self) -> dict[str, Any]:
         """Return only the skills configuration section."""

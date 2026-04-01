@@ -1,0 +1,7 @@
+# Pro-only files - DO NOT sync to community repository
+# One path per line, supports glob patterns
+# This file itself is also pro-only
+
+.pro-only
+.github/workflows/deploy.yml
+scripts/sync-community.sh
