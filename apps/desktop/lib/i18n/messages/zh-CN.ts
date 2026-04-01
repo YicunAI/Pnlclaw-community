@@ -510,9 +510,6 @@ export const zhCNMessages: MessageMap = {
   "settings.saving": "保存中...",
   "settings.saved": "已保存！",
   "settings.save": "保存设置",
-  "settings.current": "当前",
-  "settings.selectModel": "选择模型...",
-  "settings.noModelSelected": "未选择模型",
   "settings.loadError": "加载设置失败",
   "settings.saveError": "保存设置失败",
   "settings.general": "通用",
@@ -838,5 +835,4 @@ export const zhCNMessages: MessageMap = {
   "runner.lastSignal": "最近信号",
   "runner.deployedAt": "部署时间",
   "runner.strategyRunning": "策略运行中",
-  "strategies.studio.loadVersion": "加载",
 }
