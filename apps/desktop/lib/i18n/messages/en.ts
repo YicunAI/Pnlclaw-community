@@ -506,6 +506,9 @@ export const enMessages = {
   "settings.saving": "Saving...",
   "settings.saved": "Saved!",
   "settings.save": "Save Settings",
+  "settings.current": "Current",
+  "settings.selectModel": "Select model...",
+  "settings.noModelSelected": "No model selected",
   "settings.loadError": "Failed to load settings",
   "settings.saveError": "Failed to save settings",
   "settings.general": "General",
@@ -831,4 +834,5 @@ export const enMessages = {
   "runner.lastSignal": "Last Signal",
   "runner.deployedAt": "Deployed At",
   "runner.strategyRunning": "Strategy Running",
+  "strategies.studio.loadVersion": "Load",
 } as const

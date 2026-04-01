@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TradingOrder, TradingPosition, TradingBalance, TradingFill } from "./api-client"
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080"
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== "undefined" ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}` : "ws://localhost:8080")
 const RECONNECT_MS = 3000
 const STALE_AFTER_MS = 5000
 

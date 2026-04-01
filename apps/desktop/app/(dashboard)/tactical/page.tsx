@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useI18n } from "@/components/i18n/use-i18n"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || ""
 
 interface FundingRateRow {
   exchange: string

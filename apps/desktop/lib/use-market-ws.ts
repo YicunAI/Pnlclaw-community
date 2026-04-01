@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { TickerData, KlineData, OrderbookData, ExchangeProvider, MarketType } from "./api-client"
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080"
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== "undefined" ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}` : "ws://localhost:8080")
 
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
