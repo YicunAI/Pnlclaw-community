@@ -10,9 +10,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.core.dependencies import (
     AuthenticatedUser,
     build_response_meta,
-    get_login_history_repo,
     get_postgres_manager,
-    get_user_repo,
     require_admin,
 )
 from pnlclaw_types.common import APIResponse
@@ -75,6 +73,7 @@ def _serialize_row(row: Any) -> dict[str, Any]:
     """Ensure all values in a row dict are JSON-serializable."""
     import uuid as _uuid
     from datetime import date, datetime
+
     d = dict(row)
     for k, v in d.items():
         if isinstance(v, datetime):

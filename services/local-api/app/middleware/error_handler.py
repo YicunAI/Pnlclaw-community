@@ -37,9 +37,7 @@ def install_error_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=status, content=body)
 
     @app.exception_handler(RequestValidationError)
-    async def _handle_validation_error(
-        request: Request, exc: RequestValidationError
-    ) -> JSONResponse:
+    async def _handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
         """Pydantic / FastAPI validation errors → 422."""
         details = [
             {

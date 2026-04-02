@@ -123,9 +123,7 @@ class AsyncSQLiteManager:
             raise ConnectionError("Database not connected. Call connect() first.")
         return self._read_conn
 
-    async def query(
-        self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()
-    ) -> list[aiosqlite.Row]:
+    async def query(self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()) -> list[aiosqlite.Row]:
         """Execute a read-only SQL query (SELECT) on the dedicated read connection.
 
         Runs concurrently with writes thanks to WAL mode, so reads never
@@ -137,9 +135,7 @@ class AsyncSQLiteManager:
             rows = await cursor.fetchall()
             return cast(list[aiosqlite.Row], rows)
 
-    async def execute(
-        self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()
-    ) -> list[aiosqlite.Row]:
+    async def execute(self, sql: str, params: tuple[Any, ...] | dict[str, Any] = ()) -> list[aiosqlite.Row]:
         """Execute a SQL statement (INSERT/UPDATE/DELETE) and commit.
 
         Serialized via ``_write_lock`` to prevent concurrent writes on

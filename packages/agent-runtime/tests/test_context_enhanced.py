@@ -6,8 +6,7 @@ and market context injection.
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -50,6 +49,7 @@ class TestTiktokenCounting:
         text = "a" * 400
         # Fallback: 400 / 4 = 100
         from pnlclaw_agent.context.manager import _FALLBACK_CHARS_PER_TOKEN
+
         fallback_estimate = max(1, len(text) // _FALLBACK_CHARS_PER_TOKEN)
         assert fallback_estimate == 100
 
@@ -64,9 +64,11 @@ class TestAutoCompaction:
     async def test_compaction_triggered_when_threshold_exceeded(self) -> None:
         """When token count exceeds threshold × budget, compaction fires."""
         mock_compactor = AsyncMock()
-        mock_compactor.compact = AsyncMock(return_value=[
-            ChatMessage(role="system", content="[compacted]", timestamp=0),
-        ])
+        mock_compactor.compact = AsyncMock(
+            return_value=[
+                ChatMessage(role="system", content="[compacted]", timestamp=0),
+            ]
+        )
 
         cm = ContextManager(
             max_tokens=100,

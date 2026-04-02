@@ -48,9 +48,7 @@ class GitHubOAuthProvider:
         )
         return url
 
-    async def exchange_code(
-        self, code: str, redirect_uri: str, code_verifier: str | None = None
-    ) -> OAuthTokenResponse:
+    async def exchange_code(self, code: str, redirect_uri: str, code_verifier: str | None = None) -> OAuthTokenResponse:
         """Exchange an authorization code for tokens with GitHub."""
         client = self._make_client()
         try:

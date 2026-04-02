@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pnlclaw_agent.skills.prompt import (
     format_skills_compact,
     format_skills_for_prompt,
@@ -11,10 +9,9 @@ from pnlclaw_agent.skills.prompt import (
 from pnlclaw_agent.skills.types import (
     Skill,
     SkillFrontmatter,
-    SkillSource,
     SkillsLimits,
+    SkillSource,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -257,7 +257,7 @@ async def require_auth(request: Request) -> AuthenticatedUser:
             message="Missing or invalid Authorization header",
         )
 
-    token = auth_header[len("Bearer "):]
+    token = auth_header[len("Bearer ") :]
     jwt_mgr = get_jwt_manager()
     if jwt_mgr is None:
         raise PnLClawError(

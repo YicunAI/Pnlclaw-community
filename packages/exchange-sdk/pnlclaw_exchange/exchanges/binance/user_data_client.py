@@ -135,9 +135,7 @@ class BinanceUserDataClient(BaseWSClient):
 
         self._api_key = api_key
         self._api_secret = api_secret
-        self._normalizer = BinanceUserDataNormalizer(
-            symbol_normalizer or SymbolNormalizer()
-        )
+        self._normalizer = BinanceUserDataNormalizer(symbol_normalizer or SymbolNormalizer())
         self._ws: websockets.asyncio.client.ClientConnection | None = None
         self._receive_task: asyncio.Task[None] | None = None
         self._request_id: int = 0
@@ -162,9 +160,7 @@ class BinanceUserDataClient(BaseWSClient):
         self._ws = await websockets.asyncio.client.connect(self._config.url)
         await self._dispatch_connect()
         await self._stall_watchdog.start()
-        self._receive_task = asyncio.create_task(
-            self._receive_loop(), name="binance-userdata-recv"
-        )
+        self._receive_task = asyncio.create_task(self._receive_loop(), name="binance-userdata-recv")
 
     async def subscribe(self, streams: list[str]) -> None:
         """Authenticate and subscribe to user data stream.
@@ -233,9 +229,7 @@ class BinanceUserDataClient(BaseWSClient):
             "timestamp": timestamp,
         }
         query_str = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
-        signature = hmac.new(
-            self._api_secret.encode(), query_str.encode(), hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(self._api_secret.encode(), query_str.encode(), hashlib.sha256).hexdigest()
         params["signature"] = signature
 
         msg = {
@@ -282,9 +276,7 @@ class BinanceUserDataClient(BaseWSClient):
             status = data.get("status")
             if status and status != 200:
                 logger.error("Binance WS API error: %s", data)
-                await self._dispatch_error(
-                    RuntimeError(f"Binance WS API error: {data}")
-                )
+                await self._dispatch_error(RuntimeError(f"Binance WS API error: {data}"))
             return
 
         # User data stream event envelope: {"subscriptionId": N, "event": {...}}

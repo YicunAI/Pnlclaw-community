@@ -18,11 +18,10 @@ from app.core.dependencies import (
     get_paper_account_manager,
     get_paper_order_manager,
     get_paper_position_manager,
-    get_risk_engine,
-    set_risk_engine,
 )
 from app.main import create_app
 from httpx import ASGITransport, AsyncClient
+
 from pnlclaw_paper.accounts import AccountManager
 from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_paper.positions import PositionManager
@@ -207,11 +206,11 @@ async def test_strategy_returns_symbol_field():
 @pytest.mark.asyncio
 async def test_risk_engine_blocks_when_configured():
     """POST /trading/orders: risk engine blocks order when conditions are met."""
+    from app.core.dependencies import set_risk_engine as _set_risk
+
     from pnlclaw_paper.paper_execution import PaperExecutionEngine
     from pnlclaw_risk.engine import RiskEngine
     from pnlclaw_risk.rules import SymbolBlacklistRule
-
-    from app.core.dependencies import set_risk_engine as _set_risk
 
     app = create_app()
     paper_engine = PaperExecutionEngine(initial_balance=100000)
@@ -247,11 +246,11 @@ async def test_risk_engine_blocks_when_configured():
 @pytest.mark.asyncio
 async def test_risk_engine_allows_normal_order():
     """POST /trading/orders: normal order passes risk checks."""
+    from app.core.dependencies import set_risk_engine as _set_risk
+
     from pnlclaw_paper.paper_execution import PaperExecutionEngine
     from pnlclaw_risk.engine import RiskEngine
     from pnlclaw_risk.rules import create_default_rules
-
-    from app.core.dependencies import set_risk_engine as _set_risk
 
     app = create_app()
     paper_engine = PaperExecutionEngine(initial_balance=100000)

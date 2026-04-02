@@ -127,9 +127,7 @@ class TestVolatilityMismatch:
 
     def test_custom_threshold(self) -> None:
         detector = RegimeMismatchDetector()
-        result = detector.check_volatility_mismatch(
-            StrategyType.SMA_CROSS, volatility=0.6, max_volatility=0.5
-        )
+        result = detector.check_volatility_mismatch(StrategyType.SMA_CROSS, volatility=0.6, max_volatility=0.5)
         assert result is not None
 
 

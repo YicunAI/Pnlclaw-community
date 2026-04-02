@@ -129,9 +129,7 @@ class BinanceL2Manager:
             except Exception:
                 logger.warning("L2 re-init failed for %s", key, exc_info=True)
 
-    async def apply_delta(
-        self, symbol: str, delta: BinanceDepthDelta
-    ) -> bool:
+    async def apply_delta(self, symbol: str, delta: BinanceDepthDelta) -> bool:
         """Apply a depth delta to the local orderbook.
 
         Implements the Binance diff depth stream protocol (steps 3-5).
@@ -161,17 +159,13 @@ class BinanceL2Manager:
 
         # Step 4: First delta after snapshot.
         if not book.initialized:
-            if (
-                delta.first_update_id <= book.last_update_id + 1
-                and delta.last_update_id >= book.last_update_id + 1
-            ):
+            if delta.first_update_id <= book.last_update_id + 1 and delta.last_update_id >= book.last_update_id + 1:
                 book.initialized = True
             elif delta.last_update_id <= book.last_update_id:
                 return False
             else:
                 logger.info(
-                    "Accepting first delta for %s with gap "
-                    "(snapshot=%d, delta U=%d u=%d)",
+                    "Accepting first delta for %s with gap (snapshot=%d, delta U=%d u=%d)",
                     symbol,
                     book.last_update_id,
                     delta.first_update_id,

@@ -28,7 +28,7 @@ def _strip_prefix(user: AuthenticatedUser, prefixed: str) -> str | None:
         return prefixed
     prefix = f"{user.id}:"
     if prefixed.startswith(prefix):
-        return prefixed[len(prefix):]
+        return prefixed[len(prefix) :]
     return None
 
 
@@ -90,17 +90,19 @@ async def list_mcp_servers(
         display_name = _strip_prefix(user, s.name)
         if display_name is None:
             continue
-        result.append({
-            "name": display_name,
-            "connected": s.connected,
-            "tool_count": s.tool_count,
-            "error": s.error,
-            "transport": s.config.transport.value if hasattr(s.config, "transport") else "stdio",
-            "tools": [
-                {"server_name": display_name, "tool_name": t.tool_name, "description": t.description}
-                for t in s.tools
-            ],
-        })
+        result.append(
+            {
+                "name": display_name,
+                "connected": s.connected,
+                "tool_count": s.tool_count,
+                "error": s.error,
+                "transport": s.config.transport.value if hasattr(s.config, "transport") else "stdio",
+                "tools": [
+                    {"server_name": display_name, "tool_name": t.tool_name, "description": t.description}
+                    for t in s.tools
+                ],
+            }
+        )
     return {"servers": result}
 
 
@@ -193,10 +195,12 @@ async def list_mcp_tools(
         display_name = _strip_prefix(user, t.server_name)
         if display_name is None:
             continue
-        result.append({
-            "server_name": display_name,
-            "tool_name": t.tool_name,
-            "registered_name": f"mcp_{display_name}_{t.tool_name}",
-            "description": t.description,
-        })
+        result.append(
+            {
+                "server_name": display_name,
+                "tool_name": t.tool_name,
+                "registered_name": f"mcp_{display_name}_{t.tool_name}",
+                "description": t.description,
+            }
+        )
     return {"tools": result}

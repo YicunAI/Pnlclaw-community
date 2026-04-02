@@ -115,7 +115,10 @@ class PositionManager:
         if existing is None or existing.quantity == 0:
             margin = fill_usdt / leverage
             liq = _estimate_liquidation_price(
-                fill.price, leverage, side, margin_mode,
+                fill.price,
+                leverage,
+                side,
+                margin_mode,
                 available_balance=available_balance,
                 position_usdt=fill_usdt,
             )
@@ -145,14 +148,19 @@ class PositionManager:
             new_qty = existing.quantity + fill_usdt
             new_base = existing.quantity_base + fill_base
             new_avg = (
-                existing.avg_entry_price * existing.quantity_base + fill.price * fill_base
-            ) / new_base if new_base > 0 else fill.price
+                (existing.avg_entry_price * existing.quantity_base + fill.price * fill_base) / new_base
+                if new_base > 0
+                else fill.price
+            )
             existing.quantity = new_qty
             existing.quantity_base = new_base
             existing.avg_entry_price = new_avg
             existing.margin = new_qty / existing.leverage
             existing.liquidation_price = _estimate_liquidation_price(
-                new_avg, existing.leverage, side, existing.margin_mode,
+                new_avg,
+                existing.leverage,
+                side,
+                existing.margin_mode,
                 available_balance=available_balance,
                 position_usdt=new_qty,
             )
@@ -181,9 +189,7 @@ class PositionManager:
                 existing.quantity_base = remaining_base
                 existing.avg_entry_price = fill.price
                 existing.margin = remaining_usdt / leverage
-                existing.liquidation_price = _estimate_liquidation_price(
-                    fill.price, leverage, side, margin_mode
-                )
+                existing.liquidation_price = _estimate_liquidation_price(fill.price, leverage, side, margin_mode)
             elif existing.quantity <= 0:
                 existing.quantity = 0
                 existing.quantity_base = 0
@@ -228,19 +234,14 @@ class PositionManager:
 
     def clear_positions(self, account_id: str) -> None:
         """Remove all positions for an account."""
-        keys_to_delete = [
-            k for k in self._positions.keys() if k[0] == account_id
-        ]
+        keys_to_delete = [k for k in self._positions.keys() if k[0] == account_id]
         for k in keys_to_delete:
             del self._positions[k]
 
     # -- serialization ---------------------------------------------------------
 
     def get_all_data(self) -> dict[str, Any]:
-        return {
-            f"{aid}:{sym}:{ps}": pos.model_dump()
-            for (aid, sym, ps), pos in self._positions.items()
-        }
+        return {f"{aid}:{sym}:{ps}": pos.model_dump() for (aid, sym, ps), pos in self._positions.items()}
 
     def load_data(self, data: dict[str, Any]) -> None:
         self._positions = {}

@@ -84,9 +84,7 @@ class OKXNormalizer:
             change_24h_pct=round(change_pct, 4),
         )
 
-    def normalize_candle(
-        self, candle: list[str], inst_id: str, channel: str
-    ) -> KlineEvent:
+    def normalize_candle(self, candle: list[str], inst_id: str, channel: str) -> KlineEvent:
         """Normalize an OKX candlestick push data item.
 
         OKX candle array: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
@@ -120,9 +118,7 @@ class OKXNormalizer:
             side=data["side"],
         )
 
-    def normalize_liquidation(
-        self, data: dict[str, Any], inst_id: str
-    ) -> list[LiquidationEvent]:
+    def normalize_liquidation(self, data: dict[str, Any], inst_id: str) -> list[LiquidationEvent]:
         """Normalize an OKX liquidation-orders channel push.
 
         OKX pushes ``details`` array inside each item, each detail being
@@ -136,22 +132,22 @@ class OKXNormalizer:
             qty = float(detail.get("sz", 0))
             price = float(detail.get("bkPx", 0))
             notional = qty * price
-            results.append(LiquidationEvent(
-                exchange=EXCHANGE,
-                symbol=symbol,
-                side=side,
-                quantity=qty,
-                price=price,
-                avg_price=price,
-                notional_usd=notional,
-                status="FILLED",
-                timestamp=int(detail.get("ts", 0)),
-            ))
+            results.append(
+                LiquidationEvent(
+                    exchange=EXCHANGE,
+                    symbol=symbol,
+                    side=side,
+                    quantity=qty,
+                    price=price,
+                    avg_price=price,
+                    notional_usd=notional,
+                    status="FILLED",
+                    timestamp=int(detail.get("ts", 0)),
+                )
+            )
         return results
 
-    def normalize_funding_rate(
-        self, data: dict[str, Any], inst_id: str
-    ) -> FundingRateEvent:
+    def normalize_funding_rate(self, data: dict[str, Any], inst_id: str) -> FundingRateEvent:
         """Normalize an OKX funding rate REST response item."""
         return FundingRateEvent(
             exchange=EXCHANGE,
@@ -163,9 +159,7 @@ class OKXNormalizer:
             timestamp=int(data.get("fundingTime", 0) or data.get("ts", 0) or 0),
         )
 
-    def normalize_orderbook(
-        self, data: dict[str, Any], inst_id: str
-    ) -> OrderBookL2Snapshot:
+    def normalize_orderbook(self, data: dict[str, Any], inst_id: str) -> OrderBookL2Snapshot:
         """Normalize an OKX books5 push data item.
 
         OKX books5 levels: ``[[price, size, deprecated, numOrders], ...]``
@@ -174,11 +168,7 @@ class OKXNormalizer:
         ts = int(ts_raw) if ts_raw else int(time.time() * 1000)
 
         def _parse_levels(raw: list[list[str]]) -> list[PriceLevel]:
-            return [
-                PriceLevel(price=float(lv[0]), quantity=float(lv[1]))
-                for lv in raw
-                if len(lv) >= 2
-            ]
+            return [PriceLevel(price=float(lv[0]), quantity=float(lv[1])) for lv in raw if len(lv) >= 2]
 
         return OrderBookL2Snapshot(
             exchange=EXCHANGE,

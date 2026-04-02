@@ -24,9 +24,7 @@ logger = logging.getLogger(__name__)
 class OAuthAccountRepository(Protocol):
     """Minimal persistence interface for OAuth account records."""
 
-    async def get_by_provider_uid(
-        self, provider: str, provider_user_id: str
-    ) -> dict[str, Any] | None:
+    async def get_by_provider_uid(self, provider: str, provider_user_id: str) -> dict[str, Any] | None:
         """Look up an OAuth account by provider + provider user ID."""
         ...
 
@@ -101,15 +99,11 @@ class AccountLinker:
             raise AuthenticationError("User not found")
 
         # Check if provider_user_id is already linked to another user
-        existing = await self._oauth.get_by_provider_uid(
-            oauth_info.provider, oauth_info.provider_user_id
-        )
+        existing = await self._oauth.get_by_provider_uid(oauth_info.provider, oauth_info.provider_user_id)
         if existing is not None:
             existing_user_id = existing.get("user_id")
             if str(existing_user_id) != str(user_id):
-                raise OAuthError(
-                    f"This {oauth_info.provider} account is already linked to another user"
-                )
+                raise OAuthError(f"This {oauth_info.provider} account is already linked to another user")
             # Already linked to the same user — return existing
             return existing
 
@@ -139,10 +133,7 @@ class AccountLinker:
         """
         count = await self._oauth.count_for_user(user_id)
         if count <= 1:
-            raise OAuthError(
-                "Cannot unlink the last OAuth provider — the user would have "
-                "no remaining login method"
-            )
+            raise OAuthError("Cannot unlink the last OAuth provider — the user would have no remaining login method")
 
         await self._oauth.delete(user_id, provider)
         logger.info("Unlinked %s from user %s", provider, user_id)

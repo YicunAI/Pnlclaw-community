@@ -63,9 +63,7 @@ class StrategyDraft(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="When the draft was created",
     )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="Arbitrary metadata (source, author, etc.)"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Arbitrary metadata (source, author, etc.)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -95,9 +93,7 @@ class ValidatedStrategy(BaseModel):
 
     config: EngineStrategyConfig = Field(..., description="The strategy configuration")
     state: StrategyState = Field(StrategyState.VALIDATED, description="Current lifecycle state")
-    validation_result: ValidationResult = Field(
-        ..., description="Validation result (should be valid)"
-    )
+    validation_result: ValidationResult = Field(..., description="Validation result (should be valid)")
     validated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         description="When validation passed",
@@ -178,8 +174,7 @@ def validate_draft(
     """
     if draft.state != StrategyState.DRAFT:
         raise LifecycleError(
-            f"Cannot validate strategy in state '{draft.state.value}' "
-            f"(expected '{StrategyState.DRAFT.value}')"
+            f"Cannot validate strategy in state '{draft.state.value}' (expected '{StrategyState.DRAFT.value}')"
         )
 
     result = validate(draft.config, available_indicators=available_indicators)
@@ -257,7 +252,5 @@ def transition(from_state: StrategyState, to_state: StrategyState) -> StrategySt
         LifecycleError: If the transition is not allowed.
     """
     if not can_transition(from_state, to_state):
-        raise LifecycleError(
-            f"Invalid transition: {from_state.value} → {to_state.value}"
-        )
+        raise LifecycleError(f"Invalid transition: {from_state.value} → {to_state.value}")
     return to_state

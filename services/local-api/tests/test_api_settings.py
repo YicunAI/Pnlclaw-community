@@ -12,6 +12,7 @@ from app.main import create_app
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from httpx import ASGITransport, AsyncClient
+
 from pnlclaw_security.secrets import SecretResolutionError
 
 
@@ -28,13 +29,16 @@ class StubSecretManager:
         return key in self._store
 
     async def resolve(self, ref):
-        from pnlclaw_security.secrets import ResolvedSecret, SecretResolutionError, SecretSource
+        from pnlclaw_security.secrets import SecretResolutionError
+
         key = f"{ref.provider}:{ref.id}"
         if key not in self._store:
             raise SecretResolutionError(f"not found: {key}")
+
         class _R:
             def use(self_):
                 return self._store[key]
+
         return _R()
 
     async def store(self, ref, value: str) -> None:
@@ -128,8 +132,6 @@ async def test_put_settings_clear_secret(tmp_path):
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["llm"]["api_key_configured"] is False
-
-
 
 
 @pytest.mark.asyncio

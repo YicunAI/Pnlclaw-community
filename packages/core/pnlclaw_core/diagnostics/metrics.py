@@ -50,9 +50,7 @@ class MetricsCollector:
                     "values": {},  # label_key → value
                 }
 
-    def increment(
-        self, name: str, value: float = 1.0, labels: dict[str, str] | None = None
-    ) -> None:
+    def increment(self, name: str, value: float = 1.0, labels: dict[str, str] | None = None) -> None:
         """Increment a counter metric."""
         key = self._label_key(labels)
         with self._lock:

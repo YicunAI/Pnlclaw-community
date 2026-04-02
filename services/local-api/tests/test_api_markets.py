@@ -65,7 +65,9 @@ class StubMarketService:
         src = self._sources.get((exchange, market_type))
         return src.get_kline(symbol) if src else None
 
-    def get_orderbook(self, symbol: str, exchange: str = "binance", market_type: str = "spot") -> OrderBookL2Snapshot | None:
+    def get_orderbook(
+        self, symbol: str, exchange: str = "binance", market_type: str = "spot"
+    ) -> OrderBookL2Snapshot | None:
         src = self._sources.get((exchange, market_type))
         return src.get_orderbook(symbol) if src else None
 

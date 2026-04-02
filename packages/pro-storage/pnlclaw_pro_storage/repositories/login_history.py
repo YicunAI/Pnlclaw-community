@@ -92,28 +92,19 @@ class LoginHistoryRepository:
         ordered by count descending.
         """
         async with self._db.session() as session:
-            stmt = (
-                select(
-                    LoginHistory.country,
-                    func.count().label("count"),
-                )
-                .where(LoginHistory.success.is_(True))
-            )
+            stmt = select(
+                LoginHistory.country,
+                func.count().label("count"),
+            ).where(LoginHistory.success.is_(True))
 
             if start is not None:
                 stmt = stmt.where(LoginHistory.created_at >= start)
             if end is not None:
                 stmt = stmt.where(LoginHistory.created_at <= end)
 
-            stmt = (
-                stmt.group_by(LoginHistory.country)
-                .order_by(func.count().desc())
-            )
+            stmt = stmt.group_by(LoginHistory.country).order_by(func.count().desc())
             result = await session.execute(stmt)
-            return [
-                {"country": row.country, "count": row.count}
-                for row in result.all()
-            ]
+            return [{"country": row.country, "count": row.count} for row in result.all()]
 
     async def get_device_distribution(
         self,
@@ -126,29 +117,23 @@ class LoginHistoryRepository:
         and ``count`` keys, ordered by count descending.
         """
         async with self._db.session() as session:
-            stmt = (
-                select(
-                    LoginHistory.device_type,
-                    LoginHistory.os,
-                    LoginHistory.browser,
-                    func.count().label("count"),
-                )
-                .where(LoginHistory.success.is_(True))
-            )
+            stmt = select(
+                LoginHistory.device_type,
+                LoginHistory.os,
+                LoginHistory.browser,
+                func.count().label("count"),
+            ).where(LoginHistory.success.is_(True))
 
             if start is not None:
                 stmt = stmt.where(LoginHistory.created_at >= start)
             if end is not None:
                 stmt = stmt.where(LoginHistory.created_at <= end)
 
-            stmt = (
-                stmt.group_by(
-                    LoginHistory.device_type,
-                    LoginHistory.os,
-                    LoginHistory.browser,
-                )
-                .order_by(func.count().desc())
-            )
+            stmt = stmt.group_by(
+                LoginHistory.device_type,
+                LoginHistory.os,
+                LoginHistory.browser,
+            ).order_by(func.count().desc())
             result = await session.execute(stmt)
             return [
                 {

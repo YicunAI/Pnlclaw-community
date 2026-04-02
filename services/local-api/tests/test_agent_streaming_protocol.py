@@ -7,7 +7,6 @@ and that the WS endpoint maps events consistently.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -17,12 +16,13 @@ import pytest
 from app.core.dependencies import get_agent_runtime, get_settings_service
 from app.main import create_app
 from httpx import ASGITransport, AsyncClient
-from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
 
+from pnlclaw_types.agent import AgentStreamEvent, AgentStreamEventType
 
 # ---------------------------------------------------------------------------
 # Mock runtime that produces a full ReAct event sequence
 # ---------------------------------------------------------------------------
+
 
 class _ReActMockRuntime:
     """Produces the canonical event sequence for testing."""

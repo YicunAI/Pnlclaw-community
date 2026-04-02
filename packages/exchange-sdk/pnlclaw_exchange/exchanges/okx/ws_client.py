@@ -258,10 +258,12 @@ class OKXWSClient(BaseWSClient):
         Sends on the public WS.
         """
         if self._ws_public:
-            msg = json.dumps({
-                "op": "subscribe",
-                "args": [{"channel": "liquidation-orders", "instType": inst_type}],
-            })
+            msg = json.dumps(
+                {
+                    "op": "subscribe",
+                    "args": [{"channel": "liquidation-orders", "instType": inst_type}],
+                }
+            )
             await self._ws_public.send(msg)
             self._subscriptions.add(f"liquidation-orders:{inst_type}")
             self._stall_watchdog.arm()
@@ -278,9 +280,7 @@ class OKXWSClient(BaseWSClient):
             return {"channel": channel, "instType": value}
         return {"channel": channel, "instId": value}
 
-    async def _receive_loop(
-        self, ws: websockets.asyncio.client.ClientConnection, label: str
-    ) -> None:
+    async def _receive_loop(self, ws: websockets.asyncio.client.ClientConnection, label: str) -> None:
         """Read messages from one WebSocket and route them."""
         try:
             async for raw in ws:
@@ -304,14 +304,14 @@ class OKXWSClient(BaseWSClient):
                     await self._route_message(data)
                 except Exception as route_exc:
                     logger.debug(
-                        "Skipping unprocessable OKX %s message: %s", label, route_exc,
+                        "Skipping unprocessable OKX %s message: %s",
+                        label,
+                        route_exc,
                     )
                     continue
         except websockets.ConnectionClosed as exc:
             logger.info("OKX %s WS connection closed: %s", label, exc)
-            await self._dispatch_disconnect(
-                code=getattr(exc, "code", 1006), reason=str(exc)
-            )
+            await self._dispatch_disconnect(code=getattr(exc, "code", 1006), reason=str(exc))
         except asyncio.CancelledError:
             raise
         except Exception as exc:

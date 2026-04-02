@@ -61,9 +61,7 @@ class HealthRegistry:
                         )
                     )
                 else:
-                    results.append(
-                        HealthCheckResult(name=name, status="healthy", latency_ms=latency)
-                    )
+                    results.append(HealthCheckResult(name=name, status="healthy", latency_ms=latency))
             except Exception as exc:
                 latency = (time.monotonic() - start) * 1000
                 results.append(

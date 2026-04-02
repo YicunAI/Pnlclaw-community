@@ -97,9 +97,7 @@ _RAW_PATTERNS: list[tuple[str, str, int]] = [
 ]
 
 # PEM blocks handled separately with multi-line regex
-_PEM_PATTERN = re.compile(
-    r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----"
-)
+_PEM_PATTERN = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----")
 
 
 def _build_default_replacement(pattern: re.Pattern[str]) -> re.Pattern[str]:

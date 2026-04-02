@@ -240,9 +240,7 @@ class DecisionPipeline:
         """Log an audit event if logger is available."""
         if self._audit is None:
             return
-        severity = (
-            AuditSeverity.INFO if result.action == PipelineAction.EXECUTED else AuditSeverity.WARN
-        )
+        severity = AuditSeverity.INFO if result.action == PipelineAction.EXECUTED else AuditSeverity.WARN
         self._audit.log(
             AuditEvent(
                 event_type=AuditEventType.ORDER_INTENT,

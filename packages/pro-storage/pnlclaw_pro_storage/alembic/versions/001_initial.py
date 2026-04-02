@@ -9,9 +9,9 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
-from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 
 def upgrade() -> None:

@@ -101,9 +101,7 @@ async def test_error_when_not_connected():
 @pytest.mark.asyncio
 async def test_default_migrations_run_without_runner():
     async with AsyncSQLiteManager(db_path=":memory:") as mgr:
-        rows = await mgr.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'"
-        )
+        rows = await mgr.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'")
     assert len(rows) == 1
 
 
@@ -112,15 +110,9 @@ async def test_custom_runner_overrides_default():
     async def _create_demo(conn):
         await conn.execute("CREATE TABLE demo_custom (id INTEGER PRIMARY KEY)")
 
-    custom_runner = MigrationRunner(
-        [Migration(id="v900", version=900, description="demo", apply=_create_demo)]
-    )
+    custom_runner = MigrationRunner([Migration(id="v900", version=900, description="demo", apply=_create_demo)])
     async with AsyncSQLiteManager(db_path=":memory:", migration_runner=custom_runner) as mgr:
-        custom = await mgr.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='demo_custom'"
-        )
-        strategies = await mgr.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'"
-        )
+        custom = await mgr.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='demo_custom'")
+        strategies = await mgr.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'")
     assert len(custom) == 1
     assert strategies == []

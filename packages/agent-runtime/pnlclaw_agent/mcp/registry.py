@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from pnlclaw_agent.mcp.client import McpClientError, McpClientSession
+from pnlclaw_agent.mcp.client import McpClientSession
 from pnlclaw_agent.mcp.tool_wrapper import McpToolWrapper
 from pnlclaw_agent.mcp.types import (
     McpConfig,
@@ -50,9 +50,7 @@ class McpRegistry:
             tool_catalog: ``ToolCatalog`` to register MCP tools into.
         """
         self._tool_catalog = tool_catalog
-        reserved_names: set[str] = set(
-            tool_catalog.tool_names() if hasattr(tool_catalog, "tool_names") else []
-        )
+        reserved_names: set[str] = set(tool_catalog.tool_names() if hasattr(tool_catalog, "tool_names") else [])
 
         for server_name, server_config in config.servers.items():
             if not server_config.enabled:
@@ -86,9 +84,7 @@ class McpRegistry:
         if name in self._sessions:
             await self._disconnect_server(name)
 
-        reserved_names: set[str] = set(
-            self._tool_catalog.tool_names() if self._tool_catalog else []
-        )
+        reserved_names: set[str] = set(self._tool_catalog.tool_names() if self._tool_catalog else [])
         try:
             await self._connect_server(name, config, reserved_names)
             return self._get_server_status(name)
@@ -122,9 +118,7 @@ class McpRegistry:
         config = session.config
         await self._disconnect_server(name)
 
-        reserved_names: set[str] = set(
-            self._tool_catalog.tool_names() if self._tool_catalog else []
-        )
+        reserved_names: set[str] = set(self._tool_catalog.tool_names() if self._tool_catalog else [])
         try:
             await self._connect_server(name, config, reserved_names)
         except Exception as exc:
@@ -187,9 +181,7 @@ class McpRegistry:
                     else:
                         self._tool_catalog.register(wrapper)
                 except Exception as exc:
-                    logger.warning(
-                        "Failed to register MCP tool '%s': %s", wrapper.name, exc
-                    )
+                    logger.warning("Failed to register MCP tool '%s': %s", wrapper.name, exc)
 
         self._tools[name] = wrappers
         logger.info(

@@ -73,6 +73,7 @@ class _PresetMockLLM:
 
     async def chat(self, messages: list[Any], **kwargs: Any) -> str:
         import json
+
         if self._i >= len(self._responses):
             return json.dumps({"response": "done", "tool_calls": []})
         r = self._responses[self._i]
@@ -89,7 +90,7 @@ class _PresetMockLLM:
     async def chat_with_tools(
         self, messages: list[Any], tools: list[dict[str, Any]] | None = None, **kwargs: Any
     ) -> Any:
-        from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+        from pnlclaw_llm.schemas import TokenUsage, ToolCall, ToolCallResult
 
         if self._i >= len(self._responses):
             return ToolCallResult(text="done")
@@ -98,7 +99,8 @@ class _PresetMockLLM:
         raw_calls = r.get("tool_calls", [])
         parsed = [
             ToolCall(id=f"int_call_{i}", name=tc.get("tool", ""), arguments=tc.get("arguments", {}))
-            for i, tc in enumerate(raw_calls) if isinstance(tc, dict)
+            for i, tc in enumerate(raw_calls)
+            if isinstance(tc, dict)
         ]
         text = r.get("response", "") or None
         return ToolCallResult(tool_calls=parsed, text=text, usage=TokenUsage())

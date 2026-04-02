@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -14,7 +14,6 @@ from pnlclaw_exchange.exchanges.polymarket.models import (
     PolymarketMarket,
     PolymarketPosition,
     PolymarketPositionStatus,
-    PolymarketToken,
     RedemptionResult,
 )
 from pnlclaw_exchange.exchanges.polymarket.redemption import (
@@ -26,7 +25,6 @@ from pnlclaw_exchange.exchanges.polymarket.redemption import (
     USDC_E_ADDRESS,
     PolymarketRedemptionClient,
 )
-
 
 SAMPLE_WALLET = "0x1234567890abcdef1234567890abcdef12345678"
 SAMPLE_CONDITION_ID = "0xabc123def456789abc123def456789abc123def456789abc123def456789abc1"
@@ -248,9 +246,7 @@ class TestGetPositions:
     async def test_get_positions_basic(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(_positions_data())
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_positions_data()))
         client._rate_limiter = AsyncMock()
 
         positions = await client.get_positions()
@@ -268,11 +264,7 @@ class TestGetPositions:
     async def test_get_positions_redeemable(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _positions_data(redeemable=True, is_winner=True)
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_positions_data(redeemable=True, is_winner=True)))
         client._rate_limiter = AsyncMock()
 
         positions = await client.get_positions()
@@ -287,11 +279,7 @@ class TestGetPositions:
     async def test_get_redeemable_positions(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _positions_data(redeemable=True, is_winner=True)
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_positions_data(redeemable=True, is_winner=True)))
         client._rate_limiter = AsyncMock()
 
         positions = await client.get_redeemable_positions()
@@ -312,9 +300,7 @@ class TestGetPositions:
     async def test_get_portfolio_value(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response({"value": 1234.56})
-        )
+        client._http.get = AsyncMock(return_value=_mock_response({"value": 1234.56}))
         client._rate_limiter = AsyncMock()
 
         value = await client.get_portfolio_value()
@@ -331,9 +317,7 @@ class TestMarketResolution:
     async def test_get_market_unresolved(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(_market_data(resolved=False))
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=False)))
         client._rate_limiter = AsyncMock()
 
         market = await client.get_market(SAMPLE_CONDITION_ID)
@@ -345,11 +329,7 @@ class TestMarketResolution:
     async def test_get_market_resolved_yes_wins(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _market_data(resolved=True, winner_outcome="Yes")
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=True, winner_outcome="Yes")))
         client._rate_limiter = AsyncMock()
 
         market = await client.get_market(SAMPLE_CONDITION_ID)
@@ -360,11 +340,7 @@ class TestMarketResolution:
     async def test_get_market_resolved_no_wins(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _market_data(resolved=True, winner_outcome="No")
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=True, winner_outcome="No")))
         client._rate_limiter = AsyncMock()
 
         market = await client.get_market(SAMPLE_CONDITION_ID)
@@ -375,11 +351,7 @@ class TestMarketResolution:
     async def test_is_market_resolved(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _market_data(resolved=True, winner_outcome="Yes")
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=True, winner_outcome="Yes")))
         client._rate_limiter = AsyncMock()
 
         assert await client.is_market_resolved(SAMPLE_CONDITION_ID) is True
@@ -388,9 +360,7 @@ class TestMarketResolution:
     async def test_is_market_not_resolved(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(_market_data(resolved=False))
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=False)))
         client._rate_limiter = AsyncMock()
 
         assert await client.is_market_resolved(SAMPLE_CONDITION_ID) is False
@@ -399,11 +369,7 @@ class TestMarketResolution:
     async def test_get_winning_outcome_resolved(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(
-                _market_data(resolved=True, winner_outcome="Yes")
-            )
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=True, winner_outcome="Yes")))
         client._rate_limiter = AsyncMock()
 
         assert await client.get_winning_outcome(SAMPLE_CONDITION_ID) == "Yes"
@@ -412,9 +378,7 @@ class TestMarketResolution:
     async def test_get_winning_outcome_not_resolved(self) -> None:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(_market_data(resolved=False))
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=False)))
         client._rate_limiter = AsyncMock()
 
         assert await client.get_winning_outcome(SAMPLE_CONDITION_ID) is None
@@ -431,15 +395,14 @@ class TestRedemption:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
+        redeem_resp = _mock_response(
+            {
+                "transactionHash": "0xredeem_hash_123",
+                "message": "Tokens redeemed successfully.",
+            }
         )
-        redeem_resp = _mock_response({
-            "transactionHash": "0xredeem_hash_123",
-            "message": "Tokens redeemed successfully.",
-        })
 
-        call_count = 0
         async def mock_get(*args: Any, **kwargs: Any) -> httpx.Response:
             return market_resp
 
@@ -463,9 +426,7 @@ class TestRedemption:
         client._rate_limiter = AsyncMock()
 
         client._http = AsyncMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response(_market_data(resolved=False))
-        )
+        client._http.get = AsyncMock(return_value=_mock_response(_market_data(resolved=False)))
 
         result = await client.redeem_position(condition_id=SAMPLE_CONDITION_ID)
         assert result.success is False
@@ -476,12 +437,8 @@ class TestRedemption:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
-        error_resp = _mock_response(
-            {"error": "Invalid condition ID"}, status=400
-        )
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
+        error_resp = _mock_response({"error": "Invalid condition ID"}, status=400)
 
         client._http = AsyncMock()
         client._http.get = AsyncMock(return_value=market_resp)
@@ -496,9 +453,7 @@ class TestRedemption:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
 
         client._http = AsyncMock()
         client._http.get = AsyncMock(return_value=market_resp)
@@ -513,18 +468,14 @@ class TestRedemption:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
         redeem_resp = _mock_response({"transactionHash": "0xhash456"})
 
         client._http = AsyncMock()
         client._http.get = AsyncMock(return_value=market_resp)
         client._http.post = AsyncMock(return_value=redeem_resp)
 
-        result = await client.redeem_position(
-            condition_id=SAMPLE_CONDITION_ID, index_sets=[1]
-        )
+        result = await client.redeem_position(condition_id=SAMPLE_CONDITION_ID, index_sets=[1])
         assert result.success is True
 
         post_call = client._http.post.call_args
@@ -543,9 +494,7 @@ class TestRedemption:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
         redeem_resp = _mock_response({"transactionHash": "0xhash"})
 
         client._http = AsyncMock()
@@ -585,15 +534,9 @@ class TestAutoRedeem:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        positions_resp = _mock_response(
-            _positions_data(redeemable=True, is_winner=True)
-        )
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        positions_resp = _mock_response(_positions_data(redeemable=True, is_winner=True))
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
         redeem_resp = _mock_response({"transactionHash": "0xauto_hash"})
-
-        get_calls: list[httpx.Response] = []
 
         async def mock_get(url: str, **kwargs: Any) -> httpx.Response:
             if "positions" in url:
@@ -618,9 +561,7 @@ class TestAutoRedeem:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        positions_resp = _mock_response(
-            _positions_data(redeemable=True, is_winner=True)
-        )
+        positions_resp = _mock_response(_positions_data(redeemable=True, is_winner=True))
 
         client._http = AsyncMock()
         client._http.get = AsyncMock(return_value=positions_resp)
@@ -669,12 +610,8 @@ class TestAutoRedeem:
         client = PolymarketRedemptionClient(wallet_address=SAMPLE_WALLET)
         client._rate_limiter = AsyncMock()
 
-        positions_resp = _mock_response(
-            _positions_data(redeemable=False, is_winner=False)
-        )
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        positions_resp = _mock_response(_positions_data(redeemable=False, is_winner=False))
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
         redeem_resp = _mock_response({"transactionHash": "0xuntagged"})
 
         async def mock_get(url: str, **kwargs: Any) -> httpx.Response:
@@ -714,9 +651,7 @@ class TestAutoRedeem:
                 "isWinner": False,
             },
         ]
-        market_resp = _mock_response(
-            _market_data(resolved=True, winner_outcome="Yes")
-        )
+        market_resp = _mock_response(_market_data(resolved=True, winner_outcome="Yes"))
 
         async def mock_get(url: str, **kwargs: Any) -> httpx.Response:
             if "positions" in url:
@@ -785,6 +720,7 @@ class TestAutoRedeem:
             return _mock_response(market_b)
 
         post_call_count = 0
+
         async def mock_post(*args: Any, **kwargs: Any) -> httpx.Response:
             nonlocal post_call_count
             post_call_count += 1

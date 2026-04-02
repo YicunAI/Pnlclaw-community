@@ -8,9 +8,9 @@ Provides a Protocol and concrete implementations for:
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
-import base64
 import time
 from abc import ABC, abstractmethod
 from typing import Any
@@ -26,9 +26,7 @@ class ExchangeCredentials(BaseModel):
 
     api_key: SecretStr = Field(..., description="API key / access key")
     api_secret: SecretStr = Field(..., description="API secret / secret key")
-    passphrase: SecretStr | None = Field(
-        None, description="Additional passphrase (required by OKX)"
-    )
+    passphrase: SecretStr | None = Field(None, description="Additional passphrase (required by OKX)")
 
     model_config = {"json_schema_extra": {"examples": [{"api_key": "***", "api_secret": "***"}]}}
 

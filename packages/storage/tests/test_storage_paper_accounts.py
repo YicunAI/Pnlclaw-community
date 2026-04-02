@@ -49,9 +49,7 @@ async def test_get_account_nonexistent(repo: PaperAccountRepository):
 @pytest.mark.asyncio
 async def test_save_account_upsert(repo: PaperAccountRepository):
     await repo.save_account({"id": "a1", "name": "V1", "initial_balance": 10000.0})
-    await repo.save_account(
-        {"id": "a1", "name": "V2", "initial_balance": 10000.0, "current_balance": 9500.0}
-    )
+    await repo.save_account({"id": "a1", "name": "V2", "initial_balance": 10000.0, "current_balance": 9500.0})
     loaded = await repo.get_account("a1")
     assert loaded is not None
     assert loaded["name"] == "V2"

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
-import asyncio
 import app.api.v1.backtests as _mod
 import pytest
 from app.main import create_app
 from httpx import ASGITransport, AsyncClient
+
 from pnlclaw_types.strategy import BacktestMetrics, BacktestResult
 
 
@@ -17,8 +18,6 @@ def _clear_store():
     _mod._tasks.clear()
     yield
     _mod._tasks.clear()
-
-
 
 
 def _make_result(id: str = "bt-001", strategy_id: str = "strat-001") -> BacktestResult:

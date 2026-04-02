@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 from enum import Enum
 from typing import Any
 
@@ -100,9 +99,7 @@ class OKXRESTClient(BaseRESTClient):
     ) -> None:
         url = base_url or OKX_API_URL
         auth = OKXAuthenticator(credentials)
-        limiter = rate_limiter or SlidingWindowRateLimiter(
-            calls_per_window=60, window_ms=2_000
-        )
+        limiter = rate_limiter or SlidingWindowRateLimiter(calls_per_window=60, window_ms=2_000)
         super().__init__(
             base_url=url,
             authenticator=auth,
@@ -166,9 +163,7 @@ class OKXRESTClient(BaseRESTClient):
         data: dict[str, Any] = resp.json()
 
         if resp.status_code == 429:
-            raise RateLimitExceededError(
-                "OKX rate limit exceeded", exchange="okx", status_code=429
-            )
+            raise RateLimitExceededError("OKX rate limit exceeded", exchange="okx", status_code=429)
 
         if resp.status_code in (401, 403):
             raise AuthenticationError(
@@ -195,9 +190,7 @@ class OKXRESTClient(BaseRESTClient):
             data = {"msg": resp.text}
         self._handle_okx_error(data, status_code=resp.status_code)
 
-    def _handle_okx_error(
-        self, data: dict[str, Any], status_code: int | None = None
-    ) -> None:
+    def _handle_okx_error(self, data: dict[str, Any], status_code: int | None = None) -> None:
         """Map OKX error codes to typed exceptions."""
         code = data.get("code", "0")
         msg = data.get("msg", "")
@@ -221,8 +214,7 @@ class OKXRESTClient(BaseRESTClient):
         if detail_code in ("51603", "51026"):
             raise OrderNotFoundError(full_msg, exchange="okx")
 
-        if detail_code in ("51000", "51001", "51002", "51003", "51004",
-                           "51006", "51020"):
+        if detail_code in ("51000", "51001", "51002", "51003", "51004", "51006", "51020"):
             raise OrderRejectedError(full_msg, exchange="okx", details=data)
 
         raise ExchangeAPIError(
@@ -310,9 +302,7 @@ class OKXRESTClient(BaseRESTClient):
             body["clOrdId"] = client_order_id
 
         if "ordId" not in body and "clOrdId" not in body:
-            raise InvalidOrderError(
-                "Either order_id or client_order_id is required", exchange="okx"
-            )
+            raise InvalidOrderError("Either order_id or client_order_id is required", exchange="okx")
 
         return await self._okx_request("POST", "/api/v5/trade/cancel-order", body=body)
 
@@ -356,9 +346,7 @@ class OKXRESTClient(BaseRESTClient):
             params["instId"] = inst_id
         if order_type is not None:
             params["ordType"] = order_type
-        return await self._okx_request(
-            "GET", "/api/v5/trade/orders-pending", params=params
-        )
+        return await self._okx_request("GET", "/api/v5/trade/orders-pending", params=params)
 
     async def get_order_history(
         self,
@@ -380,9 +368,7 @@ class OKXRESTClient(BaseRESTClient):
         }
         if inst_id is not None:
             params["instId"] = inst_id
-        return await self._okx_request(
-            "GET", "/api/v5/trade/orders-history-archive", params=params
-        )
+        return await self._okx_request("GET", "/api/v5/trade/orders-history-archive", params=params)
 
     # ------------------------------------------------------------------
     # Account endpoints
@@ -399,9 +385,7 @@ class OKXRESTClient(BaseRESTClient):
             params["ccy"] = ",".join(currencies)
         return await self._okx_request("GET", "/api/v5/account/balance", params=params)
 
-    async def get_positions(
-        self, *, inst_id: str | None = None, inst_type: str | None = None
-    ) -> dict[str, Any]:
+    async def get_positions(self, *, inst_id: str | None = None, inst_type: str | None = None) -> dict[str, Any]:
         """Get open positions.
 
         Args:
@@ -413,17 +397,13 @@ class OKXRESTClient(BaseRESTClient):
             params["instId"] = inst_id
         if inst_type is not None:
             params["instType"] = inst_type
-        return await self._okx_request(
-            "GET", "/api/v5/account/positions", params=params
-        )
+        return await self._okx_request("GET", "/api/v5/account/positions", params=params)
 
     # ------------------------------------------------------------------
     # Public endpoints (no auth)
     # ------------------------------------------------------------------
 
-    async def get_instruments(
-        self, inst_type: str = "SPOT", inst_id: str | None = None
-    ) -> dict[str, Any]:
+    async def get_instruments(self, inst_type: str = "SPOT", inst_id: str | None = None) -> dict[str, Any]:
         """Get trading instruments info (public, no auth required)."""
         params: dict[str, Any] = {"instType": inst_type}
         if inst_id:
@@ -453,6 +433,4 @@ class OKXRESTClient(BaseRESTClient):
 
         if order_type in ("limit", "post_only", "fok", "ioc"):
             if "px" not in body:
-                raise InvalidOrderError(
-                    f"{order_type} order requires 'price'", exchange="okx"
-                )
+                raise InvalidOrderError(f"{order_type} order requires 'price'", exchange="okx")

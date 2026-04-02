@@ -89,8 +89,7 @@ def extract_structured(raw_json: str, schema: type[T]) -> T:
         data = json.loads(raw_json)
     except json.JSONDecodeError as exc:
         raise LLMError(
-            f"Failed to parse LLM output as JSON: {exc}. "
-            f"Raw output (first 200 chars): {raw_json[:200]}"
+            f"Failed to parse LLM output as JSON: {exc}. Raw output (first 200 chars): {raw_json[:200]}"
         ) from exc
 
     try:

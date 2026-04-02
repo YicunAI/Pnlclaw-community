@@ -6,8 +6,8 @@ import time
 
 import pytest
 
-from pnlclaw_market.aggregators.large_trade import LargeTradeDetector
 from pnlclaw_market.aggregators.large_order import LargeOrderDetector
+from pnlclaw_market.aggregators.large_trade import LargeTradeDetector
 from pnlclaw_market.aggregators.liquidation import LiquidationAggregator
 from pnlclaw_types.derivatives import LargeTradeEvent, LiquidationEvent, LiquidationStats
 from pnlclaw_types.market import OrderBookL2Snapshot, PriceLevel, TradeEvent
@@ -81,7 +81,7 @@ class TestLargeTradeDetector:
 
     def test_get_recent(self) -> None:
         detector = LargeTradeDetector(threshold_usd=1000)
-        for i in range(10):
+        for _i in range(10):
             detector.process(_make_trade(68000.0, 0.1))
         assert len(detector.get_recent(5)) == 5
         assert len(detector.get_recent(20)) == 10

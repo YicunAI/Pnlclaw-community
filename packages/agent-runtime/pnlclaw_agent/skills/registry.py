@@ -7,15 +7,14 @@ deduplicates by name with source priority, and provides lookup/filtering APIs.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
 from pnlclaw_agent.skills.loader import SkillLoader
 from pnlclaw_agent.skills.types import (
     Skill,
-    SkillSource,
     SkillsConfig,
+    SkillSource,
     SkillSummary,
 )
 

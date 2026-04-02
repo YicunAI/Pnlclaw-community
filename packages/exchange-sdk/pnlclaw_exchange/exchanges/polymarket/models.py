@@ -92,9 +92,7 @@ class PolymarketPosition(BaseModel):
     percent_pnl: float = Field(0.0, description="PnL as percentage")
     redeemable: bool = Field(False, description="Whether this position can be redeemed")
     is_winner: bool = Field(False, description="Whether this is the winning outcome")
-    status: PolymarketPositionStatus = Field(
-        PolymarketPositionStatus.OPEN, description="Position status"
-    )
+    status: PolymarketPositionStatus = Field(PolymarketPositionStatus.OPEN, description="Position status")
 
 
 class RedemptionResult(BaseModel):
@@ -117,6 +115,4 @@ class AutoRedeemSummary(BaseModel):
     redemptions_attempted: int = Field(0, description="Number of redemptions attempted")
     redemptions_succeeded: int = Field(0, description="Number successful")
     total_usdc_redeemed: float = Field(0.0, description="Total USDC.e recovered")
-    results: list[RedemptionResult] = Field(
-        default_factory=list, description="Per-position results"
-    )
+    results: list[RedemptionResult] = Field(default_factory=list, description="Per-position results")

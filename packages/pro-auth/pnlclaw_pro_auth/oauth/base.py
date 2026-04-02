@@ -27,9 +27,7 @@ class OAuthProvider(Protocol):
         """
         ...
 
-    async def exchange_code(
-        self, code: str, redirect_uri: str, code_verifier: str | None = None
-    ) -> OAuthTokenResponse:
+    async def exchange_code(self, code: str, redirect_uri: str, code_verifier: str | None = None) -> OAuthTokenResponse:
         """Exchange an authorization code for an access token.
 
         Args:

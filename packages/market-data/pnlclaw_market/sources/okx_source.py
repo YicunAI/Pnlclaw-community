@@ -77,9 +77,7 @@ class OKXSource:
         if not self._kline_intervals:
             self._kline_intervals = ["1h"]
         self._kline_interval = self._kline_intervals[0]  # primary interval for cache compat
-        self._okx_kline_intervals: list[str] = [
-            _OKX_KLINE_INTERVAL_MAP.get(i, "1H") for i in self._kline_intervals
-        ]
+        self._okx_kline_intervals: list[str] = [_OKX_KLINE_INTERVAL_MAP.get(i, "1H") for i in self._kline_intervals]
         self._okx_kline_interval = self._okx_kline_intervals[0]
         self._inst_suffix = "-SWAP" if market_type == "futures" else ""
         self._running = False
@@ -206,7 +204,13 @@ class OKXSource:
             await self._ws_client.subscribe_trades(inst_ids)
 
         self._subscribed_symbols.add(symbol)
-        logger.info("Subscribed %s on okx/%s (instId=%s, intervals=%s)", symbol, self._config.market_type, inst_id, self._kline_intervals)
+        logger.info(
+            "Subscribed %s on okx/%s (instId=%s, intervals=%s)",
+            symbol,
+            self._config.market_type,
+            inst_id,
+            self._kline_intervals,
+        )
 
         if kline:
             for ivl in self._kline_intervals:
@@ -287,33 +291,45 @@ class OKXSource:
             raw_candles = body.get("data", [])
             buf: deque[KlineEvent] = deque(maxlen=_MAX_KLINE_BUFFER)
             for row in reversed(raw_candles):
-                buf.append(KlineEvent(
-                    exchange="okx",
-                    market_type=self._config.market_type,
-                    symbol=symbol,
-                    timestamp=int(row[0]),
-                    interval=ivl,
-                    open=float(row[1]),
-                    high=float(row[2]),
-                    low=float(row[3]),
-                    close=float(row[4]),
-                    volume=float(row[5]),
-                    closed=row[8] == "1" if len(row) > 8 else True,
-                ))
+                buf.append(
+                    KlineEvent(
+                        exchange="okx",
+                        market_type=self._config.market_type,
+                        symbol=symbol,
+                        timestamp=int(row[0]),
+                        interval=ivl,
+                        open=float(row[1]),
+                        high=float(row[2]),
+                        low=float(row[3]),
+                        close=float(row[4]),
+                        volume=float(row[5]),
+                        closed=row[8] == "1" if len(row) > 8 else True,
+                    )
+                )
             buf_key = f"{symbol}:{ivl}"
             self._kline_buffers[buf_key] = buf
             logger.info(
                 "Fetched %d historical klines (%s) for %s on okx/%s",
-                len(buf), ivl, symbol, self._config.market_type,
+                len(buf),
+                ivl,
+                symbol,
+                self._config.market_type,
             )
         except Exception:
             logger.warning(
                 "Failed to fetch historical klines (%s) for %s on okx/%s",
-                ivl, symbol, self._config.market_type, exc_info=True,
+                ivl,
+                symbol,
+                self._config.market_type,
+                exc_info=True,
             )
 
     async def fetch_klines_rest(
-        self, symbol: str, interval: str = "1h", limit: int = 200, end_time: int | None = None,
+        self,
+        symbol: str,
+        interval: str = "1h",
+        limit: int = 200,
+        end_time: int | None = None,
     ) -> list[KlineEvent]:
         """On-demand REST fetch of klines for any interval.
 
@@ -367,24 +383,29 @@ class OKXSource:
 
             result: list[KlineEvent] = []
             for row in reversed(raw_candles):
-                result.append(KlineEvent(
-                    exchange="okx",
-                    market_type=self._config.market_type,
-                    symbol=symbol,
-                    timestamp=int(row[0]),
-                    interval=interval,
-                    open=float(row[1]),
-                    high=float(row[2]),
-                    low=float(row[3]),
-                    close=float(row[4]),
-                    volume=float(row[5]),
-                    closed=row[8] == "1" if len(row) > 8 else True,
-                ))
+                result.append(
+                    KlineEvent(
+                        exchange="okx",
+                        market_type=self._config.market_type,
+                        symbol=symbol,
+                        timestamp=int(row[0]),
+                        interval=interval,
+                        open=float(row[1]),
+                        high=float(row[2]),
+                        low=float(row[3]),
+                        close=float(row[4]),
+                        volume=float(row[5]),
+                        closed=row[8] == "1" if len(row) > 8 else True,
+                    )
+                )
             return result
         except Exception:
             logger.warning(
                 "REST kline fetch failed for %s (%s) on okx/%s",
-                symbol, interval, self._config.market_type, exc_info=True,
+                symbol,
+                interval,
+                self._config.market_type,
+                exc_info=True,
             )
             return []
 

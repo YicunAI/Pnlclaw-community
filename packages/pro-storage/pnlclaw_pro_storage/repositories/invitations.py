@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, select
 
 from pnlclaw_pro_storage.models import Invitation
 from pnlclaw_pro_storage.postgres import AsyncPostgresManager
@@ -60,12 +60,7 @@ class InvitationRepository:
     ) -> list[Invitation]:
         """Return a page of invitations ordered by creation date."""
         async with self._db.session() as session:
-            stmt = (
-                select(Invitation)
-                .order_by(Invitation.created_at.desc())
-                .offset(offset)
-                .limit(limit)
-            )
+            stmt = select(Invitation).order_by(Invitation.created_at.desc()).offset(offset).limit(limit)
             result = await session.execute(stmt)
             return list(result.scalars().all())
 
@@ -94,7 +89,7 @@ class InvitationRepository:
         updated invitation.  Returns ``None`` if the code does not exist,
         has already reached ``max_uses``, or has expired.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
             stmt = select(Invitation).where(Invitation.code == code)
             result = await session.execute(stmt)
@@ -126,7 +121,7 @@ class InvitationRepository:
 
         Returns the number of rows removed.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
             stmt = delete(Invitation).where(
                 Invitation.expires_at.isnot(None),

@@ -32,6 +32,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 class AuthenticatedUser(BaseModel):
     """Represents an authenticated user extracted from a valid JWT."""
+
     id: str
     role: str = "user"
 
@@ -330,7 +331,6 @@ def get_execution_mode() -> str:
 def get_settings_service() -> Any:
     """Return the SettingsService instance (or None)."""
     if _settings_service is None:
-        from app.core.crypto import KeyPairManager
         from app.core.settings_service import SettingsService
         from pnlclaw_security.secrets import SecretManager
 

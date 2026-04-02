@@ -209,9 +209,7 @@ def check_strategy_migration() -> CheckResult:
         return CheckResult(name, "skip", "No database", repairable=False)
     try:
         con = sqlite3.connect(str(dbp))
-        cur = con.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'"
-        )
+        cur = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='strategies'")
         if cur.fetchone() is None:
             con.close()
             return CheckResult(name, "skip", "No strategies table", repairable=False)

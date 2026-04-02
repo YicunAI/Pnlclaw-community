@@ -91,13 +91,15 @@ class OKXPrivateNormalizer:
         details = item.get("details", [])
         result: list[BalanceUpdate] = []
         for d in details:
-            result.append(BalanceUpdate(
-                exchange=EXCHANGE,
-                asset=d.get("ccy", ""),
-                free=float(d.get("availBal", "0") or "0"),
-                locked=float(d.get("frozenBal", "0") or "0"),
-                timestamp=ts,
-            ))
+            result.append(
+                BalanceUpdate(
+                    exchange=EXCHANGE,
+                    asset=d.get("ccy", ""),
+                    free=float(d.get("availBal", "0") or "0"),
+                    locked=float(d.get("frozenBal", "0") or "0"),
+                    timestamp=ts,
+                )
+            )
         return result
 
 
@@ -153,9 +155,7 @@ class OKXPrivateWSClient(BaseWSClient):
         self._ws = await websockets.asyncio.client.connect(self._config.url)
         await self._dispatch_connect()
         await self._stall_watchdog.start()
-        self._receive_task = asyncio.create_task(
-            self._receive_loop(), name="okx-private-recv"
-        )
+        self._receive_task = asyncio.create_task(self._receive_loop(), name="okx-private-recv")
 
     async def subscribe(self, streams: list[str]) -> None:
         """Authenticate and subscribe to private channels.
@@ -223,9 +223,7 @@ class OKXPrivateWSClient(BaseWSClient):
         """
         timestamp = str(int(time.time()))
         prehash = timestamp + "GET" + "/users/self/verify"
-        mac = hmac.new(
-            self._api_secret.encode(), prehash.encode(), hashlib.sha256
-        )
+        mac = hmac.new(self._api_secret.encode(), prehash.encode(), hashlib.sha256)
         sign = base64.b64encode(mac.digest()).decode()
 
         msg = {
@@ -261,9 +259,7 @@ class OKXPrivateWSClient(BaseWSClient):
         except websockets.ConnectionClosed as exc:
             logger.info("OKX private WS closed: %s", exc)
             self._authenticated = False
-            await self._dispatch_disconnect(
-                code=getattr(exc, "code", 1006), reason=str(exc)
-            )
+            await self._dispatch_disconnect(code=getattr(exc, "code", 1006), reason=str(exc))
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -283,9 +279,7 @@ class OKXPrivateWSClient(BaseWSClient):
                     logger.info("OKX private WS login successful")
                 else:
                     logger.error("OKX private WS login failed: %s", data.get("msg", ""))
-                    await self._dispatch_error(
-                        RuntimeError(f"OKX login failed: {data.get('msg', '')}")
-                    )
+                    await self._dispatch_error(RuntimeError(f"OKX login failed: {data.get('msg', '')}"))
             return
 
         # Subscribe/unsubscribe ack

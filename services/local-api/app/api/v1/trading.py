@@ -14,12 +14,10 @@ from pydantic import BaseModel, Field
 
 from app.core.dependencies import (
     AuthenticatedUser,
-    get_execution_engine,
-    get_live_engine,
     get_execution_mode,
+    get_live_engine,
     get_risk_engine,
     optional_user,
-    set_execution_engine,
     set_execution_mode,
 )
 from pnlclaw_types.trading import (
@@ -147,9 +145,7 @@ async def place_order(
                     ctx["total_equity"] = sum(b.free + b.locked for b in balances)
                 positions = await engine.get_positions(req.account_id)  # type: ignore[union-attr]
                 if positions:
-                    ctx["positions"] = {
-                        p.symbol: p.quantity * p.avg_entry_price for p in positions
-                    }
+                    ctx["positions"] = {p.symbol: p.quantity * p.avg_entry_price for p in positions}
             except Exception:
                 logger.debug(
                     "Risk pre-check: failed to load balances or positions for context",

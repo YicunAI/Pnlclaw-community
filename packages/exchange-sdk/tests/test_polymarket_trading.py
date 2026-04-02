@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import MagicMock
-
 import pytest
 
+from pnlclaw_exchange.exceptions import (
+    InvalidOrderError,
+)
 from pnlclaw_exchange.exchanges.polymarket.trading import (
     PolymarketCredentials,
     PolymarketOrderType,
     PolymarketSide,
     PolymarketTradingClient,
-)
-from pnlclaw_exchange.exceptions import (
-    InvalidOrderError,
 )
 
 
@@ -28,9 +25,7 @@ def _make_creds() -> PolymarketCredentials:
 
 
 def _make_client() -> PolymarketTradingClient:
-    return PolymarketTradingClient(
-        _make_creds(), base_url="https://clob.polymarket.com"
-    )
+    return PolymarketTradingClient(_make_creds(), base_url="https://clob.polymarket.com")
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +74,10 @@ class TestPolymarketOrderValidation:
         client = _make_client()
         with pytest.raises(InvalidOrderError, match="between 0.01 and 0.99"):
             await client.place_order(
-                token_id="abc", side="BUY", price=1.5, size=10,
+                token_id="abc",
+                side="BUY",
+                price=1.5,
+                size=10,
             )
 
     @pytest.mark.asyncio
@@ -87,7 +85,10 @@ class TestPolymarketOrderValidation:
         client = _make_client()
         with pytest.raises(InvalidOrderError):
             await client.place_order(
-                token_id="abc", side="BUY", price=0, size=10,
+                token_id="abc",
+                side="BUY",
+                price=0,
+                size=10,
             )
 
     @pytest.mark.asyncio
@@ -95,7 +96,10 @@ class TestPolymarketOrderValidation:
         client = _make_client()
         with pytest.raises(InvalidOrderError, match="positive"):
             await client.place_order(
-                token_id="abc", side="BUY", price=0.5, size=-1,
+                token_id="abc",
+                side="BUY",
+                price=0.5,
+                size=-1,
             )
 
 

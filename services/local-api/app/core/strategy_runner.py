@@ -151,16 +151,10 @@ class StrategyRunner:
             )
 
         strategy_id = strategy_config.get("id", "")
-        existing = [
-            s for s in self._slots.values()
-            if s.strategy_id == strategy_id
-        ]
+        existing = [s for s in self._slots.values() if s.strategy_id == strategy_id]
         if existing:
             dep_ids = ", ".join(s.deployment_id for s in existing)
-            return (
-                f"Strategy {strategy_id} is already deployed ({dep_ids}). "
-                f"Stop existing deployment(s) first."
-            )
+            return f"Strategy {strategy_id} is already deployed ({dep_ids}). Stop existing deployment(s) first."
 
         if account_id in ("paper-default", "auto", ""):
             new_account_id = await self._create_strategy_account(strategy_config)
@@ -204,7 +198,11 @@ class StrategyRunner:
         self._save_state()
         logger.info(
             "Deployed strategy %s on %s/%s → account %s (warmup bars: %d)",
-            engine_config.id, symbol, interval, account_id, runtime.bar_count,
+            engine_config.id,
+            symbol,
+            interval,
+            account_id,
+            runtime.bar_count,
         )
         return None
 
@@ -216,21 +214,22 @@ class StrategyRunner:
             logger.warning("Failed to subscribe symbol %s for runner", symbol, exc_info=True)
 
         _intervals_raw = (
-            os.environ.get("PNLCLAW_KLINE_INTERVALS")
-            or os.environ.get("PNLCLAW_DEFAULT_INTERVAL")
-            or "30m,1h"
+            os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "30m,1h"
         )
         supported = [i.strip() for i in _intervals_raw.split(",") if i.strip()]
         if interval not in supported:
             logger.warning(
                 "Strategy interval '%s' is not in configured kline intervals %s. "
                 "Signals will NOT fire. Set PNLCLAW_KLINE_INTERVALS to include '%s'.",
-                interval, supported, interval,
+                interval,
+                supported,
+                interval,
             )
         else:
             logger.info(
                 "Strategy interval '%s' is supported (configured: %s).",
-                interval, supported,
+                interval,
+                supported,
             )
 
     async def _create_strategy_account(self, strategy_config: dict[str, Any]) -> str | None:
@@ -247,15 +246,14 @@ class StrategyRunner:
             strategy_id = strategy_config.get("id", "")
             acct = mgr.create_account(
                 name=f"Strategy: {strategy_name}",
-                initial_balance=float(
-                    os.environ.get("PNLCLAW_PAPER_STARTING_BALANCE", "100000")
-                ),
+                initial_balance=float(os.environ.get("PNLCLAW_PAPER_STARTING_BALANCE", "100000")),
                 account_type=AccountType.STRATEGY,
                 strategy_id=strategy_id,
             )
             logger.info(
                 "Auto-created strategy account %s for strategy %s",
-                acct.id, strategy_id,
+                acct.id,
+                strategy_id,
             )
             return acct.id
         except Exception:
@@ -285,12 +283,17 @@ class StrategyRunner:
 
             logger.info(
                 "Warmup: fed %d historical klines to deployment %s (%s/%s), bar_count=%d",
-                fed, slot.deployment_id, slot.symbol, slot.interval, slot.runtime.bar_count,
+                fed,
+                slot.deployment_id,
+                slot.symbol,
+                slot.interval,
+                slot.runtime.bar_count,
             )
         except Exception:
             logger.warning(
                 "Historical kline warmup failed for deployment %s",
-                slot.deployment_id, exc_info=True,
+                slot.deployment_id,
+                exc_info=True,
             )
 
     def stop_deployment(self, deployment_id: str) -> bool:
@@ -303,10 +306,7 @@ class StrategyRunner:
 
     def stop_by_strategy_id(self, strategy_id: str) -> list[str]:
         """Stop ALL deployments for a given strategy_id and return their ids."""
-        to_remove = [
-            dep_id for dep_id, slot in self._slots.items()
-            if slot.strategy_id == strategy_id
-        ]
+        to_remove = [dep_id for dep_id, slot in self._slots.items() if slot.strategy_id == strategy_id]
         for dep_id in to_remove:
             slot = self._slots.pop(dep_id)
             logger.info("Stopped deployment %s (strategy %s)", dep_id, slot.strategy_id)
@@ -323,6 +323,7 @@ class StrategyRunner:
             return
         try:
             from pnlclaw_market import MarketDataService as _MDS
+
             svc: _MDS = self._market
             svc.on_kline(self._on_kline)
             self._kline_registered = True
@@ -359,7 +360,8 @@ class StrategyRunner:
                 slot.errors += 1
                 logger.warning(
                     "Error processing kline for deployment %s",
-                    slot.deployment_id, exc_info=True,
+                    slot.deployment_id,
+                    exc_info=True,
                 )
 
     @staticmethod
@@ -380,7 +382,11 @@ class StrategyRunner:
         return True
 
     async def _execute_signal(
-        self, slot: RunnerSlot, signal: Any, current_price: float, signal_ts_ms: int | None = None,
+        self,
+        slot: RunnerSlot,
+        signal: Any,
+        current_price: float,
+        signal_ts_ms: int | None = None,
     ) -> None:
         """Convert a Signal into a paper order."""
         try:
@@ -413,8 +419,12 @@ class StrategyRunner:
             slot.orders_placed += 1
             logger.info(
                 "Runner placed order for deployment %s: %s %s %s @ %.2f (reason: %s)",
-                slot.deployment_id, side, slot.symbol, order_type,
-                current_price, signal.reason,
+                slot.deployment_id,
+                side,
+                slot.symbol,
+                order_type,
+                current_price,
+                signal.reason,
             )
 
             await self._broadcast_signal(slot, signal, order)
@@ -423,13 +433,15 @@ class StrategyRunner:
             slot.errors += 1
             logger.warning(
                 "Failed to place order for deployment %s",
-                slot.deployment_id, exc_info=True,
+                slot.deployment_id,
+                exc_info=True,
             )
 
     async def _broadcast_signal(self, slot: RunnerSlot, signal: Any, order: Any) -> None:
         """Push strategy signal event via paper WS channel."""
         try:
             from app.api.v1.ws import broadcast_paper_event
+
             await broadcast_paper_event(
                 slot.account_id,
                 "strategy_signal",
@@ -447,6 +459,7 @@ class StrategyRunner:
         """Push runner_status event with live slot metrics via paper WS."""
         try:
             from app.api.v1.ws import broadcast_paper_event
+
             await broadcast_paper_event(
                 slot.account_id,
                 "runner_status",
@@ -506,7 +519,8 @@ class StrategyRunner:
                 if strategy_id in seen_strategies:
                     logger.info(
                         "Skipping duplicate deployment %s for strategy %s",
-                        dep_id, strategy_id,
+                        dep_id,
+                        strategy_id,
                     )
                     continue
 
@@ -515,7 +529,8 @@ class StrategyRunner:
                 if not _config_has_rules(config):
                     logger.warning(
                         "Skipping restore of deployment %s: strategy %s has empty rules",
-                        dep_id, strategy_id,
+                        dep_id,
+                        strategy_id,
                     )
                     continue
 
@@ -534,18 +549,23 @@ class StrategyRunner:
             logger.warning("Failed to restore runner state", exc_info=True)
 
     async def _load_fresh_config(
-        self, strategy_id: str, fallback: dict[str, Any],
+        self,
+        strategy_id: str,
+        fallback: dict[str, Any],
     ) -> dict[str, Any]:
         """Try to load the latest strategy config from the DB/store."""
         try:
             from app.api.v1.strategies import _get_strategy
+
             config = await _get_strategy(strategy_id)
             if config is not None:
                 fresh = config.model_dump()
                 logger.info(
                     "Restored fresh config for strategy %s (v%d, rules: entry=%s exit=%s)",
-                    strategy_id, fresh.get("version", 0),
-                    bool(fresh.get("entry_rules")), bool(fresh.get("exit_rules")),
+                    strategy_id,
+                    fresh.get("version", 0),
+                    bool(fresh.get("entry_rules")),
+                    bool(fresh.get("exit_rules")),
                 )
                 return fresh
         except Exception:

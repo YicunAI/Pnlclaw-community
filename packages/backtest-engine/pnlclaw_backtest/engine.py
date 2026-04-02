@@ -167,11 +167,7 @@ class BacktestEngine:
                                 "entry_price": _entry_price,
                                 "exit_price": fill.price,
                                 "quantity": fill.quantity,
-                                "pnl": (
-                                    (fill.price - _entry_price) * fill.quantity
-                                    - _entry_fee
-                                    - fill.fee
-                                ),
+                                "pnl": ((fill.price - _entry_price) * fill.quantity - _entry_fee - fill.fee),
                                 "entry_time": _entry_ts,
                                 "exit_time": kline.timestamp,
                             }
@@ -200,11 +196,7 @@ class BacktestEngine:
                                 "entry_price": _entry_price,
                                 "exit_price": fill.price,
                                 "quantity": fill.quantity,
-                                "pnl": (
-                                    (_entry_price - fill.price) * fill.quantity
-                                    - _entry_fee
-                                    - fill.fee
-                                ),
+                                "pnl": ((_entry_price - fill.price) * fill.quantity - _entry_fee - fill.fee),
                                 "entry_time": _entry_ts,
                                 "exit_time": kline.timestamp,
                             }
@@ -268,6 +260,7 @@ class BacktestEngine:
         drawdown_curve: list[float] = []
         if len(equity_curve) >= 2:
             import numpy as np
+
             eq = np.asarray(equity_curve, dtype=np.float64)
             peak = np.maximum.accumulate(eq)
             dd = ((eq - peak) / peak).tolist()
@@ -279,10 +272,7 @@ class BacktestEngine:
             initial_equity = equity_curve[0]
             first_close = klines[0].close
             if first_close > 0:
-                buy_hold_curve = [
-                    round(initial_equity * (k.close / first_close), 2)
-                    for k in klines
-                ]
+                buy_hold_curve = [round(initial_equity * (k.close / first_close), 2) for k in klines]
 
         start_dt = datetime.fromtimestamp(klines[0].timestamp / 1000, tz=UTC)
         end_dt = datetime.fromtimestamp(klines[-1].timestamp / 1000, tz=UTC)

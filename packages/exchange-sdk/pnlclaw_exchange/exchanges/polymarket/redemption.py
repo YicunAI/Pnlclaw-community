@@ -93,9 +93,7 @@ class PolymarketRedemptionClient:
         self._gamma_url = gamma_url.rstrip("/")
         self._clob_url = clob_url.rstrip("/")
         self._data_url = data_url.rstrip("/")
-        self._rate_limiter = rate_limiter or SlidingWindowRateLimiter(
-            calls_per_window=60, window_ms=10_000
-        )
+        self._rate_limiter = rate_limiter or SlidingWindowRateLimiter(calls_per_window=60, window_ms=10_000)
         self._http = httpx.AsyncClient(timeout=timeout)
 
     async def close(self) -> None:
@@ -132,9 +130,7 @@ class PolymarketRedemptionClient:
         if redeemable_only:
             params["redeemable"] = "true"
 
-        resp = await self._http.get(
-            f"{self._data_url}/positions", params=params
-        )
+        resp = await self._http.get(f"{self._data_url}/positions", params=params)
         resp.raise_for_status()
         raw_positions: list[dict[str, Any]] = resp.json()
 
@@ -145,22 +141,24 @@ class PolymarketRedemptionClient:
             if redeemable:
                 status = PolymarketPositionStatus.REDEEMABLE
 
-            positions.append(PolymarketPosition(
-                condition_id=raw.get("conditionId", raw.get("condition_id", "")),
-                asset_id=raw.get("assetId", raw.get("asset_id", "")),
-                title=raw.get("title", raw.get("question", "")),
-                outcome=raw.get("outcome", ""),
-                size=float(raw.get("size", 0)),
-                avg_price=float(raw.get("avgPrice", raw.get("avg_price", 0))),
-                current_price=float(raw.get("curPrice", raw.get("current_price", 0))),
-                current_value=float(raw.get("currentValue", raw.get("current_value", 0))),
-                cost_basis=float(raw.get("initialValue", raw.get("cost_basis", 0))),
-                cash_pnl=float(raw.get("cashPnl", raw.get("cash_pnl", 0))),
-                percent_pnl=float(raw.get("percentPnl", raw.get("percent_pnl", 0))),
-                redeemable=redeemable,
-                is_winner=bool(raw.get("isWinner", raw.get("is_winner", False))),
-                status=status,
-            ))
+            positions.append(
+                PolymarketPosition(
+                    condition_id=raw.get("conditionId", raw.get("condition_id", "")),
+                    asset_id=raw.get("assetId", raw.get("asset_id", "")),
+                    title=raw.get("title", raw.get("question", "")),
+                    outcome=raw.get("outcome", ""),
+                    size=float(raw.get("size", 0)),
+                    avg_price=float(raw.get("avgPrice", raw.get("avg_price", 0))),
+                    current_price=float(raw.get("curPrice", raw.get("current_price", 0))),
+                    current_value=float(raw.get("currentValue", raw.get("current_value", 0))),
+                    cost_basis=float(raw.get("initialValue", raw.get("cost_basis", 0))),
+                    cash_pnl=float(raw.get("cashPnl", raw.get("cash_pnl", 0))),
+                    percent_pnl=float(raw.get("percentPnl", raw.get("percent_pnl", 0))),
+                    redeemable=redeemable,
+                    is_winner=bool(raw.get("isWinner", raw.get("is_winner", False))),
+                    status=status,
+                )
+            )
 
         return positions
 
@@ -202,9 +200,7 @@ class PolymarketRedemptionClient:
         """
         await self._rate_limiter.acquire()
 
-        resp = await self._http.get(
-            f"{self._clob_url}/markets/{condition_id}"
-        )
+        resp = await self._http.get(f"{self._clob_url}/markets/{condition_id}")
         resp.raise_for_status()
         m: dict[str, Any] = resp.json()
 
@@ -388,29 +384,25 @@ class PolymarketRedemptionClient:
                 redeemable.append(pos)
 
         if not redeemable:
-            resolved_positions = await self._check_untagged_positions(
-                all_positions, min_shares
-            )
+            resolved_positions = await self._check_untagged_positions(all_positions, min_shares)
             redeemable.extend(resolved_positions)
 
         summary.redeemable_found = len(redeemable)
 
         if dry_run:
-            logger.info(
-                "Dry run: found %d redeemable positions", len(redeemable)
-            )
+            logger.info("Dry run: found %d redeemable positions", len(redeemable))
             for pos in redeemable:
-                summary.results.append(RedemptionResult(
-                    condition_id=pos.condition_id,
-                    outcome=pos.outcome,
-                    shares_redeemed=pos.size,
-                    usdc_received=pos.size if pos.is_winner else 0.0,
-                    success=True,
-                    error="dry_run",
-                ))
-            summary.total_usdc_redeemed = sum(
-                r.usdc_received for r in summary.results
-            )
+                summary.results.append(
+                    RedemptionResult(
+                        condition_id=pos.condition_id,
+                        outcome=pos.outcome,
+                        shares_redeemed=pos.size,
+                        usdc_received=pos.size if pos.is_winner else 0.0,
+                        success=True,
+                        error="dry_run",
+                    )
+                )
+            summary.total_usdc_redeemed = sum(r.usdc_received for r in summary.results)
             return summary
 
         for pos in redeemable:
@@ -423,9 +415,7 @@ class PolymarketRedemptionClient:
             if result.success:
                 summary.redemptions_succeeded += 1
 
-        summary.total_usdc_redeemed = sum(
-            r.usdc_received for r in summary.results
-        )
+        summary.total_usdc_redeemed = sum(r.usdc_received for r in summary.results)
 
         logger.info(
             "Auto-redeem complete: %d/%d succeeded, %.2f USDC recovered",
@@ -473,11 +463,11 @@ class PolymarketRedemptionClient:
                     redeemable.append(pos)
                     logger.info(
                         "Found untagged redeemable: %s (%s, %.1f shares)",
-                        pos.title, pos.outcome, pos.size,
+                        pos.title,
+                        pos.outcome,
+                        pos.size,
                     )
             except Exception as exc:
-                logger.warning(
-                    "Failed to check market %s: %s", pos.condition_id, exc
-                )
+                logger.warning("Failed to check market %s: %s", pos.condition_id, exc)
 
         return redeemable

@@ -55,9 +55,7 @@ class OAuthAccountRepository:
     # Read
     # ------------------------------------------------------------------
 
-    async def get_by_provider(
-        self, provider: str, provider_user_id: str
-    ) -> OAuthAccount | None:
+    async def get_by_provider(self, provider: str, provider_user_id: str) -> OAuthAccount | None:
         """Look up an OAuth account by its provider + external user id."""
         async with self._db.session() as session:
             stmt = select(OAuthAccount).where(
@@ -115,10 +113,6 @@ class OAuthAccountRepository:
     async def count_for_user(self, user_id: uuid.UUID) -> int:
         """Return the number of OAuth accounts linked to a user."""
         async with self._db.session() as session:
-            stmt = (
-                select(func.count())
-                .select_from(OAuthAccount)
-                .where(OAuthAccount.user_id == user_id)
-            )
+            stmt = select(func.count()).select_from(OAuthAccount).where(OAuthAccount.user_id == user_id)
             result = await session.execute(stmt)
             return result.scalar_one()

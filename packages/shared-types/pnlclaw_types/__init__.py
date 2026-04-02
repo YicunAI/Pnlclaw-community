@@ -17,6 +17,14 @@ from pnlclaw_types.common import (
     Symbol,
     Timestamp,
 )
+from pnlclaw_types.derivatives import (
+    FundingRateEvent,
+    LargeOrderEvent,
+    LargeTradeEvent,
+    LiquidationEvent,
+    LiquidationStats,
+    OpenInterestSnapshot,
+)
 from pnlclaw_types.errors import (
     ERROR_CODE_HTTP_STATUS,
     ErrorCode,
@@ -54,14 +62,6 @@ from pnlclaw_types.strategy import (
     Signal,
     StrategyConfig,
     StrategyType,
-)
-from pnlclaw_types.derivatives import (
-    FundingRateEvent,
-    LargeOrderEvent,
-    LargeTradeEvent,
-    LiquidationEvent,
-    LiquidationStats,
-    OpenInterestSnapshot,
 )
 from pnlclaw_types.trading import (
     AccountSnapshot,

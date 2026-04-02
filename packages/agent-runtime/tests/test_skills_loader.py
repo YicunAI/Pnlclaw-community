@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 
 from pnlclaw_agent.skills.loader import SkillLoader, _parse_frontmatter
-from pnlclaw_agent.skills.types import SkillSource, SkillsLimits
-
+from pnlclaw_agent.skills.types import SkillsLimits, SkillSource
 
 # ---------------------------------------------------------------------------
 # _parse_frontmatter unit tests
@@ -62,17 +60,7 @@ class TestParseFrontmatter:
         assert "Line three." in body
 
     def test_complex_frontmatter(self) -> None:
-        raw = (
-            "---\n"
-            "name: complex\n"
-            "tags:\n"
-            "  - alpha\n"
-            "  - beta\n"
-            "requires_tools:\n"
-            "  - market_ticker\n"
-            "---\n"
-            "Body here."
-        )
+        raw = "---\nname: complex\ntags:\n  - alpha\n  - beta\nrequires_tools:\n  - market_ticker\n---\nBody here."
         data, body = _parse_frontmatter(raw)
         assert data["name"] == "complex"
         assert data["tags"] == ["alpha", "beta"]
@@ -124,9 +112,7 @@ class TestSkillLoaderScan:
     def test_no_skill_md_skipped(self, tmp_path: Path) -> None:
         """Subdirectories without SKILL.md should be silently skipped."""
         (tmp_path / "has-skill").mkdir()
-        (tmp_path / "has-skill" / "SKILL.md").write_text(
-            "---\nname: has-skill\n---\nBody.", encoding="utf-8"
-        )
+        (tmp_path / "has-skill" / "SKILL.md").write_text("---\nname: has-skill\n---\nBody.", encoding="utf-8")
         (tmp_path / "no-skill").mkdir()
         (tmp_path / "no-skill" / "README.md").write_text("Not a skill.", encoding="utf-8")
 
@@ -162,9 +148,7 @@ class TestSkillLoaderFallback:
         """SKILL.md without frontmatter should use directory name as skill name."""
         skill_dir = tmp_path / "fallback-skill"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "# No frontmatter\nJust plain markdown body.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("# No frontmatter\nJust plain markdown body.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skills = loader.scan()
@@ -176,9 +160,7 @@ class TestSkillLoaderFallback:
         """Frontmatter missing the name field should fall back to directory name."""
         skill_dir = tmp_path / "dir-named"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\ndescription: Has desc but no name\n---\nBody.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\ndescription: Has desc but no name\n---\nBody.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skills = loader.scan()
@@ -197,9 +179,7 @@ class TestSkillLoaderFileSizeLimit:
     def test_file_within_limit_loads(self, tmp_path: Path) -> None:
         skill_dir = tmp_path / "small"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: small\n---\nSmall body.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: small\n---\nSmall body.", encoding="utf-8")
 
         limits = SkillsLimits(max_skill_file_bytes=10_000)
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED, limits)
@@ -244,9 +224,7 @@ class TestSkillLoaderPathTraversal:
         # Create an outside directory with a valid SKILL.md
         outside_dir = tmp_path / "outside"
         outside_dir.mkdir()
-        (outside_dir / "SKILL.md").write_text(
-            "---\nname: evil\n---\nMalicious content.", encoding="utf-8"
-        )
+        (outside_dir / "SKILL.md").write_text("---\nname: evil\n---\nMalicious content.", encoding="utf-8")
 
         # Create the root skills directory
         skills_root = tmp_path / "skills"
@@ -270,9 +248,7 @@ class TestSkillLoaderPathTraversal:
         """Normal subdirectories within the root should load fine."""
         skill_dir = tmp_path / "safe-skill"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: safe\n---\nSafe content.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: safe\n---\nSafe content.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skills = loader.scan()
@@ -290,9 +266,7 @@ class TestSkillLoaderInvalidYaml:
         """Invalid YAML frontmatter should not crash the loader."""
         skill_dir = tmp_path / "bad-yaml"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\n: : : garbage\n---\nBody content.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\n: : : garbage\n---\nBody content.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skills = loader.scan()
@@ -308,9 +282,7 @@ class TestSkillLoaderInvalidYaml:
         skill_dir.mkdir()
         # tags should be a list, not a string -- depending on Pydantic coercion
         # this may or may not fail, but must not crash
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: bad\ntags: not-a-list\n---\nBody.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: bad\ntags: not-a-list\n---\nBody.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skills = loader.scan()
@@ -326,9 +298,7 @@ class TestSkillLoaderSingle:
     def test_load_single_valid(self, tmp_path: Path) -> None:
         skill_dir = tmp_path / "single"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: single\n---\nContent.", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: single\n---\nContent.", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.WORKSPACE)
         skill = loader.load_single(skill_dir)
@@ -354,9 +324,7 @@ class TestSkillLoaderSingle:
         """Body content should have leading/trailing whitespace stripped."""
         skill_dir = tmp_path / "strip"
         skill_dir.mkdir()
-        (skill_dir / "SKILL.md").write_text(
-            "---\nname: strip\n---\n\n  Content here  \n\n", encoding="utf-8"
-        )
+        (skill_dir / "SKILL.md").write_text("---\nname: strip\n---\n\n  Content here  \n\n", encoding="utf-8")
 
         loader = SkillLoader(tmp_path, SkillSource.BUNDLED)
         skill = loader.load_single(skill_dir)

@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
 
 from pnlclaw_agent.mcp.tool_wrapper import McpToolWrapper, _sanitize_name
 from pnlclaw_agent.mcp.types import McpToolInfo, McpToolResult
 from pnlclaw_types.risk import RiskLevel
-
 
 # ---------------------------------------------------------------------------
 # _sanitize_name unit tests
@@ -163,9 +158,7 @@ class TestMcpToolWrapperParameters:
             },
             "required": ["path"],
         }
-        info = McpToolInfo(
-            server_name="s", tool_name="t", input_schema=schema
-        )
+        info = McpToolInfo(server_name="s", tool_name="t", input_schema=schema)
         wrapper = McpToolWrapper(session=_MockMcpSession(), tool_info=info)
         assert wrapper.parameters == schema
 
@@ -198,16 +191,12 @@ class TestMcpToolWrapperRiskLevel:
 
     def test_custom_risk_level(self) -> None:
         info = McpToolInfo(server_name="s", tool_name="t")
-        wrapper = McpToolWrapper(
-            session=_MockMcpSession(), tool_info=info, risk_level=RiskLevel.DANGEROUS
-        )
+        wrapper = McpToolWrapper(session=_MockMcpSession(), tool_info=info, risk_level=RiskLevel.DANGEROUS)
         assert wrapper.risk_level == RiskLevel.DANGEROUS
 
     def test_safe_risk_level(self) -> None:
         info = McpToolInfo(server_name="s", tool_name="t")
-        wrapper = McpToolWrapper(
-            session=_MockMcpSession(), tool_info=info, risk_level=RiskLevel.SAFE
-        )
+        wrapper = McpToolWrapper(session=_MockMcpSession(), tool_info=info, risk_level=RiskLevel.SAFE)
         assert wrapper.risk_level == RiskLevel.SAFE
 
 
@@ -228,9 +217,7 @@ class TestMcpToolWrapperExecute:
 
     def test_error_result_from_mcp(self) -> None:
         """MCP tool returning is_error=True should set ToolResult.error."""
-        session = _MockMcpSession(
-            result=McpToolResult(content="Tool failed", is_error=True)
-        )
+        session = _MockMcpSession(result=McpToolResult(content="Tool failed", is_error=True))
         info = McpToolInfo(server_name="s", tool_name="t")
         wrapper = McpToolWrapper(session=session, tool_info=info)
 

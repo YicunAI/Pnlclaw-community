@@ -16,8 +16,8 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from pnlclaw_exchange.trading import BalanceInfo, OrderResponse, TradingClient
-from pnlclaw_types.trading import AccountSnapshot, BalanceUpdate, ExchangeOrderUpdate, OrderSide
+from pnlclaw_exchange.trading import OrderResponse, TradingClient
+from pnlclaw_types.trading import AccountSnapshot, BalanceUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +97,7 @@ class ReconciliationManager:
         )
         return snapshot
 
-    async def reconcile_orders(
-        self, symbol: str | None = None
-    ) -> list[OrderResponse]:
+    async def reconcile_orders(self, symbol: str | None = None) -> list[OrderResponse]:
         """Fetch all open orders from the exchange via REST.
 
         Args:

@@ -117,9 +117,7 @@ class OvertradingDetector:
                 current_value=count,
                 limit_value=self._config.max_orders_per_hour,
                 severity=RiskLevel.RESTRICTED,
-                message=(
-                    f"Hourly order rate {count} exceeds limit {self._config.max_orders_per_hour}"
-                ),
+                message=(f"Hourly order rate {count} exceeds limit {self._config.max_orders_per_hour}"),
             )
         return None
 
@@ -135,9 +133,7 @@ class OvertradingDetector:
                 current_value=count,
                 limit_value=self._config.max_orders_per_day,
                 severity=RiskLevel.DANGEROUS,
-                message=(
-                    f"Daily order rate {count} exceeds limit {self._config.max_orders_per_day}"
-                ),
+                message=(f"Daily order rate {count} exceeds limit {self._config.max_orders_per_day}"),
             )
         return None
 

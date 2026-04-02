@@ -7,13 +7,12 @@ import pytest
 from pnlclaw_agent.skills.types import (
     Skill,
     SkillFrontmatter,
-    SkillSnapshot,
-    SkillSource,
     SkillsConfig,
     SkillsLimits,
+    SkillSnapshot,
+    SkillSource,
     SkillSummary,
 )
-
 
 # ---------------------------------------------------------------------------
 # SkillSource enum

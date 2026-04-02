@@ -1,12 +1,21 @@
 # PnLClaw ruff configuration
 # Standalone file for editors/CI that don't read pyproject.toml
 
-line-length = 100
+line-length = 120
 target-version = "py311"
 
 [lint]
 select = ["E", "F", "I", "B", "UP"]
-ignore = ["B008"]
+ignore = [
+  "B008",
+  "E501",
+  "UP042",
+  "E402",
+  "B904",
+  "E741",
+  "B017",
+  "B027",
+]
 
 [lint.isort]
 known-first-party = [

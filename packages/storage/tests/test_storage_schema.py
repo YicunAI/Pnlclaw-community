@@ -60,8 +60,6 @@ async def test_strategies_columns(migrated_conn: aiosqlite.Connection):
     assert cols >= {"id", "name", "type", "config_json", "created_at", "updated_at", "version", "lifecycle_state"}
 
 
-
-
 @pytest.mark.asyncio
 async def test_backtests_columns_include_strategy_version(migrated_conn: aiosqlite.Connection):
     cursor = await migrated_conn.execute("PRAGMA table_info(backtests)")
@@ -99,9 +97,7 @@ async def test_audit_logs_columns(migrated_conn: aiosqlite.Connection):
 
 @pytest.mark.asyncio
 async def test_indexes_exist(migrated_conn: aiosqlite.Connection):
-    cursor = await migrated_conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'"
-    )
+    cursor = await migrated_conn.execute("SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'")
     indexes = {row[0] for row in await cursor.fetchall()}
     expected = {
         "idx_strategies_name",

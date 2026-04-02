@@ -108,9 +108,7 @@ class MarketDataService:
 
         logger.info("Registered source: %s/%s", *key)
 
-    def get_source(
-        self, exchange: str = "binance", market_type: str = "spot"
-    ) -> ExchangeSource | None:
+    def get_source(self, exchange: str = "binance", market_type: str = "spot") -> ExchangeSource | None:
         """Return the source for *exchange*/*market_type*, or None."""
         return self._sources.get((exchange, market_type))
 
@@ -147,9 +145,7 @@ class MarketDataService:
                 logger.error("Failed to start source %s/%s", *key, exc_info=True)
 
         self._running = True
-        logger.info(
-            "MarketDataService started with %d source(s)", len(self._sources)
-        )
+        logger.info("MarketDataService started with %d source(s)", len(self._sources))
 
     async def stop(self) -> None:
         """Stop all sources."""
@@ -292,7 +288,10 @@ class MarketDataService:
         while len(all_klines) < total:
             batch_limit = min(page_size, total - len(all_klines))
             batch = await source.fetch_klines_rest(
-                symbol, interval, batch_limit, end_time=cursor,
+                symbol,
+                interval,
+                batch_limit,
+                end_time=cursor,
             )
             if not batch:
                 empty_streak += 1
@@ -328,7 +327,9 @@ class MarketDataService:
         self._kline_cache[cache_key] = result
         logger.info(
             "Kline batch fetched: %s → %d candles in %d pages (cached)",
-            cache_key, len(result), pages,
+            cache_key,
+            len(result),
+            pages,
         )
 
         return result
@@ -422,7 +423,5 @@ class MarketDataService:
     def _require_source(self, exchange: str, market_type: str) -> ExchangeSource:
         source = self._sources.get((exchange, market_type))
         if source is None:
-            raise MarketDataServiceError(
-                f"No source registered for {exchange}/{market_type}"
-            )
+            raise MarketDataServiceError(f"No source registered for {exchange}/{market_type}")
         return source

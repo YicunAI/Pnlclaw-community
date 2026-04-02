@@ -89,9 +89,7 @@ class ExecutionEngine(Protocol):
         """
         ...
 
-    async def get_orders(
-        self, account_id: str, *, status: OrderStatus | None = None
-    ) -> list[Order]:
+    async def get_orders(self, account_id: str, *, status: OrderStatus | None = None) -> list[Order]:
         """Get orders for an account, optionally filtered by status."""
         ...
 

@@ -26,10 +26,7 @@ class KeywordMemoryBackend:
 
     async def recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         query_lower = query.lower()
-        matches = [
-            e for e in self._entries
-            if query_lower in e.content.lower()
-        ]
+        matches = [e for e in self._entries if query_lower in e.content.lower()]
         return matches[:limit]
 
     async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:

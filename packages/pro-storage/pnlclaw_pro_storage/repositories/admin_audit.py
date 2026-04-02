@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from pnlclaw_pro_storage.models import AdminAudit
 from pnlclaw_pro_storage.postgres import AsyncPostgresManager

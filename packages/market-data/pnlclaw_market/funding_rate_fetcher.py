@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -84,7 +84,9 @@ class FundingRateFetcher:
             okx_task = asyncio.create_task(self._fetch_okx())
 
             binance_items, okx_items = await asyncio.gather(
-                binance_task, okx_task, return_exceptions=True,
+                binance_task,
+                okx_task,
+                return_exceptions=True,
             )
 
             items: list[FundingRateItem] = []
@@ -123,15 +125,17 @@ class FundingRateFetcher:
             next_ts = int(row.get("nextFundingTime", 0))
 
             try:
-                items.append(FundingRateItem(
-                    exchange="binance",
-                    symbol=symbol,
-                    funding_rate=float(rate_str),
-                    mark_price=float(mark_str),
-                    index_price=float(index_str),
-                    next_funding_time=next_ts,
-                    timestamp=now_ms,
-                ))
+                items.append(
+                    FundingRateItem(
+                        exchange="binance",
+                        symbol=symbol,
+                        funding_rate=float(rate_str),
+                        mark_price=float(mark_str),
+                        index_price=float(index_str),
+                        next_funding_time=next_ts,
+                        timestamp=now_ms,
+                    )
+                )
             except (ValueError, TypeError):
                 continue
 
@@ -148,11 +152,7 @@ class FundingRateFetcher:
         inst_resp.raise_for_status()
         inst_data = inst_resp.json().get("data", [])
 
-        usdt_instruments = [
-            inst["instId"]
-            for inst in inst_data
-            if inst.get("instId", "").endswith("-USDT-SWAP")
-        ]
+        usdt_instruments = [inst["instId"] for inst in inst_data if inst.get("instId", "").endswith("-USDT-SWAP")]
 
         if not usdt_instruments:
             return []

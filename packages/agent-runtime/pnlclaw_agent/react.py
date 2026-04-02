@@ -45,11 +45,7 @@ def _truncate_tool_output(content: str, max_chars: int = _MAX_TOOL_RESULT_CHARS)
         return content
     half = (max_chars - 60) // 2
     orig_tokens = count_tokens(content)
-    return (
-        content[:half]
-        + f"\n[...truncated {orig_tokens} tokens to fit context...]\n"
-        + content[-half:]
-    )
+    return content[:half] + f"\n[...truncated {orig_tokens} tokens to fit context...]\n" + content[-half:]
 
 
 class ReActAgentRuntime:
@@ -103,21 +99,27 @@ class ReActAgentRuntime:
         for round_num in range(1, self._max_tool_rounds + 1):
             round_start = time.monotonic()
 
-            yield _event(AgentStreamEventType.THINKING, {
-                "content": f"Round {round_num}: analyzing request and deciding next action...",
-                "round": round_num,
-            })
+            yield _event(
+                AgentStreamEventType.THINKING,
+                {
+                    "content": f"Round {round_num}: analyzing request and deciding next action...",
+                    "round": round_num,
+                },
+            )
 
             # Proactive trim if approaching context limit
             if last_prompt_tokens > 0:
                 warn_threshold = int(_DEFAULT_CTX_WINDOW * _TOKEN_WARN_RATIO)
                 if last_prompt_tokens > warn_threshold:
                     conversation = self._compact_conversation(conversation)
-                    logger.info("react_proactive_trim", extra={
-                        "prompt_tokens": last_prompt_tokens,
-                        "threshold": warn_threshold,
-                        "msgs_after": len(conversation),
-                    })
+                    logger.info(
+                        "react_proactive_trim",
+                        extra={
+                            "prompt_tokens": last_prompt_tokens,
+                            "threshold": warn_threshold,
+                            "msgs_after": len(conversation),
+                        },
+                    )
 
             # --- Act: call LLM with tools, with context-overflow recovery ---
             tool_result: ToolCallResult | None = None
@@ -127,98 +129,140 @@ class ReActAgentRuntime:
                     break
                 except Exception as exc:
                     from pnlclaw_llm.base import LLMContextLengthError
+
                     if isinstance(exc, LLMContextLengthError):
-                        logger.warning("react_context_overflow", extra={
-                            "round": round_num, "attempt": attempt + 1,
-                            "msgs": len(conversation),
-                        })
+                        logger.warning(
+                            "react_context_overflow",
+                            extra={
+                                "round": round_num,
+                                "attempt": attempt + 1,
+                                "msgs": len(conversation),
+                            },
+                        )
                         conversation = self._compact_conversation(conversation, aggressive=True)
                         continue
                     if attempt == 0:
-                        logger.error("react_llm_error", extra={
-                            "round": round_num, "error": str(exc),
-                        }, exc_info=True)
+                        logger.error(
+                            "react_llm_error",
+                            extra={
+                                "round": round_num,
+                                "error": str(exc),
+                            },
+                            exc_info=True,
+                        )
                         continue
-                    logger.error("react_llm_retry_failed", extra={
-                        "round": round_num, "error": str(exc),
-                    }, exc_info=True)
-                    yield _event(AgentStreamEventType.TEXT_DELTA, {
-                        "text": self._format_partial_answer(collected_tool_results, str(exc)),
-                    })
+                    logger.error(
+                        "react_llm_retry_failed",
+                        extra={
+                            "round": round_num,
+                            "error": str(exc),
+                        },
+                        exc_info=True,
+                    )
+                    yield _event(
+                        AgentStreamEventType.TEXT_DELTA,
+                        {
+                            "text": self._format_partial_answer(collected_tool_results, str(exc)),
+                        },
+                    )
                     yield _event(AgentStreamEventType.DONE, {})
                     return
 
             if tool_result is None:
-                yield _event(AgentStreamEventType.TEXT_DELTA, {
-                    "text": self._format_partial_answer(
-                        collected_tool_results,
-                        "Unable to get response from LLM after context trimming.",
-                    ),
-                })
+                yield _event(
+                    AgentStreamEventType.TEXT_DELTA,
+                    {
+                        "text": self._format_partial_answer(
+                            collected_tool_results,
+                            "Unable to get response from LLM after context trimming.",
+                        ),
+                    },
+                )
                 yield _event(AgentStreamEventType.DONE, {})
                 return
 
             last_prompt_tokens = tool_result.usage.prompt_tokens
 
             if tool_result.tool_calls:
-                conversation.append({
-                    "role": "assistant",
-                    "content": tool_result.text or None,
-                    "tool_calls": [
-                        {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {
-                                "name": tc.name,
-                                "arguments": json.dumps(tc.arguments, ensure_ascii=False),
-                            },
-                        }
-                        for tc in tool_result.tool_calls
-                    ],
-                })
+                conversation.append(
+                    {
+                        "role": "assistant",
+                        "content": tool_result.text or None,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.name,
+                                    "arguments": json.dumps(tc.arguments, ensure_ascii=False),
+                                },
+                            }
+                            for tc in tool_result.tool_calls
+                        ],
+                    }
+                )
 
                 for tc in tool_result.tool_calls:
                     call_key = f"{tc.name}:{json.dumps(tc.arguments, sort_keys=True)}"
 
-                    recent = call_history[-(_MAX_SAME_CALL_REPEATS - 1):]
+                    recent = call_history[-(_MAX_SAME_CALL_REPEATS - 1) :]
                     if recent.count(call_key) >= _MAX_SAME_CALL_REPEATS - 1:
-                        logger.warning("react_loop_detected", extra={
-                            "tool": tc.name, "repeat_count": _MAX_SAME_CALL_REPEATS,
-                        })
-                        yield _event(AgentStreamEventType.TEXT_DELTA, {
-                            "text": f"Tool loop detected: {tc.name} called {_MAX_SAME_CALL_REPEATS} times with same arguments. Stopping.",
-                        })
+                        logger.warning(
+                            "react_loop_detected",
+                            extra={
+                                "tool": tc.name,
+                                "repeat_count": _MAX_SAME_CALL_REPEATS,
+                            },
+                        )
+                        yield _event(
+                            AgentStreamEventType.TEXT_DELTA,
+                            {
+                                "text": f"Tool loop detected: {tc.name} called {_MAX_SAME_CALL_REPEATS} times with same arguments. Stopping.",
+                            },
+                        )
                         yield _event(AgentStreamEventType.DONE, {})
                         return
                     call_history.append(call_key)
 
-                    yield _event(AgentStreamEventType.TOOL_CALL, {
-                        "tool": tc.name, "arguments": tc.arguments,
-                    })
+                    yield _event(
+                        AgentStreamEventType.TOOL_CALL,
+                        {
+                            "tool": tc.name,
+                            "arguments": tc.arguments,
+                        },
+                    )
 
                     tool_output = await self._execute_tool(tc.name, tc.arguments)
                     collected_tool_results.append({"tool": tc.name, **tool_output})
 
-                    yield _event(AgentStreamEventType.TOOL_RESULT, {
-                        "tool": tc.name, **tool_output,
-                    })
+                    yield _event(
+                        AgentStreamEventType.TOOL_RESULT,
+                        {
+                            "tool": tc.name,
+                            **tool_output,
+                        },
+                    )
 
                     truncated_content = _truncate_tool_output(
                         tool_output.get("output", "") or tool_output.get("error", "")
                     )
-                    conversation.append({
-                        "role": "tool",
-                        "content": truncated_content,
-                        "tool_call_id": tc.id,
-                    })
+                    conversation.append(
+                        {
+                            "role": "tool",
+                            "content": truncated_content,
+                            "tool_call_id": tc.id,
+                        }
+                    )
 
                     if self._on_checkpoint:
                         try:
-                            self._on_checkpoint({
-                                "round": round_num,
-                                "tool": tc.name,
-                                "collected_count": len(collected_tool_results),
-                            })
+                            self._on_checkpoint(
+                                {
+                                    "round": round_num,
+                                    "tool": tc.name,
+                                    "collected_count": len(collected_tool_results),
+                                }
+                            )
                         except Exception:
                             pass
 
@@ -227,50 +271,62 @@ class ReActAgentRuntime:
                 no_progress_count += 1
 
             elapsed_ms = int((time.monotonic() - round_start) * 1000)
-            logger.info("react_round", extra={
-                "round": round_num,
-                "action": "act" if tool_result.tool_calls else "reflect",
-                "tool": tool_result.tool_calls[0].name if tool_result.tool_calls else None,
-                "tokens_used": tool_result.usage.total_tokens,
-                "prompt_tokens": last_prompt_tokens,
-                "elapsed_ms": elapsed_ms,
-            })
+            logger.info(
+                "react_round",
+                extra={
+                    "round": round_num,
+                    "action": "act" if tool_result.tool_calls else "reflect",
+                    "tool": tool_result.tool_calls[0].name if tool_result.tool_calls else None,
+                    "tokens_used": tool_result.usage.total_tokens,
+                    "prompt_tokens": last_prompt_tokens,
+                    "elapsed_ms": elapsed_ms,
+                },
+            )
 
             if not tool_result.tool_calls:
                 text = tool_result.text or ""
                 if text:
-                    yield _event(AgentStreamEventType.REFLECTION, {
-                        "content": "Information sufficient, generating final answer.",
-                        "round": round_num,
-                    })
+                    yield _event(
+                        AgentStreamEventType.REFLECTION,
+                        {
+                            "content": "Information sufficient, generating final answer.",
+                            "round": round_num,
+                        },
+                    )
                     text = self._apply_hallucination_check(text, collected_tool_results)
                     self._context.add_message("assistant", text)
                     yield _event(AgentStreamEventType.TEXT_DELTA, {"text": text})
                     yield _event(AgentStreamEventType.DONE, {})
                     return
 
-            yield _event(AgentStreamEventType.REFLECTION, {
-                "content": f"Round {round_num} complete. Evaluating if more data is needed...",
-                "round": round_num,
-            })
+            yield _event(
+                AgentStreamEventType.REFLECTION,
+                {
+                    "content": f"Round {round_num} complete. Evaluating if more data is needed...",
+                    "round": round_num,
+                },
+            )
 
             if no_progress_count >= _MAX_CONSECUTIVE_NO_PROGRESS:
-                logger.warning("react_no_progress", extra={
-                    "rounds_without_progress": no_progress_count,
-                })
-                yield _event(AgentStreamEventType.TEXT_DELTA, {
-                    "text": self._format_partial_answer(
-                        collected_tool_results,
-                        "Reached maximum rounds without progress.",
-                    ),
-                })
+                logger.warning(
+                    "react_no_progress",
+                    extra={
+                        "rounds_without_progress": no_progress_count,
+                    },
+                )
+                yield _event(
+                    AgentStreamEventType.TEXT_DELTA,
+                    {
+                        "text": self._format_partial_answer(
+                            collected_tool_results,
+                            "Reached maximum rounds without progress.",
+                        ),
+                    },
+                )
                 yield _event(AgentStreamEventType.DONE, {})
                 return
 
-        warning = (
-            f"Reached maximum tool calling rounds ({self._max_tool_rounds}). "
-            f"Stopping to prevent infinite loops."
-        )
+        warning = f"Reached maximum tool calling rounds ({self._max_tool_rounds}). Stopping to prevent infinite loops."
         self._context.add_message("assistant", warning)
         yield _event(AgentStreamEventType.TEXT_DELTA, {"text": warning})
         yield _event(AgentStreamEventType.DONE, {})
@@ -325,7 +381,7 @@ class ReActAgentRuntime:
             return head + rest
 
         # Summarize old rounds, keep recent ones
-        old = rest[: -keep_recent]
+        old = rest[:-keep_recent]
         recent = rest[-keep_recent:]
 
         tool_names: list[str] = []
@@ -353,17 +409,21 @@ class ReActAgentRuntime:
                     }
             compacted.append(msg)
 
-        logger.info("react_compact", extra={
-            "removed": len(old),
-            "kept": len(recent),
-            "aggressive": aggressive,
-        })
+        logger.info(
+            "react_compact",
+            extra={
+                "removed": len(old),
+                "kept": len(recent),
+                "aggressive": aggressive,
+            },
+        )
         return compacted
 
     # -- LLM interaction -------------------------------------------------------
 
     async def _call_llm_with_tools(
-        self, messages: list[dict[str, str]],
+        self,
+        messages: list[dict[str, str]],
     ) -> ToolCallResult:
         """Try native chat_with_tools, fall back to JSON text parsing."""
         tool_defs = self._catalog.get_tool_definitions()
@@ -381,7 +441,8 @@ class ReActAgentRuntime:
     @staticmethod
     def _parse_text_as_tool_result(raw_text: str) -> ToolCallResult:
         """Parse raw LLM text into a ToolCallResult (JSON fallback)."""
-        from pnlclaw_llm.schemas import ToolCall, ToolCallResult as TCR
+        from pnlclaw_llm.schemas import ToolCall
+        from pnlclaw_llm.schemas import ToolCallResult as TCR
 
         stripped = raw_text.strip()
         if not stripped:
@@ -396,11 +457,13 @@ class ReActAgentRuntime:
                         calls = []
                         for i, tc in enumerate(raw_calls):
                             if isinstance(tc, dict):
-                                calls.append(ToolCall(
-                                    id=f"json_call_{i}",
-                                    name=tc.get("tool", tc.get("name", "")),
-                                    arguments=tc.get("arguments", {}),
-                                ))
+                                calls.append(
+                                    ToolCall(
+                                        id=f"json_call_{i}",
+                                        name=tc.get("tool", tc.get("name", "")),
+                                        arguments=tc.get("arguments", {}),
+                                    )
+                                )
                         text = parsed.get("response", "")
                         return TCR(tool_calls=calls, text=text or None)
                     text = parsed.get("response", "")
@@ -414,7 +477,9 @@ class ReActAgentRuntime:
     # -- Tool execution --------------------------------------------------------
 
     async def _execute_tool(
-        self, tool_name: str, arguments: dict[str, Any],
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
     ) -> dict[str, Any]:
         """Execute a tool with security checks and error handling.
 
@@ -442,9 +507,14 @@ class ReActAgentRuntime:
                 "error": result.error,
             }
         except Exception as exc:
-            logger.error("react_tool_error", extra={
-                "tool": tool_name, "error": str(exc),
-            }, exc_info=True)
+            logger.error(
+                "react_tool_error",
+                extra={
+                    "tool": tool_name,
+                    "error": str(exc),
+                },
+                exc_info=True,
+            )
             return {"output": "", "error": f"Tool execution error: {exc}"}
 
     # -- Hallucination check ---------------------------------------------------
@@ -480,7 +550,8 @@ class ReActAgentRuntime:
 
     @staticmethod
     def _format_partial_answer(
-        tool_results: list[dict[str, Any]], reason: str,
+        tool_results: list[dict[str, Any]],
+        reason: str,
     ) -> str:
         """Build a partial answer from collected tool results when aborting."""
         parts = [reason]

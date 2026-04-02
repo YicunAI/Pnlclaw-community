@@ -94,9 +94,7 @@ class Order(BaseModel):
     price: float | None = Field(None, ge=0, description="Limit price (None for market orders)")
     stop_price: float | None = Field(None, ge=0, description="Stop trigger price")
     filled_quantity: float = Field(0.0, ge=0, description="Total quantity filled so far (USDT)")
-    avg_fill_price: float | None = Field(
-        None, ge=0, description="Volume-weighted average fill price"
-    )
+    avg_fill_price: float | None = Field(None, ge=0, description="Volume-weighted average fill price")
     leverage: int = Field(1, ge=1, le=125, description="Leverage multiplier")
     margin_mode: MarginMode = Field(MarginMode.CROSS, description="Margin mode: cross/isolated/cash")
     pos_side: PositionSide = Field(PositionSide.NET, description="Position side: long/short/net")

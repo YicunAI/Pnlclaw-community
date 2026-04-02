@@ -229,14 +229,19 @@ async def oauth_login(
     oauth_provider = providers[provider]
 
     result = await oauth_provider.get_authorization_url(
-        state=state_token, redirect_uri=redirect_uri,
+        state=state_token,
+        redirect_uri=redirect_uri,
     )
     if isinstance(result, tuple):
         redirect_url, code_verifier = result
         state_token = jwt_mgr.create_state_token(
-            provider=provider, nonce=nonce, code_verifier=code_verifier, **extra,
+            provider=provider,
+            nonce=nonce,
+            code_verifier=code_verifier,
+            **extra,
         )
-        from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
+        from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
         parsed = urlparse(redirect_url)
         qs = parse_qs(parsed.query, keep_blank_values=True)
         qs["state"] = [state_token]
@@ -304,7 +309,9 @@ async def oauth_callback(
 
     try:
         token_response = await oauth_provider.exchange_code(
-            code, redirect_uri=redirect_uri, code_verifier=code_verifier,
+            code,
+            redirect_uri=redirect_uri,
+            code_verifier=code_verifier,
         )
     except Exception as exc:
         raise PnLClawError(
@@ -497,7 +504,7 @@ async def verify_totp(
 
     user_id = nonce_parts[0]
     user_role = nonce_parts[1] if len(nonce_parts) > 1 else "user"
-    email = nonce_parts[2] if len(nonce_parts) > 2 else ""
+    nonce_parts[2] if len(nonce_parts) > 2 else ""
     display_name = nonce_parts[3] if len(nonce_parts) > 3 else ""
 
     user = await user_repo.get_by_id(uuid.UUID(user_id))

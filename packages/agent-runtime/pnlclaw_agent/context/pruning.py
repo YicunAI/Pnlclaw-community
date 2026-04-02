@@ -51,11 +51,7 @@ class ContextPruner:
         current_tokens = self._total_tokens(result)
 
         # Stage 1: identify stale tool results
-        stale_indices = [
-            i
-            for i, m in enumerate(result)
-            if m.role == "tool" and (now_ms - m.timestamp) > self._ttl_ms
-        ]
+        stale_indices = [i for i, m in enumerate(result) if m.role == "tool" and (now_ms - m.timestamp) > self._ttl_ms]
 
         if not stale_indices:
             return result

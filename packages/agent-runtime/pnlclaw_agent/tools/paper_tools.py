@@ -46,10 +46,7 @@ class PaperCreateAccountTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return (
-            "Create a new paper trading account with a specified name "
-            "and initial balance for simulated trading."
-        )
+        return "Create a new paper trading account with a specified name and initial balance for simulated trading."
 
     @property
     def parameters(self) -> dict[str, Any]:

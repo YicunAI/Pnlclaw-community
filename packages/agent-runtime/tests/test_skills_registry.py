@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from pnlclaw_agent.skills.registry import SkillRegistry
-from pnlclaw_agent.skills.types import SkillSource, SkillsConfig, SkillsLimits
-
+from pnlclaw_agent.skills.types import SkillsConfig, SkillSource
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,9 +24,7 @@ def _create_skill_dir(root: Path, name: str, description: str = "") -> Path:
     return skill_dir
 
 
-def _create_skill_with_tools(
-    root: Path, name: str, requires_tools: list[str]
-) -> Path:
+def _create_skill_with_tools(root: Path, name: str, requires_tools: list[str]) -> Path:
     """Create a skill subdirectory with tool requirements in frontmatter."""
     skill_dir = root / name
     skill_dir.mkdir(parents=True, exist_ok=True)
@@ -78,9 +73,7 @@ class TestSkillRegistryLoading:
 
     def test_get_nonexistent(self, tmp_path: Path) -> None:
         """get() for a nonexistent skill returns None."""
-        registry = SkillRegistry(
-            bundled_dir=tmp_path / "empty", user_dir=tmp_path / "eu"
-        )
+        registry = SkillRegistry(bundled_dir=tmp_path / "empty", user_dir=tmp_path / "eu")
         assert registry.get("does-not-exist") is None
 
     def test_empty_dirs(self, tmp_path: Path) -> None:
@@ -377,9 +370,7 @@ class TestSkillRegistryEnabledConfig:
         _create_skill_dir(bundled, "disabled-skill")
 
         config = SkillsConfig(enabled={"disabled-skill": False})
-        registry = SkillRegistry(
-            config=config, bundled_dir=bundled, user_dir=tmp_path / "eu"
-        )
+        registry = SkillRegistry(config=config, bundled_dir=bundled, user_dir=tmp_path / "eu")
         registry.load()
 
         assert "enabled-skill" in registry
@@ -393,9 +384,7 @@ class TestSkillRegistryEnabledConfig:
         _create_skill_dir(bundled, "explicit")
 
         config = SkillsConfig(enabled={"explicit": True})
-        registry = SkillRegistry(
-            config=config, bundled_dir=bundled, user_dir=tmp_path / "eu"
-        )
+        registry = SkillRegistry(config=config, bundled_dir=bundled, user_dir=tmp_path / "eu")
         registry.load()
 
         assert "explicit" in registry
@@ -407,9 +396,7 @@ class TestSkillRegistryEnabledConfig:
         _create_skill_dir(bundled, "unlisted")
 
         config = SkillsConfig(enabled={"other": False})
-        registry = SkillRegistry(
-            config=config, bundled_dir=bundled, user_dir=tmp_path / "eu"
-        )
+        registry = SkillRegistry(config=config, bundled_dir=bundled, user_dir=tmp_path / "eu")
         registry.load()
 
         assert "unlisted" in registry

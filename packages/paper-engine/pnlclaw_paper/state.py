@@ -22,7 +22,11 @@ logger = logging.getLogger(__name__)
 _DEFAULT_STATE_DIR = Path.home() / ".pnlclaw" / "paper"
 
 _STATE_FILES = (
-    "accounts.json", "orders.json", "positions.json", "fills.json", "meta.json",
+    "accounts.json",
+    "orders.json",
+    "positions.json",
+    "fills.json",
+    "meta.json",
 )
 
 

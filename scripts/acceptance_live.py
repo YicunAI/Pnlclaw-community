@@ -18,9 +18,9 @@ def measure_latency(method: str, path: str, **kwargs: object) -> float:
     client = httpx.Client(base_url=BASE, timeout=10)
     t0 = time.time()
     if method == "GET":
-        r = client.get(path)
+        client.get(path)
     elif method == "POST":
-        r = client.post(path, **kwargs)  # type: ignore[arg-type]
+        client.post(path, **kwargs)  # type: ignore[arg-type]
     else:
         raise ValueError(method)
     elapsed = (time.time() - t0) * 1000
@@ -92,8 +92,7 @@ def check_f08_live() -> None:
 
     r2 = client.post(
         "/api/v1/strategies/validate",
-        json={"name": "test", "type": "sma_cross", "symbols": ["BTC/USDT"],
-              "interval": "1h", "parameters": {}},
+        json={"name": "test", "type": "sma_cross", "symbols": ["BTC/USDT"], "interval": "1h", "parameters": {}},
     )
     ok2 = r2.status_code in (200, 422)
     icon2 = "[OK]" if ok2 else "[!!]"

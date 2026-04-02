@@ -61,6 +61,7 @@ class MockLLM:
             resp = self._responses[self._call_count]
             self._call_count += 1
             import json
+
             return json.dumps(resp)
         return '{"response": "No more responses configured."}'
 
@@ -71,7 +72,7 @@ class MockLLM:
     async def chat_with_tools(
         self, messages: list[Any], tools: list[dict[str, Any]] | None = None, **kwargs: Any
     ) -> Any:
-        from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+        from pnlclaw_llm.schemas import TokenUsage, ToolCall, ToolCallResult
 
         if self._call_count < len(self._responses):
             resp = self._responses[self._call_count]
@@ -301,9 +302,7 @@ class TestLegacyAgentRuntime:
         return AgentContext(react_enabled=False)
 
     @pytest.mark.asyncio
-    async def test_text_response(
-        self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext
-    ) -> None:
+    async def test_text_response(self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext) -> None:
         llm = MockLLM([{"response": "Hello! How can I help?"}])
         runtime = LegacyAgentRuntime(llm, catalog, context, prompt_ctx)
 
@@ -345,9 +344,7 @@ class TestLegacyAgentRuntime:
         assert AgentStreamEventType.DONE in types
 
     @pytest.mark.asyncio
-    async def test_unknown_tool(
-        self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext
-    ) -> None:
+    async def test_unknown_tool(self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext) -> None:
         llm = MockLLM(
             [
                 {
@@ -371,10 +368,7 @@ class TestLegacyAgentRuntime:
     async def test_max_rounds_limit(
         self, catalog: ToolCatalog, context: ContextManager, prompt_ctx: AgentContext
     ) -> None:
-        responses = [
-            {"response": "", "tool_calls": [{"tool": "market_ticker", "arguments": {}}]}
-            for _ in range(15)
-        ]
+        responses = [{"response": "", "tool_calls": [{"tool": "market_ticker", "arguments": {}}]} for _ in range(15)]
         llm = MockLLM(responses)
         runtime = LegacyAgentRuntime(llm, catalog, context, prompt_ctx, max_tool_rounds=3)
 
@@ -415,4 +409,5 @@ class TestAgentRuntimeAlias:
 
     def test_alias_is_react(self) -> None:
         from pnlclaw_agent.react import ReActAgentRuntime
+
         assert AgentRuntime is ReActAgentRuntime

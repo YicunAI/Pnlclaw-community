@@ -98,9 +98,7 @@ class RiskAlert(BaseModel):
     rule_id: str = Field(..., description="Triggering rule ID")
     level: RiskLevel = Field(..., description="Alert severity")
     message: str = Field(..., description="Alert message")
-    context: dict[str, Any] = Field(
-        default_factory=dict, description="Additional context about the alert"
-    )
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional context about the alert")
     timestamp: Timestamp = Field(..., description="Alert time (ms epoch)")
     acknowledged: bool = Field(False, description="Whether the user has acknowledged this alert")
 

@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from pnlclaw_types.common import Symbol, Timestamp
 from pnlclaw_types.market import MarketType
 
-
 # ---------------------------------------------------------------------------
 # LiquidationEvent — single forced liquidation
 # ---------------------------------------------------------------------------
@@ -25,9 +24,7 @@ class LiquidationEvent(BaseModel):
     exchange: str = Field(..., description="Exchange identifier")
     symbol: Symbol = Field(..., description="Normalized trading pair")
     market_type: MarketType = Field("futures", description="Always futures for liquidations")
-    side: Literal["long", "short"] = Field(
-        ..., description="Which side was liquidated: long (SELL) or short (BUY)"
-    )
+    side: Literal["long", "short"] = Field(..., description="Which side was liquidated: long (SELL) or short (BUY)")
     quantity: float = Field(..., gt=0, description="Liquidation quantity in base currency")
     price: float = Field(..., gt=0, description="Liquidation order price")
     avg_price: float = Field(..., ge=0, description="Average fill price (0 if not filled yet)")

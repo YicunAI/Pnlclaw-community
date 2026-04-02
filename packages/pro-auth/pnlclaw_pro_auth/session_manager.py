@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from uuid import UUID
 
@@ -147,7 +147,7 @@ class SessionManager:
             avatar_url=avatar_url,
         )
 
-        session_expires = datetime.now(timezone.utc) + refresh_delta
+        session_expires = datetime.now(UTC) + refresh_delta
         session_id = await self._sessions.create(
             user_id=user_id,
             jti=jti,
@@ -254,7 +254,7 @@ class SessionManager:
             session_id=session_id_str,
             expires_delta=refresh_delta,
         )
-        new_expires = datetime.now(timezone.utc) + refresh_delta
+        new_expires = datetime.now(UTC) + refresh_delta
 
         await self._refresh.create(
             session_id=session_uuid,

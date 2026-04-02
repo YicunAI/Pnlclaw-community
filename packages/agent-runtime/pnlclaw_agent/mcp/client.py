@@ -9,7 +9,6 @@ even when the SDK is not installed.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -61,16 +60,11 @@ class McpClientSession:
         try:
             from mcp import ClientSession  # noqa: F401
         except ImportError:
-            raise McpClientError(
-                "The 'mcp' package is required for MCP support. "
-                "Install it with: pip install mcp"
-            )
+            raise McpClientError("The 'mcp' package is required for MCP support. Install it with: pip install mcp")
 
         errors = self.config.validate_config()
         if errors:
-            raise McpClientError(
-                f"Invalid MCP config for '{self.server_name}': {'; '.join(errors)}"
-            )
+            raise McpClientError(f"Invalid MCP config for '{self.server_name}': {'; '.join(errors)}")
 
         try:
             if self.config.transport == McpTransport.STDIO:
@@ -84,9 +78,7 @@ class McpClientSession:
             raise
         except Exception as exc:
             self._connected = False
-            raise McpClientError(
-                f"Failed to connect to MCP server '{self.server_name}': {exc}"
-            ) from exc
+            raise McpClientError(f"Failed to connect to MCP server '{self.server_name}': {exc}") from exc
 
     async def _connect_stdio(self) -> None:
         """Connect via stdio transport."""
@@ -138,9 +130,7 @@ class McpClientSession:
             try:
                 await self._session_ctx.__aexit__(None, None, None)
             except Exception:
-                logger.debug(
-                    "Error closing MCP session for '%s'", self.server_name, exc_info=True
-                )
+                logger.debug("Error closing MCP session for '%s'", self.server_name, exc_info=True)
             self._session_ctx = None
             self._session = None
 
@@ -149,9 +139,7 @@ class McpClientSession:
             try:
                 await self._transport_ctx.__aexit__(None, None, None)
             except Exception:
-                logger.debug(
-                    "Error closing MCP transport for '%s'", self.server_name, exc_info=True
-                )
+                logger.debug("Error closing MCP transport for '%s'", self.server_name, exc_info=True)
             self._transport_ctx = None
 
     # -- tool operations -----------------------------------------------------

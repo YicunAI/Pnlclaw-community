@@ -174,18 +174,14 @@ class SecretManager:
             return
 
         if self._keyring_required_for_store:
-            raise SecretResolutionError(
-                "Secret persistence requires keyring backend; refusing insecure storage."
-            )
+            raise SecretResolutionError("Secret persistence requires keyring backend; refusing insecure storage.")
 
         if ref.source == SecretSource.FILE:
             self._store_file(ref, value)
             self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
             return
 
-        raise SecretResolutionError(
-            f"Store operation is not supported for source: {ref.source}"
-        )
+        raise SecretResolutionError(f"Store operation is not supported for source: {ref.source}")
 
     async def delete(self, ref: SecretRef) -> None:
         """Delete a persisted secret for the given reference."""
@@ -195,18 +191,14 @@ class SecretManager:
             return
 
         if self._keyring_required_for_store:
-            raise SecretResolutionError(
-                "Secret deletion requires keyring backend; refusing insecure storage."
-            )
+            raise SecretResolutionError("Secret deletion requires keyring backend; refusing insecure storage.")
 
         if ref.source == SecretSource.FILE:
             self._delete_file(ref)
             self._cache.pop(f"{ref.source}:{ref.provider}:{ref.id}", None)
             return
 
-        raise SecretResolutionError(
-            f"Delete operation is not supported for source: {ref.source}"
-        )
+        raise SecretResolutionError(f"Delete operation is not supported for source: {ref.source}")
 
     # -- source resolvers ----------------------------------------------------
 
@@ -237,8 +229,7 @@ class SecretManager:
             mode = file_stat.st_mode
             if mode & (stat.S_IRGRP | stat.S_IROTH):
                 raise SecretResolutionError(
-                    f"Secret file {file_path} is readable by group/others. "
-                    f"Fix with: chmod 600 {file_path}"
+                    f"Secret file {file_path} is readable by group/others. Fix with: chmod 600 {file_path}"
                 )
 
         # Size check
@@ -259,9 +250,7 @@ class SecretManager:
         service = ref.provider or "pnlclaw"
         value = keyring.get_password(service, ref.id)
         if value is None:
-            raise SecretResolutionError(
-                f"No keyring entry found for service={service!r}, key={ref.id!r}"
-            )
+            raise SecretResolutionError(f"No keyring entry found for service={service!r}, key={ref.id!r}")
         return value
 
     async def _store_keyring(self, ref: SecretRef, value: str) -> None:

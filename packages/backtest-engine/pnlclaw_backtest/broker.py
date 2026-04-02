@@ -80,9 +80,7 @@ class SimulatedBroker:
         from pnlclaw_types.trading import OrderSide
 
         is_buy = order.side == OrderSide.BUY
-        triggered = (is_buy and kline.low <= order.price) or (
-            not is_buy and kline.high >= order.price
-        )
+        triggered = (is_buy and kline.low <= order.price) or (not is_buy and kline.high >= order.price)
 
         if not triggered:
             return None

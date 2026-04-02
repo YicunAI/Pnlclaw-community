@@ -16,7 +16,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import AuthenticatedUser, get_settings_service, get_skill_registry, optional_user
+from app.core.dependencies import (
+    AuthenticatedUser,
+    get_settings_service,
+    get_skill_registry,
+    optional_user,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/skills", tags=["skills"])

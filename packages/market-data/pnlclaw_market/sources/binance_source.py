@@ -48,10 +48,20 @@ _BINANCE_FUTURES_KLINE_REST = "https://fapi.binance.com/fapi/v1/klines"
 _MAX_KLINE_BUFFER = 200
 
 INTERVAL_MS: dict[str, int] = {
-    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
-    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000,
-    "6h": 21_600_000, "8h": 28_800_000, "12h": 43_200_000,
-    "1d": 86_400_000, "3d": 259_200_000, "1w": 604_800_000,
+    "1m": 60_000,
+    "3m": 180_000,
+    "5m": 300_000,
+    "15m": 900_000,
+    "30m": 1_800_000,
+    "1h": 3_600_000,
+    "2h": 7_200_000,
+    "4h": 14_400_000,
+    "6h": 21_600_000,
+    "8h": 28_800_000,
+    "12h": 43_200_000,
+    "1d": 86_400_000,
+    "3d": 259_200_000,
+    "1w": 604_800_000,
 }
 
 
@@ -74,9 +84,7 @@ class BinanceSource:
         self._config = ExchangeSourceConfig(exchange="binance", market_type=market_type)
         self._ws_url = ws_url or (_BINANCE_FUTURES_WS if is_futures else _BINANCE_SPOT_WS)
         self._rest_url = rest_url or (_BINANCE_FUTURES_REST if is_futures else _BINANCE_SPOT_REST)
-        self._kline_rest_url = (
-            _BINANCE_FUTURES_KLINE_REST if is_futures else _BINANCE_SPOT_KLINE_REST
-        )
+        self._kline_rest_url = _BINANCE_FUTURES_KLINE_REST if is_futures else _BINANCE_SPOT_KLINE_REST
         self._proxy_url = proxy_url
 
         # Multi-interval support: accept list or single string (backward compat)
@@ -225,13 +233,17 @@ class BinanceSource:
                 try:
                     await self._l2_manager.initialize(binance_upper)
                 except Exception:
-                    logger.warning("L2 init failed for %s on binance/%s", symbol, self._config.market_type, exc_info=True)
+                    logger.warning(
+                        "L2 init failed for %s on binance/%s", symbol, self._config.market_type, exc_info=True
+                    )
             await self._ws_client.subscribe_depth(binance_syms)
         if trade:
             await self._ws_client.subscribe_agg_trade(binance_syms)
 
         self._subscribed_symbols.add(symbol)
-        logger.info("Subscribed %s on binance/%s (intervals=%s)", symbol, self._config.market_type, self._kline_intervals)
+        logger.info(
+            "Subscribed %s on binance/%s (intervals=%s)", symbol, self._config.market_type, self._kline_intervals
+        )
 
         if kline:
             for ivl in self._kline_intervals:
@@ -316,33 +328,45 @@ class BinanceSource:
 
             buf: deque[KlineEvent] = deque(maxlen=_MAX_KLINE_BUFFER)
             for row in raw:
-                buf.append(KlineEvent(
-                    exchange="binance",
-                    market_type=self._config.market_type,
-                    symbol=symbol,
-                    timestamp=int(row[0]),
-                    interval=ivl,
-                    open=float(row[1]),
-                    high=float(row[2]),
-                    low=float(row[3]),
-                    close=float(row[4]),
-                    volume=float(row[5]),
-                    closed=True,
-                ))
+                buf.append(
+                    KlineEvent(
+                        exchange="binance",
+                        market_type=self._config.market_type,
+                        symbol=symbol,
+                        timestamp=int(row[0]),
+                        interval=ivl,
+                        open=float(row[1]),
+                        high=float(row[2]),
+                        low=float(row[3]),
+                        close=float(row[4]),
+                        volume=float(row[5]),
+                        closed=True,
+                    )
+                )
             buf_key = f"{symbol}:{ivl}"
             self._kline_buffers[buf_key] = buf
             logger.info(
                 "Fetched %d historical klines (%s) for %s on binance/%s",
-                len(buf), ivl, symbol, self._config.market_type,
+                len(buf),
+                ivl,
+                symbol,
+                self._config.market_type,
             )
         except Exception:
             logger.warning(
                 "Failed to fetch historical klines (%s) for %s on binance/%s",
-                ivl, symbol, self._config.market_type, exc_info=True,
+                ivl,
+                symbol,
+                self._config.market_type,
+                exc_info=True,
             )
 
     async def fetch_klines_rest(
-        self, symbol: str, interval: str = "1h", limit: int = 200, end_time: int | None = None,
+        self,
+        symbol: str,
+        interval: str = "1h",
+        limit: int = 200,
+        end_time: int | None = None,
     ) -> list[KlineEvent]:
         """On-demand REST fetch of klines for any interval.
 
@@ -367,28 +391,36 @@ class BinanceSource:
                 interval_ms = INTERVAL_MS.get(interval, 3_600_000)
                 candle_end = open_time + interval_ms
                 is_closed = now_ms >= candle_end
-                result.append(KlineEvent(
-                    exchange="binance",
-                    market_type=self._config.market_type,
-                    symbol=symbol,
-                    timestamp=open_time,
-                    interval=interval,
-                    open=float(row[1]),
-                    high=float(row[2]),
-                    low=float(row[3]),
-                    close=float(row[4]),
-                    volume=float(row[5]),
-                    closed=is_closed,
-                ))
+                result.append(
+                    KlineEvent(
+                        exchange="binance",
+                        market_type=self._config.market_type,
+                        symbol=symbol,
+                        timestamp=open_time,
+                        interval=interval,
+                        open=float(row[1]),
+                        high=float(row[2]),
+                        low=float(row[3]),
+                        close=float(row[4]),
+                        volume=float(row[5]),
+                        closed=is_closed,
+                    )
+                )
             logger.info(
                 "REST fetched %d klines (%s) for %s on binance/%s",
-                len(result), interval, symbol, self._config.market_type,
+                len(result),
+                interval,
+                symbol,
+                self._config.market_type,
             )
             return result
         except Exception:
             logger.warning(
                 "REST kline fetch failed for %s (%s) on binance/%s",
-                symbol, interval, self._config.market_type, exc_info=True,
+                symbol,
+                interval,
+                self._config.market_type,
+                exc_info=True,
             )
             return []
 
@@ -463,4 +495,3 @@ class BinanceSource:
     def _on_funding_rate(self, event: FundingRateEvent) -> None:
         self._stamp(event)
         self._event_bus.publish(event)
-

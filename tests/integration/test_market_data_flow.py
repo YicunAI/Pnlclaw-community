@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -19,7 +18,7 @@ from pnlclaw_exchange.exchanges.binance.normalizer import BinanceDepthDelta, Bin
 from pnlclaw_exchange.normalizers.symbol import SymbolNormalizer
 from pnlclaw_market.service import MarketDataService
 from pnlclaw_market.source import ExchangeSourceConfig
-from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, PriceLevel, TickerEvent
+from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, TickerEvent
 
 
 @pytest.fixture

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _new_id(prefix: str = "cs") -> str:
@@ -70,9 +70,7 @@ class ChatSessionRepository:
         return [dict(r) for r in rows]
 
     async def get_session(self, session_id: str) -> dict[str, Any] | None:
-        rows = await self._db.query(
-            "SELECT * FROM chat_sessions WHERE id = ?", (session_id,)
-        )
+        rows = await self._db.query("SELECT * FROM chat_sessions WHERE id = ?", (session_id,))
         return dict(rows[0]) if rows else None
 
     async def update_session_title(self, session_id: str, title: str) -> None:
@@ -109,10 +107,20 @@ class ChatSessionRepository:
             (mid, session_id, role, content, extra_json, now),
         )
         await self.touch_session(session_id)
-        return {"id": mid, "session_id": session_id, "role": role, "content": content, "extra": extra or {}, "created_at": now}
+        return {
+            "id": mid,
+            "session_id": session_id,
+            "role": role,
+            "content": content,
+            "extra": extra or {},
+            "created_at": now,
+        }
 
     async def get_messages(
-        self, session_id: str, limit: int = 200, offset: int = 0,
+        self,
+        session_id: str,
+        limit: int = 200,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         rows = await self._db.query(
             "SELECT * FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC LIMIT ? OFFSET ?",
@@ -129,7 +137,9 @@ class ChatSessionRepository:
         return result
 
     async def save_messages_bulk(
-        self, session_id: str, messages: list[dict[str, Any]],
+        self,
+        session_id: str,
+        messages: list[dict[str, Any]],
     ) -> None:
         """Upsert a batch of messages in a single transaction."""
         params = []
@@ -144,9 +154,7 @@ class ChatSessionRepository:
         if not params:
             return
         async with self._db.connection() as conn:
-            await conn.execute(
-                "DELETE FROM chat_messages WHERE session_id = ?", (session_id,)
-            )
+            await conn.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
             await conn.executemany(
                 "INSERT INTO chat_messages (id, session_id, role, content, extra_json, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?)",

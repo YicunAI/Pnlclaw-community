@@ -197,9 +197,7 @@ class PolymarketWSClient(BaseWSClient):
 
         # Start PING keepalive per Polymarket docs (every 50s)
         if self._ping_task is None or self._ping_task.done():
-            self._ping_task = asyncio.create_task(
-                self._ping_loop(), name="polymarket-ws-ping"
-            )
+            self._ping_task = asyncio.create_task(self._ping_loop(), name="polymarket-ws-ping")
 
     async def _connect_user(self) -> None:
         """Open the user WebSocket connection (called by subscribe_user)."""
@@ -256,19 +254,13 @@ class PolymarketWSClient(BaseWSClient):
                 break
 
             delay = min(1.0 * (2 ** min(attempt, 6)), 60.0)
-            logger.info(
-                "Polymarket WS reconnect attempt %d in %.1fs", attempt, delay
-            )
+            logger.info("Polymarket WS reconnect attempt %d in %.1fs", attempt, delay)
             await asyncio.sleep(delay)
 
             try:
                 await self._connect_market()
                 # Re-subscribe to all previously active market subscriptions
-                market_tokens = [
-                    s.split(":", 1)[1]
-                    for s in self._subscriptions
-                    if s.startswith("market:")
-                ]
+                market_tokens = [s.split(":", 1)[1] for s in self._subscriptions if s.startswith("market:")]
                 if market_tokens:
                     await self.subscribe_market(market_tokens)
                 logger.info("Polymarket WS reconnected after %d attempts", attempt)
@@ -350,18 +342,24 @@ class PolymarketWSClient(BaseWSClient):
         """Unsubscribe from market token streams."""
         self._subscriptions -= set(streams)
 
-        market_tokens = [
-            s.split(":", 1)[1] for s in streams if s.startswith("market:")
-        ]
+        market_tokens = [s.split(":", 1)[1] for s in streams if s.startswith("market:")]
         if market_tokens and self._ws_market is not None:
-            await self._ws_market.send(json.dumps({
-                "assets_ids": market_tokens,
-                "type": "unsubscribe_market",
-            }))
-            await self._ws_market.send(json.dumps({
-                "assets_ids": market_tokens,
-                "type": "unsubscribe_book",
-            }))
+            await self._ws_market.send(
+                json.dumps(
+                    {
+                        "assets_ids": market_tokens,
+                        "type": "unsubscribe_market",
+                    }
+                )
+            )
+            await self._ws_market.send(
+                json.dumps(
+                    {
+                        "assets_ids": market_tokens,
+                        "type": "unsubscribe_book",
+                    }
+                )
+            )
             logger.info("Polymarket market unsubscribe: %d tokens", len(market_tokens))
 
     # ------------------------------------------------------------------
@@ -430,15 +428,11 @@ class PolymarketWSClient(BaseWSClient):
                         continue
                     parsed: Any = json.loads(raw)
                 except (json.JSONDecodeError, UnicodeDecodeError):
-                    logger.debug(
-                        "Non-JSON from Polymarket %s: %s", label, str(raw)[:200]
-                    )
+                    logger.debug("Non-JSON from Polymarket %s: %s", label, str(raw)[:200])
                     continue
 
                 # Polymarket may send a single dict or a list of dicts
-                items: list[dict[str, Any]] = (
-                    parsed if isinstance(parsed, list) else [parsed]
-                )
+                items: list[dict[str, Any]] = parsed if isinstance(parsed, list) else [parsed]
                 for item in items:
                     if not isinstance(item, dict):
                         continue
@@ -447,9 +441,7 @@ class PolymarketWSClient(BaseWSClient):
             logger.info("Polymarket %s WS closed: %s", label, exc)
             if label == "user":
                 self._user_authenticated = False
-            await self._dispatch_disconnect(
-                code=getattr(exc, "code", 1006), reason=str(exc)
-            )
+            await self._dispatch_disconnect(code=getattr(exc, "code", 1006), reason=str(exc))
             if label == "market":
                 self._ws_market = None
                 if self.on_disconnect_cb:

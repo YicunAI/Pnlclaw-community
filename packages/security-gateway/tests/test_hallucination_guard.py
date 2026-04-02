@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from pnlclaw_security.guardrails.hallucination import HallucinationDetector, ScanResult
+from pnlclaw_security.guardrails.hallucination import HallucinationDetector
 
 # ---------------------------------------------------------------------------
 # Test 1: Unverified price claim → appends warning

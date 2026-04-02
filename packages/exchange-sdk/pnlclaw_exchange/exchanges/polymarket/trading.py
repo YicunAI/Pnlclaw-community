@@ -116,9 +116,7 @@ class PolymarketTradingClient:
     ) -> None:
         self._creds = credentials
         self._base_url = base_url.rstrip("/")
-        self._rate_limiter = rate_limiter or SlidingWindowRateLimiter(
-            calls_per_window=100, window_ms=10_000
-        )
+        self._rate_limiter = rate_limiter or SlidingWindowRateLimiter(calls_per_window=100, window_ms=10_000)
         self._http = httpx.AsyncClient(timeout=timeout)
 
     async def close(self) -> None:
@@ -212,14 +210,10 @@ class PolymarketTradingClient:
         error_msg = data.get("error", data.get("message", str(data)))
 
         if "insufficient" in str(error_msg).lower() or "balance" in str(error_msg).lower():
-            raise InsufficientBalanceError(
-                f"Polymarket: {error_msg}", exchange="polymarket"
-            )
+            raise InsufficientBalanceError(f"Polymarket: {error_msg}", exchange="polymarket")
 
         if "not found" in str(error_msg).lower():
-            raise OrderNotFoundError(
-                f"Polymarket: {error_msg}", exchange="polymarket"
-            )
+            raise OrderNotFoundError(f"Polymarket: {error_msg}", exchange="polymarket")
 
         if resp.status_code == 400:
             raise OrderRejectedError(
@@ -268,9 +262,7 @@ class PolymarketTradingClient:
                 exchange="polymarket",
             )
         if size <= 0:
-            raise InvalidOrderError(
-                "Order size must be positive", exchange="polymarket"
-            )
+            raise InvalidOrderError("Order size must be positive", exchange="polymarket")
 
         body: dict[str, Any] = {
             "tokenID": token_id,
@@ -299,9 +291,7 @@ class PolymarketTradingClient:
         Args:
             order_ids: List of order IDs to cancel.
         """
-        return await self._request(
-            "DELETE", "/orders", body={"orderIDs": order_ids}
-        )
+        return await self._request("DELETE", "/orders", body={"orderIDs": order_ids})
 
     async def cancel_all_orders(self) -> dict[str, Any]:
         """Cancel all active orders."""

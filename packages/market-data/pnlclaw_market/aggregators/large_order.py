@@ -72,18 +72,20 @@ class LargeOrderDetector:
                 side_str, price_str = key.split(":", 1)
                 price = float(price_str)
                 prev_qty = prev_notional / price if price > 0 else 1.0
-                events.append(LargeOrderEvent(
-                    exchange=snapshot.exchange,
-                    symbol=symbol,
-                    market_type=snapshot.market_type,
-                    side=side_str,  # type: ignore[arg-type]
-                    price=price,
-                    quantity=prev_qty,
-                    notional_usd=prev_notional,
-                    depth_rank=0,
-                    event_type="disappeared",
-                    timestamp=now_ms,
-                ))
+                events.append(
+                    LargeOrderEvent(
+                        exchange=snapshot.exchange,
+                        symbol=symbol,
+                        market_type=snapshot.market_type,
+                        side=side_str,  # type: ignore[arg-type]
+                        price=price,
+                        quantity=prev_qty,
+                        notional_usd=prev_notional,
+                        depth_rank=0,
+                        event_type="disappeared",
+                        timestamp=now_ms,
+                    )
+                )
 
         self._prev_large[symbol] = current_large
 
@@ -146,21 +148,25 @@ class LargeOrderDetector:
         for rank, level in enumerate(snapshot.bids):
             notional = level.price * level.quantity
             if notional >= self._threshold_usd:
-                result["bid_walls"].append({
-                    "price": level.price,
-                    "quantity": level.quantity,
-                    "notional_usd": notional,
-                    "rank": rank,
-                })
+                result["bid_walls"].append(
+                    {
+                        "price": level.price,
+                        "quantity": level.quantity,
+                        "notional_usd": notional,
+                        "rank": rank,
+                    }
+                )
 
         for rank, level in enumerate(snapshot.asks):
             notional = level.price * level.quantity
             if notional >= self._threshold_usd:
-                result["ask_walls"].append({
-                    "price": level.price,
-                    "quantity": level.quantity,
-                    "notional_usd": notional,
-                    "rank": rank,
-                })
+                result["ask_walls"].append(
+                    {
+                        "price": level.price,
+                        "quantity": level.quantity,
+                        "notional_usd": notional,
+                        "rank": rank,
+                    }
+                )
 
         return result

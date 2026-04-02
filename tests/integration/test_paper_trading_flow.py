@@ -13,7 +13,6 @@ import pytest_asyncio
 from pnlclaw_paper.paper_execution import PaperExecutionEngine
 from pnlclaw_types.trading import (
     BalanceUpdate,
-    ExecutionMode,
     Fill,
     Order,
     OrderSide,

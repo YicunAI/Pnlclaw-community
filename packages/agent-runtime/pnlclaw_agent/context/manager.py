@@ -170,7 +170,7 @@ class ContextManager:
         *,
         max_tokens: int = 200_000,
         max_messages: int = 100,
-    ) -> "ContextManager":
+    ) -> ContextManager:
         """Restore a ContextManager from serialized message data."""
         cm = cls(max_tokens=max_tokens, max_messages=max_messages)
         for item in data:
@@ -227,11 +227,14 @@ class ContextManager:
                 )
                 return
 
-        self._messages.insert(0, ChatMessage(
-            role="system",
-            content=summary,
-            timestamp=int(time.time() * 1000),
-        ))
+        self._messages.insert(
+            0,
+            ChatMessage(
+                role="system",
+                content=summary,
+                timestamp=int(time.time() * 1000),
+            ),
+        )
 
     # -- auto compaction -------------------------------------------------------
 

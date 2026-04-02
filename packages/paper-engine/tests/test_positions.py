@@ -28,8 +28,13 @@ class TestPositionManager:
         mgr = PositionManager()
         fill = _make_fill(67000.0, 67000.0)
         pos, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", fill, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.CROSS, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            fill,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.CROSS,
+            pos_side=PositionSide.LONG,
         )
         assert pos.side == OrderSide.BUY
         assert pos.quantity == 67000.0
@@ -44,12 +49,20 @@ class TestPositionManager:
         f1 = _make_fill(66000.0, 66000.0)
         f2 = _make_fill(68000.0, 68000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         pos, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         assert pos.quantity == pytest.approx(134000.0)
         assert pos.quantity_base == pytest.approx(2.0)
@@ -60,13 +73,21 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(66000.0, 66000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         f2 = _make_fill(68000.0, 66000.0)
         pos, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         assert pos.quantity == pytest.approx(0.0, abs=1)
         assert realized == pytest.approx(2000.0)
@@ -75,13 +96,21 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(68000.0, 68000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         f2 = _make_fill(66000.0, 68000.0)
         _, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         assert realized == pytest.approx(-2000.0)
 
@@ -89,13 +118,21 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         f2 = _make_fill(68000.0, 33500.0)
         pos, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         assert pos.quantity == pytest.approx(33500.0)
         assert realized == pytest.approx(500.0)
@@ -104,8 +141,12 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.SHORT,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.SHORT,
         )
         pos = mgr.get_position("acc-1", "BTC-USDT-SWAP")
         assert pos is not None
@@ -115,13 +156,21 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(68000.0, 68000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.SHORT,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.SHORT,
         )
         f2 = _make_fill(66000.0, 68000.0)
         _, realized = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.SHORT,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.SHORT,
         )
         assert realized == pytest.approx(2000.0)
 
@@ -129,8 +178,13 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         pos, _ = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.ISOLATED, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.ISOLATED,
+            pos_side=PositionSide.LONG,
         )
         assert pos.liquidation_price is not None
         assert pos.liquidation_price < 67000.0
@@ -139,8 +193,13 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         pos, _ = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.CROSS, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.CROSS,
+            pos_side=PositionSide.LONG,
         )
         assert pos.liquidation_price is not None
         assert pos.liquidation_price < 67000.0
@@ -150,15 +209,25 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         pos1, _ = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.ISOLATED, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.ISOLATED,
+            pos_side=PositionSide.LONG,
         )
         liq_1 = pos1.liquidation_price
 
         f2 = _make_fill(68000.0, 68000.0)
         pos2, _ = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f2, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.ISOLATED, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f2,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.ISOLATED,
+            pos_side=PositionSide.LONG,
         )
         liq_2 = pos2.liquidation_price
 
@@ -171,8 +240,13 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         pos, _ = mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, margin_mode=MarginMode.CROSS, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            margin_mode=MarginMode.CROSS,
+            pos_side=PositionSide.LONG,
             available_balance=100000.0,
         )
         assert pos.liquidation_price is not None
@@ -182,8 +256,12 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         updated = mgr.update_unrealized_pnl("acc-1", "BTC-USDT-SWAP", 68000.0)
         assert len(updated) == 1
@@ -194,8 +272,12 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.SHORT,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.SHORT,
         )
         updated = mgr.update_unrealized_pnl("acc-1", "BTC-USDT-SWAP", 66000.0)
         assert len(updated) == 1
@@ -205,18 +287,30 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         f2 = _make_fill(3000.0, 30000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "ETH-USDT-SWAP", f2, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "ETH-USDT-SWAP",
+            f2,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         f3 = _make_fill(68000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f3, OrderSide.SELL,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f3,
+            OrderSide.SELL,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         open_pos = mgr.get_open_positions("acc-1")
         assert len(open_pos) == 1
@@ -226,8 +320,12 @@ class TestPositionManager:
         mgr = PositionManager()
         f1 = _make_fill(67000.0, 67000.0)
         mgr.apply_fill_with_symbol(
-            "acc-1", "BTC-USDT-SWAP", f1, OrderSide.BUY,
-            leverage=10, pos_side=PositionSide.LONG,
+            "acc-1",
+            "BTC-USDT-SWAP",
+            f1,
+            OrderSide.BUY,
+            leverage=10,
+            pos_side=PositionSide.LONG,
         )
         data = mgr.get_all_data()
 

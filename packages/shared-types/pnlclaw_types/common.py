@@ -37,9 +37,7 @@ class Pagination(BaseModel):
     limit: int = Field(50, ge=1, le=1000, description="Max items per page")
     total: int = Field(0, ge=0, description="Total items available")
 
-    model_config = ConfigDict(
-        json_schema_extra={"examples": [{"offset": 0, "limit": 50, "total": 120}]}
-    )
+    model_config = ConfigDict(json_schema_extra={"examples": [{"offset": 0, "limit": 50, "total": 120}]})
 
 
 # ---------------------------------------------------------------------------
@@ -79,9 +77,7 @@ class ResponseMeta(BaseModel):
     pagination: Pagination | None = Field(None, description="Pagination info if applicable")
 
     model_config = ConfigDict(
-        json_schema_extra={
-            "examples": [{"request_id": "550e8400-e29b-41d4-a716-446655440000", "pagination": None}]
-        }
+        json_schema_extra={"examples": [{"request_id": "550e8400-e29b-41d4-a716-446655440000", "pagination": None}]}
     )
 
 

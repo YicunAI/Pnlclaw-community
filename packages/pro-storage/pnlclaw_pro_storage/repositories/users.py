@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import delete, func, or_, select, update
@@ -13,8 +13,13 @@ from pnlclaw_pro_storage.models import User, UserTag, UserTagAssignment
 from pnlclaw_pro_storage.postgres import AsyncPostgresManager
 
 _ALLOWED_SORT_COLUMNS = {
-    "created_at", "display_name", "email", "status", "role",
-    "last_login_at", "login_count",
+    "created_at",
+    "display_name",
+    "email",
+    "status",
+    "role",
+    "last_login_at",
+    "login_count",
 }
 
 
@@ -65,7 +70,6 @@ class UserRepository:
 
     async def get_by_id(self, user_id: uuid.UUID) -> User | None:
         """Return a user by primary key, or ``None``."""
-        from pnlclaw_pro_storage.models import OAuthAccount
 
         async with self._db.session() as session:
             stmt = (
@@ -161,13 +165,7 @@ class UserRepository:
                 base = base.where(User.last_country == country)
 
             if provider:
-                base = base.where(
-                    User.id.in_(
-                        select(OAuthAccount.user_id).where(
-                            OAuthAccount.provider == provider
-                        )
-                    )
-                )
+                base = base.where(User.id.in_(select(OAuthAccount.user_id).where(OAuthAccount.provider == provider)))
 
             if tag:
                 base = base.where(
@@ -235,13 +233,9 @@ class UserRepository:
 
     async def soft_delete(self, user_id: uuid.UUID) -> None:
         """Mark a user as deleted without removing the row."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
-            stmt = (
-                update(User)
-                .where(User.id == user_id)
-                .values(deleted_at=now, status="deleted")
-            )
+            stmt = update(User).where(User.id == user_id).values(deleted_at=now, status="deleted")
             await session.execute(stmt)
 
     async def hard_delete_expired(self, days: int = 30) -> int:
@@ -249,11 +243,8 @@ class UserRepository:
 
         Returns the number of rows removed.
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         async with self._db.session() as session:
-            stmt = (
-                delete(User)
-                .where(User.deleted_at.isnot(None), User.deleted_at < cutoff)
-            )
+            stmt = delete(User).where(User.deleted_at.isnot(None), User.deleted_at < cutoff)
             result = await session.execute(stmt)
             return result.rowcount  # type: ignore[return-value]

@@ -8,9 +8,7 @@ from typing import Any
 
 import structlog
 
-_request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "pnlclaw_request_id", default=None
-)
+_request_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar("pnlclaw_request_id", default=None)
 
 # Patterns that should be redacted in log output
 _REDACT_PATTERNS: list[re.Pattern[str]] = [
@@ -50,9 +48,7 @@ def _redact_processor(logger: Any, method_name: str, event_dict: dict[str, Any])
     return event_dict
 
 
-def _request_id_processor(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+def _request_id_processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
     """Inject the current request_id into every log entry."""
     rid = _request_id_var.get()
     if rid is not None:

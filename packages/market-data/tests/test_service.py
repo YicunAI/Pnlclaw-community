@@ -12,7 +12,6 @@ from pnlclaw_market.source import ExchangeSourceConfig
 from pnlclaw_types.market import (
     KlineEvent,
     OrderBookL2Snapshot,
-    PriceLevel,
     TickerEvent,
 )
 
@@ -98,7 +97,6 @@ def _ticker(exchange: str = "binance", market_type: str = "spot", symbol: str = 
 
 
 class TestMarketDataService:
-
     def test_is_running_default_false(self) -> None:
         svc = MarketDataService()
         assert svc.is_running is False

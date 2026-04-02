@@ -5,10 +5,9 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from app.core.crypto import KeyPairManager, decrypt_if_encrypted
 from pnlclaw_core.infra.atomic_write import atomic_write
 from pnlclaw_security.secrets import SecretManager, SecretRef, SecretSource
-
-from app.core.crypto import KeyPairManager, decrypt_if_encrypted
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +101,7 @@ class SettingsService:
             "keyring_available": self._secret_manager.keyring_available(),
             "persistence_guarantee": "best-effort-os-keychain",
             "security_note": (
-                "Secrets are stored via OS keychain when available. "
-                "No software can guarantee absolute unbreakability."
+                "Secrets are stored via OS keychain when available. No software can guarantee absolute unbreakability."
             ),
         }
 
@@ -194,13 +192,9 @@ class SettingsService:
         if "skills" in payload and isinstance(payload["skills"], dict):
             skills = payload["skills"]
             if "extra_dirs" in skills and isinstance(skills["extra_dirs"], list):
-                non_sensitive["skills"]["extra_dirs"] = [
-                    str(d).strip() for d in skills["extra_dirs"] if str(d).strip()
-                ]
+                non_sensitive["skills"]["extra_dirs"] = [str(d).strip() for d in skills["extra_dirs"] if str(d).strip()]
             if "enabled" in skills and isinstance(skills["enabled"], dict):
-                non_sensitive["skills"]["enabled"].update(
-                    {str(k): bool(v) for k, v in skills["enabled"].items()}
-                )
+                non_sensitive["skills"]["enabled"].update({str(k): bool(v) for k, v in skills["enabled"].items()})
 
         if "ai" in payload and isinstance(payload["ai"], dict):
             ai_cfg = payload["ai"]
@@ -326,13 +320,16 @@ class SettingsService:
     def get_ai_config(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Return the AI configuration section (PRD supplement E)."""
         data = self._load_non_sensitive(user_id=user_id)
-        return data.get("ai", {
-            "react_enabled": True,
-            "max_tool_rounds": 10,
-            "show_thinking": True,
-            "hallucination_check": True,
-            "compaction_threshold": 0.8,
-        })
+        return data.get(
+            "ai",
+            {
+                "react_enabled": True,
+                "max_tool_rounds": 10,
+                "show_thinking": True,
+                "hallucination_check": True,
+                "compaction_threshold": 0.8,
+            },
+        )
 
     async def resolve_llm_api_key(self, *, user_id: str | None = None) -> str | None:
         """Resolve the LLM API key from keyring for the given user."""
@@ -367,8 +364,6 @@ class SettingsService:
                 str(d).strip() for d in skills_payload["extra_dirs"] if str(d).strip()
             ]
         if "enabled" in skills_payload and isinstance(skills_payload["enabled"], dict):
-            non_sensitive["skills"]["enabled"].update(
-                {str(k): bool(v) for k, v in skills_payload["enabled"].items()}
-            )
+            non_sensitive["skills"]["enabled"].update({str(k): bool(v) for k, v in skills_payload["enabled"].items()})
         self._save_non_sensitive(non_sensitive, user_id=user_id)
         return non_sensitive["skills"]

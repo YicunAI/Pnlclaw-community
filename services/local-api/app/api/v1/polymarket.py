@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -307,11 +307,13 @@ def _extract_outcomes_from_market(m: dict[str, Any]) -> list[dict[str, Any]]:
         for i, tid in enumerate(clob_ids):
             name = outcome_names[i] if i < len(outcome_names) else f"Outcome {i}"
             price = float(prices_list[i]) if i < len(prices_list) else 0.0
-            outcomes_list.append({
-                "token_id": str(tid),
-                "outcome": str(name),
-                "price": price,
-            })
+            outcomes_list.append(
+                {
+                    "token_id": str(tid),
+                    "outcome": str(name),
+                    "price": price,
+                }
+            )
         if outcomes_list:
             return outcomes_list
 
@@ -321,13 +323,15 @@ def _extract_outcomes_from_market(m: dict[str, Any]) -> list[dict[str, Any]]:
             tokens = _json.loads(tokens) if tokens else []
         except Exception:
             tokens = []
-    for t in (tokens if isinstance(tokens, list) else []):
+    for t in tokens if isinstance(tokens, list) else []:
         if isinstance(t, dict):
-            outcomes_list.append({
-                "token_id": t.get("token_id", ""),
-                "outcome": t.get("outcome", ""),
-                "price": float(t.get("price", 0) or 0),
-            })
+            outcomes_list.append(
+                {
+                    "token_id": t.get("token_id", ""),
+                    "outcome": t.get("outcome", ""),
+                    "price": float(t.get("price", 0) or 0),
+                }
+            )
 
     return outcomes_list
 
@@ -350,18 +354,20 @@ def _enrich_event(raw: dict[str, Any]) -> dict[str, Any]:
         for o in outcomes:
             o.setdefault("winner", False)
 
-        markets_enriched.append({
-            "id": m.get("id", ""),
-            "question": m.get("question", ""),
-            "question_zh": _translate_title(m.get("question", "")),
-            "condition_id": m.get("conditionId", m.get("condition_id", "")),
-            "slug": m.get("slug", ""),
-            "active": m.get("active", True),
-            "closed": m.get("closed", False),
-            "volume": float(m.get("volume", 0) or 0),
-            "liquidity": float(m.get("liquidity", 0) or 0),
-            "outcomes": outcomes,
-        })
+        markets_enriched.append(
+            {
+                "id": m.get("id", ""),
+                "question": m.get("question", ""),
+                "question_zh": _translate_title(m.get("question", "")),
+                "condition_id": m.get("conditionId", m.get("condition_id", "")),
+                "slug": m.get("slug", ""),
+                "active": m.get("active", True),
+                "closed": m.get("closed", False),
+                "volume": float(m.get("volume", 0) or 0),
+                "liquidity": float(m.get("liquidity", 0) or 0),
+                "outcomes": outcomes,
+            }
+        )
 
     return {
         "id": raw.get("id", ""),
@@ -468,8 +474,7 @@ async def get_event(
                 (
                     rm
                     for rm in raw_m_list
-                    if rm.get("id", "") == m["id"]
-                    or rm.get("conditionId", "") == m["condition_id"]
+                    if rm.get("id", "") == m["id"] or rm.get("conditionId", "") == m["condition_id"]
                 ),
                 {},
             )
@@ -556,7 +561,7 @@ def _parse_iso_date(s: str) -> datetime | None:
     try:
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         return dt
     except Exception:
         return None
@@ -572,10 +577,11 @@ def _extract_window_from_slug(slug: str, tf: str) -> tuple[datetime | None, date
     m = _SLUG_TS_RE.search(slug)
     if not m:
         return None, None
-    window_start = datetime.fromtimestamp(int(m.group(1)), tz=timezone.utc)
+    window_start = datetime.fromtimestamp(int(m.group(1)), tz=UTC)
     duration = _TIMEFRAME_SECONDS.get(tf, 0)
     if duration:
         from datetime import timedelta
+
         window_end = window_start + timedelta(seconds=duration)
     else:
         window_end = None
@@ -673,7 +679,7 @@ async def list_crypto_predictions(
     try:
         import asyncio as _aio
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # --- Strategy 1: deterministic slug fetch for 5m/15m (fast & precise) ---
@@ -685,8 +691,11 @@ async def list_crypto_predictions(
         # --- Strategy 2: end_date_min filter for 1h/daily (official Gamma param) ---
         async def _fetch_hourly() -> list[dict[str, Any]]:
             return await client.list_events(
-                limit=50, active=True, closed=False,
-                order="endDate", ascending=True,
+                limit=50,
+                active=True,
+                closed=False,
+                order="endDate",
+                ascending=True,
                 end_date_min=now_iso,
             )
 
@@ -699,7 +708,7 @@ async def list_crypto_predictions(
         predictions: list[dict[str, Any]] = []
 
         # Process slug-based results (5m/15m)
-        for (slug, tf_label, ws_ts), result in zip(current_slugs, slug_results):
+        for (_slug, tf_label, ws_ts), result in zip(current_slugs, slug_results, strict=False):
             if isinstance(result, Exception) or result is None:
                 continue
             pred = _event_to_prediction(result)
@@ -713,9 +722,7 @@ async def list_crypto_predictions(
             if timeframe and pred["timeframe"] != timeframe.lower():
                 continue
 
-            window_end = datetime.fromtimestamp(
-                ws_ts + _TIMEFRAME_SECONDS.get(tf_label, 300), tz=timezone.utc
-            )
+            window_end = datetime.fromtimestamp(ws_ts + _TIMEFRAME_SECONDS.get(tf_label, 300), tz=UTC)
             pred["_end_sort"] = window_end
             predictions.append(pred)
 

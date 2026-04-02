@@ -52,9 +52,7 @@ class McpServerConfig(BaseModel):
 class McpConfig(BaseModel):
     """Top-level MCP configuration."""
 
-    servers: dict[str, McpServerConfig] = Field(
-        default_factory=dict, description="Named MCP server configs"
-    )
+    servers: dict[str, McpServerConfig] = Field(default_factory=dict, description="Named MCP server configs")
 
 
 class McpToolInfo(BaseModel):
@@ -63,9 +61,7 @@ class McpToolInfo(BaseModel):
     server_name: str = Field(..., description="Name of the MCP server providing this tool")
     tool_name: str = Field(..., description="Original tool name from the MCP server")
     description: str = Field("", description="Tool description")
-    input_schema: dict[str, Any] = Field(
-        default_factory=dict, description="JSON Schema for tool input"
-    )
+    input_schema: dict[str, Any] = Field(default_factory=dict, description="JSON Schema for tool input")
 
 
 class McpToolResult(BaseModel):

@@ -90,9 +90,7 @@ class TokenCostTracker:
             target = date
 
         filtered = [
-            r
-            for r in self._records
-            if datetime.fromtimestamp(r.timestamp, tz=UTC).strftime("%Y-%m-%d") == target
+            r for r in self._records if datetime.fromtimestamp(r.timestamp, tz=UTC).strftime("%Y-%m-%d") == target
         ]
         return self._aggregate(filtered)
 

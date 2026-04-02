@@ -5,9 +5,12 @@ from __future__ import annotations
 import abc
 from collections.abc import AsyncIterator
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from pnlclaw_llm.schemas import ToolCallResult as ToolCallResult  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -25,9 +28,7 @@ class LLMConnectionError(LLMError):
 class LLMRateLimitError(LLMError):
     """Provider returned a rate-limit response (429)."""
 
-    def __init__(
-        self, message: str = "Rate limit exceeded", retry_after: float | None = None
-    ) -> None:
+    def __init__(self, message: str = "Rate limit exceeded", retry_after: float | None = None) -> None:
         super().__init__(message)
         self.retry_after = retry_after
 
@@ -167,7 +168,7 @@ class LLMProvider(abc.ABC):
         messages: list[LLMMessage],
         tools: list[dict[str, Any]] | None = None,
         **kwargs: Any,
-    ) -> "ToolCallResult":
+    ) -> ToolCallResult:
         """Native function calling (tool use).
 
         Providers that support native tool calling should override this method.

@@ -80,8 +80,7 @@ class SuggestionGenerator:
         if issue == ISSUE_TOO_FEW_TRADES:
             return [
                 StrategyImprovement(
-                    description="Use a shorter timeframe or faster parameters "
-                    "to increase signal frequency.",
+                    description="Use a shorter timeframe or faster parameters to increase signal frequency.",
                     category="timeframe",
                     suggested_changes={"interval": "15m"},
                 )
@@ -112,9 +111,7 @@ def apply_suggestion(
     changes = suggestion.suggested_changes
 
     for key, value in changes.items():
-        if key in ("parameters", "entry_rules", "exit_rules", "risk_params") and isinstance(
-            value, dict
-        ):
+        if key in ("parameters", "entry_rules", "exit_rules", "risk_params") and isinstance(value, dict):
             base = data.get(key)
             if isinstance(base, dict):
                 merged = {**base, **value}

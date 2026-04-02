@@ -12,12 +12,11 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pnlclaw_types.trading import Fill, Order, OrderSide, OrderStatus, OrderType
+from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +114,7 @@ class TradingClient(ABC):
         """
 
     @abstractmethod
-    async def cancel_order(
-        self, *, symbol: str, order_id: str
-    ) -> OrderResponse:
+    async def cancel_order(self, *, symbol: str, order_id: str) -> OrderResponse:
         """Cancel an existing order.
 
         Args:
@@ -126,9 +123,7 @@ class TradingClient(ABC):
         """
 
     @abstractmethod
-    async def get_order(
-        self, *, symbol: str, order_id: str
-    ) -> OrderResponse:
+    async def get_order(self, *, symbol: str, order_id: str) -> OrderResponse:
         """Get current status of an order.
 
         Args:
@@ -162,7 +157,7 @@ class BinanceTradingAdapter(TradingClient):
 
     def __init__(self, client: Any) -> None:
         """Args:
-            client: A ``BinanceRESTClient`` instance.
+        client: A ``BinanceRESTClient`` instance.
         """
         self._client = client
 
@@ -200,15 +195,11 @@ class BinanceTradingAdapter(TradingClient):
         return self._parse_order_response(raw)
 
     async def cancel_order(self, *, symbol: str, order_id: str) -> OrderResponse:
-        raw = await self._client.cancel_order(
-            symbol=symbol.replace("/", ""), order_id=int(order_id)
-        )
+        raw = await self._client.cancel_order(symbol=symbol.replace("/", ""), order_id=int(order_id))
         return self._parse_order_response(raw)
 
     async def get_order(self, *, symbol: str, order_id: str) -> OrderResponse:
-        raw = await self._client.get_order(
-            symbol=symbol.replace("/", ""), order_id=int(order_id)
-        )
+        raw = await self._client.get_order(symbol=symbol.replace("/", ""), order_id=int(order_id))
         return self._parse_order_response(raw)
 
     async def get_open_orders(self, symbol: str | None = None) -> list[OrderResponse]:
@@ -339,12 +330,14 @@ class OKXTradingAdapter(TradingClient):
         raw = await self._client.get_balance()
         balances: list[BalanceInfo] = []
         for detail in raw.get("data", [{}])[0].get("details", []):
-            balances.append(BalanceInfo(
-                asset=detail.get("ccy", ""),
-                free=float(detail.get("availBal", 0)),
-                locked=float(detail.get("frozenBal", 0)),
-                total=float(detail.get("cashBal", 0)),
-            ))
+            balances.append(
+                BalanceInfo(
+                    asset=detail.get("ccy", ""),
+                    free=float(detail.get("availBal", 0)),
+                    locked=float(detail.get("frozenBal", 0)),
+                    total=float(detail.get("cashBal", 0)),
+                )
+            )
         return balances
 
     async def test_connectivity(self) -> bool:
@@ -354,9 +347,7 @@ class OKXTradingAdapter(TradingClient):
     async def close(self) -> None:
         await self._client.close()
 
-    def _parse_order_response(
-        self, raw: dict[str, Any], request: OrderRequest
-    ) -> OrderResponse:
+    def _parse_order_response(self, raw: dict[str, Any], request: OrderRequest) -> OrderResponse:
         data = raw.get("data", [{}])
         item = data[0] if data else {}
 
@@ -373,9 +364,7 @@ class OKXTradingAdapter(TradingClient):
             raw=raw,
         )
 
-    def _parse_cancel_response(
-        self, raw: dict[str, Any], symbol: str
-    ) -> OrderResponse:
+    def _parse_cancel_response(self, raw: dict[str, Any], symbol: str) -> OrderResponse:
         data = raw.get("data", [{}])
         item = data[0] if data else {}
 
@@ -396,8 +385,13 @@ class OKXTradingAdapter(TradingClient):
         if data:
             return self._parse_single_order(data[0])
         return OrderResponse(
-            exchange="okx", order_id="", symbol="", side=OrderSide.BUY,
-            order_type=OrderType.MARKET, status=OrderStatus.REJECTED, quantity=0,
+            exchange="okx",
+            order_id="",
+            symbol="",
+            side=OrderSide.BUY,
+            order_type=OrderType.MARKET,
+            status=OrderStatus.REJECTED,
+            quantity=0,
             raw=raw,
         )
 
@@ -494,15 +488,18 @@ class PolymarketTradingAdapter(TradingClient):
             if o.get("id") == order_id or o.get("orderID") == order_id:
                 return self._parse_poly_order(o)
         return OrderResponse(
-            exchange="polymarket", order_id=order_id, symbol=symbol,
-            side=OrderSide.BUY, order_type=OrderType.LIMIT,
-            status=OrderStatus.FILLED, quantity=0, raw=raw,
+            exchange="polymarket",
+            order_id=order_id,
+            symbol=symbol,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            status=OrderStatus.FILLED,
+            quantity=0,
+            raw=raw,
         )
 
     async def get_open_orders(self, symbol: str | None = None) -> list[OrderResponse]:
-        raw = await self._client.get_active_orders(
-            asset_id=symbol if symbol else None
-        )
+        raw = await self._client.get_active_orders(asset_id=symbol if symbol else None)
         orders = raw.get("data", raw.get("orders", []))
         return [self._parse_poly_order(o) for o in (orders if isinstance(orders, list) else [])]
 

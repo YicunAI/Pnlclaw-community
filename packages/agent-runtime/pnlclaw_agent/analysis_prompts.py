@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Intent constants
 # ---------------------------------------------------------------------------
@@ -20,12 +19,14 @@ INTENT_TIMEFRAME_TRADE = "timeframe_trade"
 INTENT_CLOSE_EVALUATION = "close_evaluation"
 INTENT_BACKTEST_EXPLAIN = "backtest_explain"
 
-VALID_INTENTS = frozenset({
-    INTENT_MULTI_TIMEFRAME,
-    INTENT_TIMEFRAME_TRADE,
-    INTENT_CLOSE_EVALUATION,
-    INTENT_BACKTEST_EXPLAIN,
-})
+VALID_INTENTS = frozenset(
+    {
+        INTENT_MULTI_TIMEFRAME,
+        INTENT_TIMEFRAME_TRADE,
+        INTENT_CLOSE_EVALUATION,
+        INTENT_BACKTEST_EXPLAIN,
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +93,7 @@ _BACKTEST_EXPLAIN = """\
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _derive_base(symbol: str) -> str:
     """Extract the base currency from a symbol string."""
     if "/" in symbol:
@@ -114,9 +116,7 @@ def _format_position_block(
         leverage = p.get("leverage", 1)
         margin = _safe_float(p.get("margin", 0))
         qty_base = _safe_float(p.get("quantity_base", 0))
-        avg_entry = _safe_float(
-            p.get("avg_entry_price") or p.get("entry_price", 0)
-        )
+        avg_entry = _safe_float(p.get("avg_entry_price") or p.get("entry_price", 0))
         unrealized = _safe_float(p.get("unrealized_pnl", 0))
         lines.append(
             f"- {contract_symbol} {side_label}: "

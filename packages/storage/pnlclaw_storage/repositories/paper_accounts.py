@@ -100,12 +100,10 @@ class PaperAccountRepository:
 
     async def delete_account(self, account_id: str) -> bool:
         """Permanently delete a paper account.
-        
+
         Cascades to orders and positions in database.
         """
-        rows = await self._db.execute(
-            "DELETE FROM paper_accounts WHERE id = ?", (account_id,)
-        )
+        await self._db.execute("DELETE FROM paper_accounts WHERE id = ?", (account_id,))
         # rows is empty for DELETE but commit was successful
         return True
 
@@ -259,6 +257,7 @@ class PaperAccountRepository:
     async def save_equity_point(self, account_id: str, equity: float) -> str:
         """Record a current equity point for an account."""
         import uuid
+
         now = datetime.now(UTC).isoformat()
         point_id = f"eh-{uuid.uuid4().hex[:8]}"
         await self._db.execute(
@@ -270,9 +269,7 @@ class PaperAccountRepository:
         )
         return point_id
 
-    async def get_equity_history(
-        self, account_id: str, limit: int = 100
-    ) -> list[dict[str, Any]]:
+    async def get_equity_history(self, account_id: str, limit: int = 100) -> list[dict[str, Any]]:
         """Retrieve the most recent equity points for an account (in ASC order)."""
         rows = await self._db.query(
             """

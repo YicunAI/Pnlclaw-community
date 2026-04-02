@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 import uuid
 from typing import Any
@@ -17,10 +16,20 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import AuthenticatedUser, build_response_meta, get_strategy_repo, optional_user
+from app.core.dependencies import (
+    AuthenticatedUser,
+    build_response_meta,
+    get_strategy_repo,
+    optional_user,
+)
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
-from pnlclaw_types.strategy import StrategyConfig, StrategyDeployment, StrategyType, StrategyVersionSnapshot
+from pnlclaw_types.strategy import (
+    StrategyConfig,
+    StrategyDeployment,
+    StrategyType,
+    StrategyVersionSnapshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -148,10 +157,7 @@ async def _list_strategies(
     configs = list(_strategies.values())
     if tags:
         tag_set = {t.strip().lower() for t in tags.split(",") if t.strip()}
-        configs = [
-            s for s in configs
-            if tag_set & {t.lower() for t in getattr(s, "tags", [])}
-        ]
+        configs = [s for s in configs if tag_set & {t.lower() for t in getattr(s, "tags", [])}]
     return configs[offset : offset + limit]
 
 
@@ -289,17 +295,18 @@ async def list_strategies(
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            total = len(await repo.list(limit=10000, offset=0, tags=[t.strip() for t in tags.split(",")] if tags else None, user_id=user.id))
+            total = len(
+                await repo.list(
+                    limit=10000, offset=0, tags=[t.strip() for t in tags.split(",")] if tags else None, user_id=user.id
+                )
+            )
         except Exception:
             total = len(_strategies)
     else:
         all_strategies = list(_strategies.values())
         if tags:
             tag_set = {t.strip().lower() for t in tags.split(",") if t.strip()}
-            all_strategies = [
-                s for s in all_strategies
-                if tag_set & {t.lower() for t in getattr(s, "tags", [])}
-            ]
+            all_strategies = [s for s in all_strategies if tag_set & {t.lower() for t in getattr(s, "tags", [])}]
         total = len(all_strategies)
 
     page = await _list_strategies(offset=offset, limit=limit, tags=tags, user_id=user.id)
@@ -315,6 +322,7 @@ async def list_strategies(
 
 # FX04: Static routes MUST be defined before parameterized /{strategy_id}
 # to prevent FastAPI from matching "validate" or "deployments" as a strategy ID.
+
 
 @router.post("/validate")
 async def validate_strategy(
@@ -452,6 +460,7 @@ async def get_deployment_signals(
 
 # --- Parameterized routes below ---
 
+
 @router.get("/{strategy_id}")
 async def get_strategy(
     strategy_id: str,
@@ -503,8 +512,6 @@ async def update_strategy(
     )
 
 
-
-
 @router.get("/{strategy_id}/versions")
 async def list_strategy_versions(
     strategy_id: str,
@@ -520,19 +527,22 @@ async def list_strategy_versions(
     version_backtests: dict[int, list[dict[str, Any]]] = {}
 
     def _add_bt(bt_id: str, sid: str, ver: int, metrics: Any, trades: int, created: Any) -> None:
-        version_backtests.setdefault(ver, []).append({
-            "id": bt_id,
-            "total_return": getattr(metrics, "total_return", 0),
-            "sharpe_ratio": getattr(metrics, "sharpe_ratio", 0),
-            "max_drawdown": getattr(metrics, "max_drawdown", 0),
-            "win_rate": getattr(metrics, "win_rate", 0),
-            "trades_count": trades,
-            "created_at": created,
-        })
+        version_backtests.setdefault(ver, []).append(
+            {
+                "id": bt_id,
+                "total_return": getattr(metrics, "total_return", 0),
+                "sharpe_ratio": getattr(metrics, "sharpe_ratio", 0),
+                "max_drawdown": getattr(metrics, "max_drawdown", 0),
+                "win_rate": getattr(metrics, "win_rate", 0),
+                "trades_count": trades,
+                "created_at": created,
+            }
+        )
 
     try:
         from app.api.v1.backtests import _result_owners
         from pnlclaw_agent.tools.strategy_tools import get_results_store
+
         for bt in get_results_store().values():
             if bt.strategy_id != strategy_id:
                 continue
@@ -547,6 +557,7 @@ async def list_strategy_versions(
     try:
         from app.core.dependencies import get_db_manager
         from pnlclaw_storage.repositories.backtests import BacktestRepository
+
         db = get_db_manager()
         if db is not None:
             repo = BacktestRepository(db)
@@ -625,8 +636,7 @@ async def deploy_strategy_to_paper(
         )
 
     existing_running = next(
-        (d for d in _strategy_deployments
-         if d.strategy_id == strategy_id and d.status == "running"),
+        (d for d in _strategy_deployments if d.strategy_id == strategy_id and d.status == "running"),
         None,
     )
     if existing_running:
@@ -650,6 +660,7 @@ async def deploy_strategy_to_paper(
     runner_error = None
     try:
         from app.core.dependencies import get_strategy_runner
+
         runner = get_strategy_runner()
         if runner is not None:
             runner_error = await runner.deploy(
@@ -685,6 +696,7 @@ async def deploy_strategy_to_paper(
     # Register ownership so the account is visible only to this user
     try:
         from app.api.v1.paper import _register_owner
+
         _register_owner(actual_account_id, user.id)
     except Exception:
         logger.debug("Failed to register deployment account ownership", exc_info=True)
@@ -749,7 +761,8 @@ async def stop_strategy_deployment(
 
     logger.info(
         "Stopped strategy %s: %d runner slot(s) removed",
-        strategy_id, len(stopped_in_runner),
+        strategy_id,
+        len(stopped_in_runner),
     )
 
     return APIResponse(
@@ -775,5 +788,3 @@ async def delete_strategy(
         meta=build_response_meta(request),
         error=None,
     )
-
-

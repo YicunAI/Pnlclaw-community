@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, runtime_checkable
 
@@ -155,9 +154,7 @@ class LegacyAgentRuntime:
                     )
                     continue
 
-                result_text = (
-                    result.output if not result.error else f"Error: {result.error}\n{result.output}"
-                )
+                result_text = result.output if not result.error else f"Error: {result.error}\n{result.output}"
                 self._context.add_message("tool", result_text, {"tool_name": tool_name})
                 yield _event(
                     AgentStreamEventType.TOOL_RESULT,
@@ -171,10 +168,7 @@ class LegacyAgentRuntime:
                 {"tool_calls": tool_calls},
             )
 
-        warning = (
-            f"Reached maximum tool calling rounds ({self._max_tool_rounds}). "
-            f"Stopping to prevent infinite loops."
-        )
+        warning = f"Reached maximum tool calling rounds ({self._max_tool_rounds}). Stopping to prevent infinite loops."
         self._context.add_message("assistant", warning)
         yield _event(AgentStreamEventType.TEXT_DELTA, {"text": warning})
         yield _event(AgentStreamEventType.DONE, {})
@@ -225,11 +219,9 @@ class LegacyAgentRuntime:
 
 from pnlclaw_agent.events import make_event as _event  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Backward-compatible alias: AgentRuntime → ReActAgentRuntime
 # ---------------------------------------------------------------------------
-
 from pnlclaw_agent.react import ReActAgentRuntime  # noqa: E402
 
 AgentRuntime = ReActAgentRuntime

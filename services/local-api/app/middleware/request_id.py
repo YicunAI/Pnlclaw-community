@@ -11,7 +11,6 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from starlette.requests import Request
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from pnlclaw_core.logging import bind_request_id
@@ -35,12 +34,14 @@ class RequestIDMiddleware:
         bind_request_id(request_id)
 
         if scope["type"] == "http":
+
             async def send_with_id(message: Any) -> None:
                 if message["type"] == "http.response.start":
                     h = list(message.get("headers", []))
                     h.append((b"x-request-id", request_id.encode()))
                     message["headers"] = h
                 await send(message)
+
             await self.app(scope, receive, send_with_id)
         else:
             await self.app(scope, receive, send)

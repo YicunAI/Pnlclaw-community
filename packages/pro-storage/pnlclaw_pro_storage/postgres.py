@@ -11,13 +11,13 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy import text
 
 from pnlclaw_pro_storage.config import ProDatabaseConfig
 
@@ -90,14 +90,12 @@ class AsyncPostgresManager:
         from concurrent.futures import ThreadPoolExecutor
 
         def _run_alembic() -> None:
-            from alembic.config import Config
             from alembic import command
+            from alembic.config import Config
 
             alembic_cfg = Config(str(_ALEMBIC_INI))
             # Override sqlalchemy.url with the actual URL (swap asyncpg → psycopg for sync)
-            sync_url = self._config.database_url.replace(
-                "postgresql+asyncpg", "postgresql+psycopg"
-            )
+            sync_url = self._config.database_url.replace("postgresql+asyncpg", "postgresql+psycopg")
             alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
             command.upgrade(alembic_cfg, "head")
 

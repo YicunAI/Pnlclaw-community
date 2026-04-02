@@ -122,10 +122,7 @@ class BaseTool(abc.ABC):
                 if expected_type and expected_type in _JSON_TYPE_MAP:
                     py_type = _JSON_TYPE_MAP[expected_type]
                     if not isinstance(value, py_type):
-                        errors.append(
-                            f"Parameter '{key}' expected type '{expected_type}', "
-                            f"got {type(value).__name__}"
-                        )
+                        errors.append(f"Parameter '{key}' expected type '{expected_type}', got {type(value).__name__}")
 
         return errors
 

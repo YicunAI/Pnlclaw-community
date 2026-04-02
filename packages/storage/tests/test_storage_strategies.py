@@ -85,8 +85,6 @@ async def test_list_with_offset(repo: StrategyRepository):
     assert len(page2) == 1
 
 
-
-
 @pytest.mark.asyncio
 async def test_list_filter_by_tags(repo: StrategyRepository):
     await repo.save(_make_strategy("s1", "BTC Trend"))

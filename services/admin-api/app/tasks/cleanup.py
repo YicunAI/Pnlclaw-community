@@ -66,14 +66,13 @@ class CleanupTasks:
             if self._pg is None:
                 # Try to get pg_manager from dependencies
                 from app.core.dependencies import get_postgres_manager
+
                 self._pg = get_postgres_manager()
 
             if self._pg is None:
                 return 0
 
-            result = await self._pg.execute(
-                "DELETE FROM invitations WHERE expires_at < NOW()"
-            )
+            result = await self._pg.execute("DELETE FROM invitations WHERE expires_at < NOW()")
             # Parse count from result string like "DELETE 5"
             count = 0
             if result and isinstance(result, str):

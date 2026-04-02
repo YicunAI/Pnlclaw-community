@@ -98,9 +98,8 @@ def _get_fill_price(order: Order, current_price: float) -> float | None:
     if order.type == OrderType.STOP_LIMIT:
         if order.stop_price is None or order.price is None:
             return None
-        triggered = (
-            (order.side == OrderSide.BUY and current_price >= order.stop_price)
-            or (order.side == OrderSide.SELL and current_price <= order.stop_price)
+        triggered = (order.side == OrderSide.BUY and current_price >= order.stop_price) or (
+            order.side == OrderSide.SELL and current_price <= order.stop_price
         )
         if not triggered:
             return None
