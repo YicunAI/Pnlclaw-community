@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/public/pnl.png" alt="PnLClaw" height="120" />
+  <img src="apps/desktop/public/pnl-white.png" alt="PnLClaw" height="60" />
   <br /><br />
   <p><strong>Chat is Quant — Local-first AI-powered crypto quantitative research</strong><br />
   Drive the entire strategy lifecycle through natural language conversation.<br />
