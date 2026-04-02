@@ -89,7 +89,12 @@ class BinanceWSClient(BaseWSClient):
         """Open WebSocket connection to Binance."""
         proxy = self._config.proxy_url or None
         logger.info("Connecting to Binance WS: %s (proxy=%s)", self._config.url, proxy or "none")
-        self._ws = await websockets.asyncio.client.connect(self._config.url, proxy=proxy)
+        self._ws = await websockets.asyncio.client.connect(
+            self._config.url,
+            proxy=proxy,
+            ping_interval=30,
+            ping_timeout=60,
+        )
         await self._dispatch_connect()
         await self._stall_watchdog.start()
         if self._subscriptions:

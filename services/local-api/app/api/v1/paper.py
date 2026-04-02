@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 import logging
 
 from app.core.dependencies import (
+    AuthenticatedUser,
     build_response_meta,
     get_execution_engine,
     get_market_service,
@@ -22,6 +23,7 @@ from app.core.dependencies import (
     get_paper_order_manager,
     get_paper_position_manager,
     get_db_manager,
+    optional_user,
 )
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import ErrorCode, NotFoundError, PnLClawError
@@ -33,6 +35,62 @@ router = APIRouter(prefix="/paper", tags=["paper-trading"])
 
 _equity_record_timestamps: dict[str, float] = {}
 EQUITY_RECORD_INTERVAL = 30.0
+
+# ---------------------------------------------------------------------------
+# Account ownership registry  (account_id → user_id)
+#
+# The in-memory PaperExecutionEngine / AccountManager has no concept of
+# "user".  We track ownership at the API layer so each user can only see
+# and operate on their own accounts.
+# ---------------------------------------------------------------------------
+
+_account_owners: dict[str, str] = {}
+_owners_loaded = False
+
+
+def _register_owner(account_id: str, user_id: str) -> None:
+    """Record that *account_id* belongs to *user_id*."""
+    _account_owners[account_id] = user_id
+
+
+def _owner_of(account_id: str) -> str | None:
+    """Return the user_id that owns *account_id*, or None."""
+    return _account_owners.get(account_id)
+
+
+async def _ensure_owners_loaded() -> None:
+    """One-time load of ownership from the DB (paper_accounts.user_id)."""
+    global _owners_loaded
+    if _owners_loaded:
+        return
+    _owners_loaded = True
+    try:
+        db = get_db_manager()
+        if db is None:
+            return
+        rows = await db.query(
+            "SELECT id, user_id FROM paper_accounts WHERE user_id IS NOT NULL", ()
+        )
+        for r in rows:
+            _account_owners[r["id"]] = r["user_id"]
+        logger.info("Loaded %d paper account owner mappings from DB", len(rows))
+    except Exception:
+        logger.debug("Could not preload paper account owners", exc_info=True)
+
+
+def _verify_ownership(account_id: str, user: AuthenticatedUser) -> None:
+    """Raise 403 if the current user does not own *account_id*.
+
+    In Community mode (user.id == "local") ownership checks are skipped.
+    """
+    if user.id == "local":
+        return
+    owner = _owner_of(account_id)
+    if owner is not None and owner != user.id:
+        raise PnLClawError(
+            ErrorCode.PERMISSION_DENIED,
+            "You do not have access to this account",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -152,16 +210,40 @@ async def list_accounts(
     request: Request,
     mgr: Any = Depends(_get_accounts),
     pos_mgr: Any = Depends(_get_positions),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
-    """List all paper trading accounts with live equity.
+    """List paper trading accounts owned by the current user.
 
     Equity = wallet_balance + unrealized PnL.
     wallet_balance = initial_balance + total_realized_pnl - total_fee.
-    Margin locked in open positions is still counted as part of wallet balance.
     """
     import time as _time
 
-    accounts = mgr.list_accounts()
+    await _ensure_owners_loaded()
+
+    all_accounts = mgr.list_accounts()
+
+    if user.id == "local":
+        accounts = all_accounts
+    else:
+        accounts = [a for a in all_accounts if _owner_of(a.id) == user.id]
+
+        if not accounts:
+            new_acct = mgr.create_account(
+                name="Default Paper Account",
+                initial_balance=100_000.0,
+            )
+            _register_owner(new_acct.id, user.id)
+            db = get_db_manager()
+            if db is not None:
+                try:
+                    from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+                    repo = PaperAccountRepository(db)
+                    await repo.save_account(new_acct.model_dump(), user_id=user.id)
+                except Exception:
+                    logger.debug("Failed to persist auto-created paper account", exc_info=True)
+            accounts = [new_acct]
+
     result = []
     now = _time.time()
     for a in accounts:
@@ -196,8 +278,9 @@ async def create_account(
     request: Request,
     body: CreateAccountRequest,
     mgr: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
-    """Create a new paper trading account."""
+    """Create a new paper trading account owned by the current user."""
     kwargs: dict[str, Any] = {
         "name": body.name,
         "initial_balance": body.initial_balance,
@@ -214,11 +297,24 @@ async def create_account(
         pass
 
     account = mgr.create_account(**kwargs)
+
+    _register_owner(account.id, user.id)
+
     data = account.model_dump()
     data["equity"] = account.initial_balance
     data["balance"] = account.current_balance
     data["unrealized_pnl"] = 0.0
     data["realized_pnl"] = 0.0
+
+    db = get_db_manager()
+    if db is not None:
+        try:
+            from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+            repo = PaperAccountRepository(db)
+            await repo.save_account(account.model_dump(), user_id=user.id)
+        except Exception:
+            logger.debug("Failed to persist paper account with user_id", exc_info=True)
+
     return APIResponse(data=data, meta=build_response_meta(request), error=None)
 
 
@@ -227,11 +323,14 @@ async def delete_account(
     account_id: str,
     request: Request,
     mgr: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
-    """Delete a paper trading account."""
+    """Delete a paper trading account (must be owned by current user)."""
+    _verify_ownership(account_id, user)
     deleted = mgr.delete_account(account_id)
     if not deleted:
         raise NotFoundError(f"Paper account '{account_id}' not found")
+    _account_owners.pop(account_id, None)
     return APIResponse(data={"deleted": account_id}, meta=build_response_meta(request), error=None)
 
 
@@ -241,8 +340,10 @@ async def reset_account(
     request: Request,
     mgr: Any = Depends(_get_accounts),
     engine: Any = Depends(get_execution_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Reset a paper trading account to initial state."""
+    _verify_ownership(account_id, user)
     if engine is not None and hasattr(engine, "reset_account"):
         success = engine.reset_account(account_id)
         if not success:
@@ -277,8 +378,10 @@ async def get_account(
     request: Request,
     mgr: Any = Depends(_get_accounts),
     pos_mgr: Any = Depends(_get_positions),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Get account details with live equity."""
+    _verify_ownership(account_id, user)
     account = mgr.get_account(account_id)
     if account is None:
         raise NotFoundError(f"Account '{account_id}' not found")
@@ -330,6 +433,7 @@ async def place_order(
     body: PlaceOrderRequest,
     accounts: Any = Depends(_get_accounts),
     orders: Any = Depends(_get_orders),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Place a paper trading order.
 
@@ -337,6 +441,7 @@ async def place_order(
     for market orders.  The engine accepts ``mark_price`` from the frontend
     as a fallback fill price when its internal price cache is empty.
     """
+    _verify_ownership(body.account_id, user)
     account = accounts.get_account(body.account_id)
     if account is None:
         raise NotFoundError(f"Account '{body.account_id}' not found")
@@ -437,8 +542,10 @@ async def list_orders(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
     orders_mgr: Any = Depends(_get_orders),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
-    """List orders for an account."""
+    """List orders for an account (must be owned by current user)."""
+    _verify_ownership(account_id, user)
     all_orders = orders_mgr.get_orders(account_id, status=status)
     total = len(all_orders)
     page = all_orders[offset : offset + limit]
@@ -458,6 +565,7 @@ async def cancel_order_endpoint(
     request: Request,
     orders_mgr: Any = Depends(_get_orders),
     accounts: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Cancel a pending paper trading order and release frozen margin."""
     engine = get_execution_engine()
@@ -478,6 +586,7 @@ async def cancel_order_endpoint(
                     break
 
             if account_id:
+                _verify_ownership(account_id, user)
                 account = accounts.get_account(account_id)
                 if account is not None:
                     remaining_qty = order.quantity - order.filled_quantity
@@ -521,11 +630,13 @@ async def close_position(
     request: Request,
     body: ClosePositionRequest,
     accounts: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Close an open position (market close).
 
     Places a reduce-only market order in the opposite direction.
     """
+    _verify_ownership(body.account_id, user)
     account = accounts.get_account(body.account_id)
     if account is None:
         raise NotFoundError(f"Account '{body.account_id}' not found")
@@ -601,8 +712,10 @@ async def list_positions(
     request: Request,
     account_id: str = Query(..., description="Paper account ID"),
     pos_mgr: Any = Depends(_get_positions),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """List positions for an account with live unrealized PnL."""
+    _verify_ownership(account_id, user)
     positions = pos_mgr.get_positions(account_id)
 
     engine = get_execution_engine()
@@ -672,12 +785,14 @@ def _get_live_price(symbol: str, engine: Any, market_svc: Any) -> float | None:
 async def list_fills(
     request: Request,
     account_id: str = Query(..., description="Paper account ID"),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """Return actual Fill records (not orders) as trade history.
 
     Mirrors OKX ``/api/v5/trade/fills-history``: each record includes
     execution price, fee, fee_rate, realized PnL, exec_type, etc.
     """
+    _verify_ownership(account_id, user)
     engine = get_execution_engine()
     if engine is None:
         return APIResponse(data=[], meta=build_response_meta(request), error=None)
@@ -706,8 +821,10 @@ async def get_paper_settings(
     request: Request,
     account_id: str = Query("paper-default", description="Paper account ID"),
     mgr: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Return current paper trading settings (fee rates etc)."""
+    _verify_ownership(account_id, user)
     account = mgr.get_account(account_id)
     if account is None:
         raise NotFoundError(f"Account '{account_id}' not found")
@@ -728,8 +845,10 @@ async def update_paper_settings(
     body: FeeSettingsRequest,
     account_id: str = Query("paper-default", description="Paper account ID"),
     mgr: Any = Depends(_get_accounts),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Update paper trading fee rates."""
+    _verify_ownership(account_id, user)
     account = mgr.get_account(account_id)
     if account is None:
         raise NotFoundError(f"Account '{account_id}' not found")
@@ -762,8 +881,10 @@ async def get_pnl(
     request: Request,
     account_id: str = Query(..., description="Paper account ID"),
     pos_mgr: Any = Depends(_get_positions),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """Calculate PnL for all positions of an account."""
+    _verify_ownership(account_id, user)
     positions = pos_mgr.get_positions(account_id)
 
     prices: dict[str, float] = {}
@@ -812,8 +933,10 @@ async def get_equity_history_endpoint(
     account_id: str,
     request: Request,
     limit: int = Query(100, ge=1, le=1000),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """Retrieve historical equity points for an account."""
+    _verify_ownership(account_id, user)
     db = get_db_manager()
     if not db:
         return APIResponse(data=[], meta=build_response_meta(request))
@@ -848,8 +971,8 @@ async def _record_equity(account_id: str, equity: float):
             if acct_mgr:
                 account = acct_mgr.get_account(account_id)
                 if account:
-                    # Sync account status/balance
-                    await repo.save_account(account.model_dump())
+                    owner_id = _owner_of(account_id) or "local"
+                    await repo.save_account(account.model_dump(), user_id=owner_id)
                     
                     # If this is the VERY FIRST record, insert initial_balance as the starting point
                     if not await repo.has_equity_history(account_id):

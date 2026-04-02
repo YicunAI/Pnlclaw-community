@@ -32,11 +32,16 @@ class BinanceDepthDelta:
     Binance's diff depth stream provides both ``U`` (first update ID) and
     ``u`` (last update ID) for gap detection, while the unified
     :class:`OrderBookL2Delta` has only a single ``sequence_id``.
+
+    Futures streams additionally include ``pu`` (previous final update ID)
+    which enables linked-list-style continuity checking instead of the
+    strict ``U == prev_u + 1`` rule used by spot.
     """
 
     delta: OrderBookL2Delta
     first_update_id: int  # Binance ``U`` field
     last_update_id: int  # Binance ``u`` field
+    previous_update_id: int | None = None  # Binance ``pu`` field (futures only)
 
 
 class BinanceNormalizer:
@@ -185,6 +190,7 @@ class BinanceNormalizer:
         timestamp = int(data["E"])
         first_update_id = int(data["U"])
         last_update_id = int(data["u"])
+        previous_update_id = int(data["pu"]) if "pu" in data else None
 
         bids = [
             PriceLevel(price=float(entry[0]), quantity=float(entry[1]))
@@ -208,4 +214,5 @@ class BinanceNormalizer:
             delta=delta,
             first_update_id=first_update_id,
             last_update_id=last_update_id,
+            previous_update_id=previous_update_id,
         )

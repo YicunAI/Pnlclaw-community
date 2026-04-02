@@ -65,7 +65,7 @@ type HoverState = { side: "ask" | "bid"; displayIndex: number } | null
 
 export function OrderbookPanel({
   data,
-  maxRows = 15,
+  maxRows = 8,
   title,
   baseCurrency,
   quoteCurrency = "USDT",

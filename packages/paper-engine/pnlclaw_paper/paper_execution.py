@@ -66,6 +66,8 @@ class PaperExecutionEngine:
         self._on_fill_cbs: list[Callable[[Fill], Any]] = []
         self._on_position_update_cbs: list[Callable[[Position], Any]] = []
         self._on_balance_update_cbs: list[Callable[[list[BalanceUpdate]], Any]] = []
+        self._on_position_update_scoped_cbs: list[Callable[[str, Position], Any]] = []
+        self._on_balance_update_scoped_cbs: list[Callable[[str, list[BalanceUpdate]], Any]] = []
 
     def _get_fee_rates(self, account_id: str) -> tuple[float, float]:
         """Return (maker_fee_rate, taker_fee_rate) for the given account."""
@@ -374,6 +376,14 @@ class PaperExecutionEngine:
     def on_balance_update(self, callback: Callable[[list[BalanceUpdate]], Any]) -> None:
         self._on_balance_update_cbs.append(callback)
 
+    def on_position_update_scoped(self, callback: Callable[[str, Position], Any]) -> None:
+        """Register a callback that receives (account_id, position) for proper routing."""
+        self._on_position_update_scoped_cbs.append(callback)
+
+    def on_balance_update_scoped(self, callback: Callable[[str, list[BalanceUpdate]], Any]) -> None:
+        """Register a callback that receives (account_id, balances) for proper routing."""
+        self._on_balance_update_scoped_cbs.append(callback)
+
     # ------------------------------------------------------------------
     # Price feed integration
     # ------------------------------------------------------------------
@@ -398,7 +408,7 @@ class PaperExecutionEngine:
         for account in self._account_mgr.list_accounts():
             updated_positions = self._position_mgr.update_unrealized_pnl(account.id, symbol, price)
             for pos in updated_positions:
-                await self._fire_position_update(pos)
+                await self._fire_position_update(pos, account_id=account.id)
 
         open_orders = self._order_mgr.get_open_orders()
         for order in open_orders:
@@ -457,7 +467,7 @@ class PaperExecutionEngine:
         if updated_order:
             await self._fire_order_update(updated_order)
         await self._fire_fill(fill)
-        await self._fire_position_update(pos)
+        await self._fire_position_update(pos, account_id=account_id)
 
         if is_close:
             released_margin = fill.quantity / order.leverage
@@ -470,7 +480,7 @@ class PaperExecutionEngine:
             self._account_mgr.update_balance(account_id, realized_pnl)
 
         balances = await self.get_balances(account_id)
-        await self._fire_balance_update(balances)
+        await self._fire_balance_update(balances, account_id=account_id)
 
     def _get_order_account(self, order_id: str) -> str:
         """Look up the account_id for a given order."""
@@ -498,13 +508,19 @@ class PaperExecutionEngine:
         for cb in self._on_fill_cbs:
             await self._invoke(cb, fill)
 
-    async def _fire_position_update(self, position: Position) -> None:
+    async def _fire_position_update(self, position: Position, account_id: str | None = None) -> None:
         for cb in self._on_position_update_cbs:
             await self._invoke(cb, position)
+        if account_id is not None:
+            for cb in self._on_position_update_scoped_cbs:
+                await self._invoke(cb, account_id, position)
 
-    async def _fire_balance_update(self, balances: list[BalanceUpdate]) -> None:
+    async def _fire_balance_update(self, balances: list[BalanceUpdate], account_id: str | None = None) -> None:
         for cb in self._on_balance_update_cbs:
             await self._invoke(cb, balances)
+        if account_id is not None:
+            for cb in self._on_balance_update_scoped_cbs:
+                await self._invoke(cb, account_id, balances)
 
     @staticmethod
     async def _invoke(callback: Callable[..., Any], *args: Any) -> None:

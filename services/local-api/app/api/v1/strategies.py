@@ -14,10 +14,10 @@ import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import build_response_meta, get_strategy_repo
+from app.core.dependencies import AuthenticatedUser, build_response_meta, get_strategy_repo, optional_user
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import StrategyConfig, StrategyDeployment, StrategyType, StrategyVersionSnapshot
@@ -36,22 +36,22 @@ _strategy_versions: dict[str, list[StrategyVersionSnapshot]] = {}
 _strategy_deployments: list[StrategyDeployment] = []
 
 
-async def _persist_save(config: StrategyConfig) -> None:
+async def _persist_save(config: StrategyConfig, *, user_id: str = "local") -> None:
     """Persist strategy to DB if repository is available."""
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            await repo.save(config)
+            await repo.save(config, user_id=user_id)
         except Exception:
             logger.warning("Failed to persist strategy %s", config.id, exc_info=True)
 
 
-async def _persist_delete(strategy_id: str) -> None:
+async def _persist_delete(strategy_id: str, *, user_id: str = "local") -> None:
     """Delete strategy from DB if repository is available."""
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            await repo.delete(strategy_id)
+            await repo.delete(strategy_id, user_id=user_id)
         except Exception:
             logger.warning("Failed to delete strategy %s from DB", strategy_id, exc_info=True)
 
@@ -112,12 +112,12 @@ class ValidateStrategyRequest(BaseModel):
     risk_params: dict[str, Any] = Field(default_factory=dict)
 
 
-async def _get_strategy(strategy_id: str) -> StrategyConfig | None:
+async def _get_strategy(strategy_id: str, *, user_id: str = "local") -> StrategyConfig | None:
     """Load a strategy, preferring the repository when available."""
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            config = await repo.get(strategy_id)
+            config = await repo.get(strategy_id, user_id=user_id)
             if config is not None:
                 _strategies[strategy_id] = config
                 return config
@@ -131,13 +131,14 @@ async def _list_strategies(
     offset: int,
     limit: int,
     tags: str | None,
+    user_id: str = "local",
 ) -> list[StrategyConfig]:
     """List strategies, preferring repository-backed reads when available."""
     tag_list = [t.strip() for t in tags.split(",")] if tags else None
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            configs = await repo.list(limit=limit, offset=offset, tags=tag_list)
+            configs = await repo.list(limit=limit, offset=offset, tags=tag_list, user_id=user_id)
             for config in configs:
                 _strategies[config.id] = config
             return configs
@@ -241,6 +242,7 @@ async def _list_deployments(*, account_id: str | None = None) -> list[StrategyDe
 async def create_strategy(
     request: Request,
     body: CreateStrategyRequest,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Create a new strategy and store it."""
     strategy_id = f"strat-{uuid.uuid4().hex[:8]}"
@@ -259,7 +261,7 @@ async def create_strategy(
         source=body.source,
     )
     _strategies[strategy_id] = config
-    asyncio.create_task(_persist_save(config))
+    asyncio.create_task(_persist_save(config, user_id=user.id))
     await _save_version_snapshot(config, "initial create")
     return APIResponse(
         data=_strategy_to_dict(config),
@@ -281,12 +283,13 @@ async def list_strategies(
     offset: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=1000, description="Page size"),
     tags: str | None = Query(None, description="Comma-separated tags to filter by"),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """List all strategies with pagination and optional tag filtering."""
     repo = get_strategy_repo()
     if repo is not None:
         try:
-            total = len(await repo.list(limit=10000, offset=0, tags=[t.strip() for t in tags.split(",")] if tags else None))
+            total = len(await repo.list(limit=10000, offset=0, tags=[t.strip() for t in tags.split(",")] if tags else None, user_id=user.id))
         except Exception:
             total = len(_strategies)
     else:
@@ -299,7 +302,7 @@ async def list_strategies(
             ]
         total = len(all_strategies)
 
-    page = await _list_strategies(offset=offset, limit=limit, tags=tags)
+    page = await _list_strategies(offset=offset, limit=limit, tags=tags, user_id=user.id)
     return APIResponse(
         data=[_strategy_to_dict(s) for s in page],
         meta=build_response_meta(
@@ -364,9 +367,25 @@ async def validate_strategy(
 async def list_strategy_deployments(
     request: Request,
     account_id: str | None = Query(None),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
-    """List strategy deployments, optionally filtered by paper account."""
+    """List strategy deployments, optionally filtered by paper account.
+
+    In Pro mode, only returns deployments for strategies owned by the user.
+    """
     deployments = await _list_deployments(account_id=account_id)
+    if user.id != "local":
+        user_strategy_ids: set[str] = set()
+        repo = get_strategy_repo()
+        if repo is not None:
+            try:
+                configs = await repo.list(limit=10000, offset=0, user_id=user.id)
+                user_strategy_ids = {c.id for c in configs}
+            except Exception:
+                pass
+        if not user_strategy_ids:
+            user_strategy_ids = {sid for sid, cfg in _strategies.items()}
+        deployments = [d for d in deployments if d.strategy_id in user_strategy_ids]
     return APIResponse(
         data=[deployment.model_dump(mode="json") for deployment in deployments],
         meta=build_response_meta(request),
@@ -437,9 +456,10 @@ async def get_deployment_signals(
 async def get_strategy(
     strategy_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Get a strategy by ID."""
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     return APIResponse(
@@ -454,9 +474,10 @@ async def update_strategy(
     strategy_id: str,
     body: UpdateStrategyRequest,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Update a strategy by ID (partial update)."""
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
 
@@ -473,7 +494,7 @@ async def update_strategy(
     update_data["version"] = config.version + 1
     updated = config.model_copy(update=update_data)
     _strategies[strategy_id] = updated
-    asyncio.create_task(_persist_save(updated))
+    asyncio.create_task(_persist_save(updated, user_id=user.id))
     await _save_version_snapshot(updated, version_note or "manual update")
     return APIResponse(
         data=_strategy_to_dict(updated),
@@ -488,9 +509,10 @@ async def update_strategy(
 async def list_strategy_versions(
     strategy_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """List version snapshots with aggregated backtest metrics per version."""
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     snapshots = await _list_version_snapshots(strategy_id)
@@ -509,10 +531,15 @@ async def list_strategy_versions(
         })
 
     try:
+        from app.api.v1.backtests import _result_owners
         from pnlclaw_agent.tools.strategy_tools import get_results_store
         for bt in get_results_store().values():
-            if bt.strategy_id == strategy_id:
-                _add_bt(bt.id, bt.strategy_id, bt.strategy_version, bt.metrics, bt.trades_count, bt.created_at)
+            if bt.strategy_id != strategy_id:
+                continue
+            owner = _result_owners.get(bt.id)
+            if user.id != "local" and owner is not None and owner != user.id:
+                continue
+            _add_bt(bt.id, bt.strategy_id, bt.strategy_version, bt.metrics, bt.trades_count, bt.created_at)
     except Exception:
         pass
 
@@ -523,7 +550,7 @@ async def list_strategy_versions(
         db = get_db_manager()
         if db is not None:
             repo = BacktestRepository(db)
-            persisted = await repo.list_by_strategy(strategy_id, limit=200)
+            persisted = await repo.list_by_strategy(strategy_id, limit=200, user_id=user.id)
             for bt in persisted:
                 if bt.id not in seen_ids:
                     _add_bt(bt.id, bt.strategy_id, bt.strategy_version, bt.metrics, bt.trades_count, bt.created_at)
@@ -547,14 +574,15 @@ async def list_strategy_versions(
 async def confirm_strategy(
     strategy_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Move a strategy to CONFIRMED state."""
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     updated = config.model_copy(update={"lifecycle_state": "confirmed", "version": config.version + 1})
     _strategies[strategy_id] = updated
-    asyncio.create_task(_persist_save(updated))
+    asyncio.create_task(_persist_save(updated, user_id=user.id))
     await _save_version_snapshot(updated, "confirmed for paper deployment")
     return APIResponse(data=_strategy_to_dict(updated), meta=build_response_meta(request), error=None)
 
@@ -564,6 +592,7 @@ async def deploy_strategy_to_paper(
     strategy_id: str,
     body: DeployStrategyRequest,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Create a paper deployment and start continuous strategy execution.
 
@@ -571,7 +600,7 @@ async def deploy_strategy_to_paper(
     deployment. The StrategyRunner handles account creation, rule validation,
     duplicate prevention, and historical kline warmup internally.
     """
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
     if config.lifecycle_state not in ("confirmed", "draft", "running"):
@@ -653,6 +682,13 @@ async def deploy_strategy_to_paper(
     slot_status = runner.get_slot_status(deployment_id) if runner else None
     actual_account_id = slot_status["account_id"] if slot_status else account_id
 
+    # Register ownership so the account is visible only to this user
+    try:
+        from app.api.v1.paper import _register_owner
+        _register_owner(actual_account_id, user.id)
+    except Exception:
+        logger.debug("Failed to register deployment account ownership", exc_info=True)
+
     deployment = StrategyDeployment(
         id=deployment_id,
         strategy_id=strategy_id,
@@ -668,7 +704,7 @@ async def deploy_strategy_to_paper(
     if config.lifecycle_state != "running":
         updated = config.model_copy(update={"lifecycle_state": "running"})
         _strategies[strategy_id] = updated
-        asyncio.create_task(_persist_save(updated))
+        asyncio.create_task(_persist_save(updated, user_id=user.id))
     else:
         updated = config
 
@@ -690,6 +726,7 @@ async def deploy_strategy_to_paper(
 async def stop_strategy_deployment(
     strategy_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Stop a running strategy deployment."""
     from app.core.dependencies import get_strategy_runner
@@ -704,11 +741,11 @@ async def stop_strategy_deployment(
         if dep.strategy_id == strategy_id and dep.status == "running":
             dep.status = "stopped"
 
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id=user.id)
     if config is not None and config.lifecycle_state == "running":
         updated = config.model_copy(update={"lifecycle_state": "confirmed"})
         _strategies[strategy_id] = updated
-        asyncio.create_task(_persist_save(updated))
+        asyncio.create_task(_persist_save(updated, user_id=user.id))
 
     logger.info(
         "Stopped strategy %s: %d runner slot(s) removed",
@@ -726,12 +763,13 @@ async def stop_strategy_deployment(
 async def delete_strategy(
     strategy_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Delete a strategy by ID."""
     config = _strategies.pop(strategy_id, None)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
-    asyncio.create_task(_persist_delete(strategy_id))
+    asyncio.create_task(_persist_delete(strategy_id, user_id=user.id))
     return APIResponse(
         data={"deleted": strategy_id},
         meta=build_response_meta(request),

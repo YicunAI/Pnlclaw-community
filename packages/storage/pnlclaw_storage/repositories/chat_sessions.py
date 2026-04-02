@@ -31,13 +31,15 @@ class ChatSessionRepository:
         strategy_id: str | None = None,
         title: str = "",
         session_id: str | None = None,
+        *,
+        user_id: str = "local",
     ) -> dict[str, Any]:
         sid = session_id or _new_id("cs")
         now = _now_iso()
         await self._db.execute(
-            "INSERT INTO chat_sessions (id, strategy_id, title, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (sid, strategy_id, title, now, now),
+            "INSERT INTO chat_sessions (id, strategy_id, title, created_at, updated_at, user_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (sid, strategy_id, title, now, now, user_id),
         )
         return {"id": sid, "strategy_id": strategy_id, "title": title, "created_at": now, "updated_at": now}
 
@@ -46,23 +48,25 @@ class ChatSessionRepository:
         strategy_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
+        *,
+        user_id: str | None = None,
     ) -> list[dict[str, Any]]:
+        conditions: list[str] = []
+        params: list[Any] = []
         if strategy_id:
-            rows = await self._db.query(
-                "SELECT s.*, "
-                "  (SELECT COUNT(*) FROM chat_messages m WHERE m.session_id = s.id) AS message_count "
-                "FROM chat_sessions s "
-                "WHERE s.strategy_id = ? ORDER BY s.updated_at DESC LIMIT ? OFFSET ?",
-                (strategy_id, limit, offset),
-            )
-        else:
-            rows = await self._db.query(
-                "SELECT s.*, "
-                "  (SELECT COUNT(*) FROM chat_messages m WHERE m.session_id = s.id) AS message_count "
-                "FROM chat_sessions s "
-                "ORDER BY s.updated_at DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            )
+            conditions.append("s.strategy_id = ?")
+            params.append(strategy_id)
+        if user_id is not None:
+            conditions.append("s.user_id = ?")
+            params.append(user_id)
+        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        params.extend([limit, offset])
+        rows = await self._db.query(
+            "SELECT s.*, "
+            "  (SELECT COUNT(*) FROM chat_messages m WHERE m.session_id = s.id) AS message_count "
+            f"FROM chat_sessions s {where} ORDER BY s.updated_at DESC LIMIT ? OFFSET ?",
+            tuple(params),
+        )
         return [dict(r) for r in rows]
 
     async def get_session(self, session_id: str) -> dict[str, Any] | None:

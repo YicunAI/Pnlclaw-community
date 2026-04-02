@@ -835,4 +835,11 @@ export const zhCNMessages: MessageMap = {
   "runner.lastSignal": "最近信号",
   "runner.deployedAt": "部署时间",
   "runner.strategyRunning": "策略运行中",
+
+  "auth.login": "登录",
+  "auth.logout": "退出登录",
+  "auth.agentLoginRequired": "使用 AI 助手需要登录",
+  "auth.loginToChat": "登录后即可与 AI 助手对话…",
+  "auth.loginRequired": "需要登录",
+  "auth.loginRequiredDesc": "此功能需要登录后才能使用。请先登录您的账户。",
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import { useI18n } from "@/components/i18n/use-i18n"
 import { AlertTriangle } from "lucide-react"
 
@@ -8,6 +9,7 @@ export default function TradingPage() {
   const { t } = useI18n()
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -31,5 +33,6 @@ export default function TradingPage() {
         </div>
       </div>
     </div>
+    </RequireAuth>
   )
 }

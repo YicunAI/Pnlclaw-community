@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/public/logo.svg" alt="PnLClaw" height="72" />
+  <img src="apps/desktop/public/logo-white.svg" alt="PnLClaw" height="120" />
   <br /><br />
   <p><strong>对话即量化 —— 本地优先的 AI 量化研究平台</strong><br />
   用自然语言对话驱动策略设计、回测、模拟交易的完整闭环。<br />
@@ -531,6 +531,13 @@ PnLClaw **不是**一个通用高权限 Agent。
 - [ ] 事件驱动策略模板（宏观经济、选举、体育、加密事件）
 - [ ] 隐含概率校准与定价偏差分析
 - [ ] 新闻驱动的事件概率估算（Agent 自主抓取 + 分析）
+
+### AI 驱动与 Alpha 挖掘
+
+- [ ] 大语言模型舆情与情绪分析（社交媒体、新闻事件深度提取与量化）
+- [ ] 强化学习与机器学习策略研发（深度网络、时序预测模型）
+- [ ] 多维交易数据特征工程（复杂订单簿特征、高频微观结构分析）
+- [ ] 另类数据与 Alpha 因子注入（非结构化数据解析、多因子模型构建）
 
 ### Agent 智能演进
 

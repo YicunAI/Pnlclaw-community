@@ -22,11 +22,12 @@ class StrategyRepository:
     def __init__(self, db: AsyncSQLiteManager) -> None:
         self._db = db
 
-    async def save(self, strategy: StrategyConfig) -> str:
+    async def save(self, strategy: StrategyConfig, *, user_id: str = "local") -> str:
         """Insert or update a strategy.
 
         Args:
             strategy: The strategy configuration to persist.
+            user_id: Owner user ID (defaults to ``'local'`` for Community).
 
         Returns:
             The strategy ID.
@@ -36,31 +37,38 @@ class StrategyRepository:
 
         await self._db.execute(
             """
-            INSERT INTO strategies (id, name, type, config_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO strategies (id, name, type, config_json, created_at, updated_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 type = excluded.type,
                 config_json = excluded.config_json,
                 updated_at = excluded.updated_at
             """,
-            (strategy.id, strategy.name, strategy.type.value, config_json, now, now),
+            (strategy.id, strategy.name, strategy.type.value, config_json, now, now, user_id),
         )
         return strategy.id
 
-    async def get(self, strategy_id: str) -> StrategyConfig | None:
+    async def get(self, strategy_id: str, *, user_id: str | None = None) -> StrategyConfig | None:
         """Retrieve a strategy by ID.
 
         Args:
             strategy_id: The strategy identifier.
+            user_id: If provided, enforce ownership check.
 
         Returns:
             The strategy config, or ``None`` if not found.
         """
-        rows = await self._db.query(
-            "SELECT config_json FROM strategies WHERE id = ?",
-            (strategy_id,),
-        )
+        if user_id is not None:
+            rows = await self._db.query(
+                "SELECT config_json FROM strategies WHERE id = ? AND user_id = ?",
+                (strategy_id, user_id),
+            )
+        else:
+            rows = await self._db.query(
+                "SELECT config_json FROM strategies WHERE id = ?",
+                (strategy_id,),
+            )
         if not rows:
             return None
         return StrategyConfig.model_validate_json(rows[0]["config_json"])
@@ -70,18 +78,26 @@ class StrategyRepository:
         limit: int = 50,
         offset: int = 0,
         *,
+        user_id: str | None = None,
         tags: list[str] | None = None,
         source: str | None = None,
         strategy_type: str | None = None,
     ) -> list[StrategyConfig]:
         """List strategies ordered by last update, with minimal filtering.
 
-        Filtering beyond SQL columns is applied after loading the config JSON.
+        Args:
+            user_id: If provided, filter to this user's strategies only.
         """
-        rows = await self._db.query(
-            "SELECT config_json FROM strategies ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        )
+        if user_id is not None:
+            rows = await self._db.query(
+                "SELECT config_json FROM strategies WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, offset),
+            )
+        else:
+            rows = await self._db.query(
+                "SELECT config_json FROM strategies ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
         strategies = [StrategyConfig.model_validate_json(r["config_json"]) for r in rows]
 
         if strategy_type is not None:
@@ -96,18 +112,20 @@ class StrategyRepository:
             ]
         return strategies
 
-
-    async def delete(self, strategy_id: str) -> bool:
-        """Delete a strategy by ID.
-
-        Args:
-            strategy_id: The strategy identifier.
+    async def delete(self, strategy_id: str, *, user_id: str | None = None) -> bool:
+        """Delete a strategy by ID, optionally scoped by owner.
 
         Returns:
             ``True`` if a row was deleted, ``False`` if not found.
         """
-        rows = await self._db.execute(
-            "DELETE FROM strategies WHERE id = ? RETURNING id",
-            (strategy_id,),
-        )
+        if user_id is not None:
+            rows = await self._db.execute(
+                "DELETE FROM strategies WHERE id = ? AND user_id = ? RETURNING id",
+                (strategy_id, user_id),
+            )
+        else:
+            rows = await self._db.execute(
+                "DELETE FROM strategies WHERE id = ? RETURNING id",
+                (strategy_id,),
+            )
         return len(rows) > 0

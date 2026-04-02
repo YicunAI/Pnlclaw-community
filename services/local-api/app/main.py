@@ -8,8 +8,13 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.agent import router as agent_router
@@ -33,6 +38,7 @@ from app.core.dependencies import (
     set_execution_mode,
     set_funding_rate_fetcher,
     set_health_registry,
+    set_jwt_manager,
     set_key_pair_manager,
     set_market_service,
     set_mcp_registry,
@@ -119,6 +125,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     from app.core.crypto import KeyPairManager
     from app.core.settings_service import SettingsService
+
+    # --- JWT (Pro mode: verify tokens from admin-api) ---
+    jwt_secret = os.environ.get("PNLCLAW_AUTH_JWT_SECRET", "")
+    if jwt_secret:
+        try:
+            from pnlclaw_pro_auth.jwt_manager import JWTManager
+            jwt_mgr = JWTManager(secret_key=jwt_secret)
+            set_jwt_manager(jwt_mgr)
+            logger.info("JWT auth enabled — local-api will verify admin-api tokens")
+        except ImportError:
+            logger.info("pnlclaw_pro_auth not available, JWT auth disabled")
+    else:
+        logger.info("PNLCLAW_AUTH_JWT_SECRET not set, running in Community (no-auth) mode")
 
     # --- Health ---
     async def _local_api_health() -> HealthCheckResult:
@@ -931,6 +950,8 @@ def _register_agent_tools(
 async def _build_agent_runtime(
     settings_service: object,
     tool_catalog: object | None = None,
+    *,
+    user_id: str | None = None,
 ) -> object | None:
     """Build an AgentRuntime from persisted LLM settings, or return None."""
     from pnlclaw_security.secrets import (
@@ -943,11 +964,15 @@ async def _build_agent_runtime(
     from app.core.settings_service import SettingsService
 
     svc: SettingsService = settings_service  # type: ignore[assignment]
-    settings = svc._load_non_sensitive()
+    settings = svc._load_non_sensitive(user_id=user_id)
     llm_section = settings.get("llm", {})
 
     sm = SecretManager()
-    ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id="api_key")
+    llm_prov = svc._kr_provider("pnlclaw.llm", user_id)
+    smart_prov = svc._kr_provider("pnlclaw.llm.smart", user_id)
+    net_prov = svc._kr_provider("pnlclaw.network", user_id)
+
+    ref = SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id="api_key")
     try:
         resolved = await sm.resolve(ref)
         api_key = resolved.use()
@@ -955,6 +980,48 @@ async def _build_agent_runtime(
         return None
     if not api_key:
         return None
+
+    _keyring_fields = {"base_url": "", "model": "", "provider": ""}
+    for field in _keyring_fields:
+        try:
+            r = await sm.resolve(
+                SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field)
+            )
+            _keyring_fields[field] = r.use() or ""
+        except SecretResolutionError:
+            pass
+
+    llm_section["base_url"] = _keyring_fields["base_url"] or llm_section.get("base_url", "")
+    llm_section["model"] = _keyring_fields["model"] or llm_section.get("model", "")
+    llm_section["provider"] = _keyring_fields["provider"] or llm_section.get("provider", "")
+
+    _smart_fields = ("strategy", "analysis", "quick")
+    smart_models_kr: dict[str, str] = {}
+    for sf in _smart_fields:
+        try:
+            r = await sm.resolve(
+                SecretRef(source=SecretSource.KEYRING, provider=smart_prov, id=sf)
+            )
+            val = r.use() or ""
+            if val:
+                smart_models_kr[sf] = val
+        except SecretResolutionError:
+            pass
+    if smart_models_kr:
+        existing = llm_section.get("smart_models")
+        if isinstance(existing, dict):
+            existing.update(smart_models_kr)
+        else:
+            llm_section["smart_models"] = smart_models_kr
+
+    proxy_url = ""
+    try:
+        r = await sm.resolve(
+            SecretRef(source=SecretSource.KEYRING, provider=net_prov, id="proxy_url")
+        )
+        proxy_url = r.use() or ""
+    except SecretResolutionError:
+        pass
 
     from pnlclaw_agent import AgentRuntime, ToolCatalog
     from pnlclaw_agent.context.manager import ContextManager
@@ -976,13 +1043,18 @@ async def _build_agent_runtime(
     else:
         model = default_model
 
+    logger.info(
+        "Building agent runtime: model=%s, base_url=%s",
+        model, llm_section.get("base_url", "")[:40],
+    )
+
     config = LLMConfig(
         model=model,
         api_key=api_key,
         base_url=llm_section.get("base_url") or None,
     )
 
-    proxy_url = settings.get("network", {}).get("proxy_url", "")
+    proxy_url = proxy_url or settings.get("network", {}).get("proxy_url", "")
     transport = None
     if proxy_url:
         import httpx
@@ -1028,10 +1100,17 @@ async def _build_agent_runtime(
 
 
 def _bridge_market_events(market_svc: object) -> None:
-    """Bridge MarketDataService EventBus events to WebSocket broadcast."""
-    import asyncio
+    """Bridge MarketDataService EventBus events to WebSocket broadcast.
 
-    from app.api.v1.ws import broadcast_market_event
+    Orderbook snapshots are throttled to avoid saturating the event loop
+    with expensive ``model_dump()`` serialisation of 2000-level books at
+    ~120 updates/s.  Other event types are lightweight and forwarded
+    immediately.
+    """
+    import asyncio
+    import time as _time
+
+    from app.api.v1.ws import broadcast_market_event, _market_manager
     from pnlclaw_types.derivatives import (
         FundingRateEvent,
         LargeOrderEvent,
@@ -1041,20 +1120,58 @@ def _bridge_market_events(market_svc: object) -> None:
     )
     from pnlclaw_types.market import KlineEvent, OrderBookL2Snapshot, TickerEvent
 
+    _ORDERBOOK_BROADCAST_INTERVAL = 0.25  # max 4 broadcasts/s per symbol
+    _last_ob_broadcast: dict[str, float] = {}
+    _pending_ob: dict[str, OrderBookL2Snapshot] = {}
+    _ob_flush_running = False
+
+    async def _flush_pending_orderbooks() -> None:
+        """Periodically flush throttled orderbook snapshots."""
+        nonlocal _ob_flush_running
+        _ob_flush_running = True
+        try:
+            while True:
+                await asyncio.sleep(_ORDERBOOK_BROADCAST_INTERVAL)
+                if not _pending_ob:
+                    continue
+                if _market_manager.active_count == 0:
+                    _pending_ob.clear()
+                    continue
+                batch = dict(_pending_ob)
+                _pending_ob.clear()
+                now = _time.monotonic()
+                for key, snap in batch.items():
+                    _last_ob_broadcast[key] = now
+                    asyncio.ensure_future(broadcast_market_event(
+                        snap.symbol, "depth", snap.model_dump(),
+                    ))
+        except asyncio.CancelledError:
+            pass
+        finally:
+            _ob_flush_running = False
+
     def _on_ticker(event: TickerEvent) -> None:
+        if _market_manager.active_count == 0:
+            return
         asyncio.ensure_future(broadcast_market_event(
             event.symbol, "ticker", event.model_dump(),
         ))
 
     def _on_kline(event: KlineEvent) -> None:
+        if _market_manager.active_count == 0:
+            return
         asyncio.ensure_future(broadcast_market_event(
             event.symbol, "kline", event.model_dump(),
         ))
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "depth", event.model_dump(),
-        ))
+        nonlocal _ob_flush_running
+        if _market_manager.active_count == 0:
+            return
+        key = f"{event.exchange}:{event.market_type}:{event.symbol}"
+        _pending_ob[key] = event
+        if not _ob_flush_running:
+            asyncio.ensure_future(_flush_pending_orderbooks())
 
     def _on_large_trade(event: LargeTradeEvent) -> None:
         asyncio.ensure_future(broadcast_market_event(
@@ -1171,28 +1288,26 @@ def _bridge_paper_engine_events(engine: object) -> None:
         aid = _resolve_account_for_order(fill.order_id)
         if aid:
             asyncio.ensure_future(broadcast_paper_event(aid, "fill", fill.model_dump()))
-        asyncio.ensure_future(_paper_snapshot_after_fill(engine, fill))
+            asyncio.ensure_future(_paper_snapshot_after_fill(engine, fill, aid))
 
-    def _on_position(pos: Position) -> None:
-        for account in engine._account_mgr.list_accounts():  # type: ignore[union-attr]
-            asyncio.ensure_future(broadcast_paper_event(
-                account.id, "position_update", pos.model_dump(),
-            ))
+    def _on_position_scoped(account_id: str, pos: Position) -> None:
+        asyncio.ensure_future(broadcast_paper_event(
+            account_id, "position_update", pos.model_dump(),
+        ))
 
-    def _on_balance(balances: list[BalanceUpdate]) -> None:
-        for account in engine._account_mgr.list_accounts():  # type: ignore[union-attr]
-            asyncio.ensure_future(broadcast_paper_event(
-                account.id, "balance_update", [b.model_dump() for b in balances],
-            ))
+    def _on_balance_scoped(account_id: str, balances: list[BalanceUpdate]) -> None:
+        asyncio.ensure_future(broadcast_paper_event(
+            account_id, "balance_update", [b.model_dump() for b in balances],
+        ))
 
     engine.on_order_update(_on_order)  # type: ignore[union-attr]
     engine.on_fill(_on_fill)  # type: ignore[union-attr]
-    engine.on_position_update(_on_position)  # type: ignore[union-attr]
-    engine.on_balance_update(_on_balance)  # type: ignore[union-attr]
+    engine.on_position_update_scoped(_on_position_scoped)  # type: ignore[union-attr]
+    engine.on_balance_update_scoped(_on_balance_scoped)  # type: ignore[union-attr]
 
 
-async def _paper_snapshot_after_fill(engine: object, fill: object) -> None:
-    """After a fill, broadcast a full account_snapshot and record equity."""
+async def _paper_snapshot_after_fill(engine: object, fill: object, account_id: str | None = None) -> None:
+    """After a fill, broadcast account_snapshot only to the affected account."""
     try:
         from app.api.v1.paper import _record_equity
         from app.api.v1.ws import broadcast_paper_event
@@ -1203,7 +1318,13 @@ async def _paper_snapshot_after_fill(engine: object, fill: object) -> None:
         if not acct_mgr or not pos_mgr:
             return
 
-        for account in acct_mgr.list_accounts():
+        if account_id:
+            target_accounts = [acct_mgr.get_account(account_id)]
+            target_accounts = [a for a in target_accounts if a is not None]
+        else:
+            target_accounts = acct_mgr.list_accounts()
+
+        for account in target_accounts:
             unrealized = sum(p.unrealized_pnl for p in pos_mgr.get_open_positions(account.id))
             wallet_bal = account.initial_balance + account.total_realized_pnl - account.total_fee
             equity = wallet_bal + unrealized
@@ -1245,14 +1366,25 @@ def create_app() -> FastAPI:
     # Middleware (outermost first)
     app.add_middleware(RequestIDMiddleware)
 
-    # CORS — allow desktop frontend
+    # Security headers
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+        return response
+
+    # CORS — allow desktop and admin frontends
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "tauri://localhost"],
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "tauri://localhost"],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["X-Session-ID"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+        expose_headers=["X-Session-ID", "X-Request-ID"],
         max_age=3600,
     )
 

@@ -16,13 +16,20 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_settings_service, get_skill_registry
+from app.core.dependencies import AuthenticatedUser, get_settings_service, get_skill_registry, optional_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/skills", tags=["skills"])
 
 _USER_SKILLS_DIR = Path.home() / ".pnlclaw" / "skills"
 _SAFE_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
+
+
+def _user_skills_dir(user: AuthenticatedUser) -> Path:
+    """Return the skills directory scoped to the current user."""
+    if user.id == "local":
+        return _USER_SKILLS_DIR
+    return Path.home() / ".pnlclaw" / "users" / user.id / "skills"
 
 
 # ---------------------------------------------------------------------------
@@ -132,8 +139,17 @@ def _build_skill_md(
 
 
 def _write_user_skill(name: str, md_content: str) -> Path:
-    """Write a SKILL.md into the user skills directory."""
+    """Write a SKILL.md into the default user skills directory."""
     skill_dir = _USER_SKILLS_DIR / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    skill_file = skill_dir / "SKILL.md"
+    skill_file.write_text(md_content, encoding="utf-8")
+    return skill_file
+
+
+def _write_user_skill_scoped(base_dir: Path, name: str, md_content: str) -> Path:
+    """Write a SKILL.md into a user-scoped skills directory."""
+    skill_dir = base_dir / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_file = skill_dir / "SKILL.md"
     skill_file.write_text(md_content, encoding="utf-8")
@@ -166,6 +182,7 @@ def _parse_existing_skill_md(file_path: Path) -> dict[str, Any]:
 async def list_skills(
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """List all loaded skills with their enabled state."""
     if registry is None:
@@ -188,8 +205,9 @@ async def create_skill(
     body: SkillCreateRequest,
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
-    """Create a new user skill from submitted content."""
+    """Create a new user skill (scoped to current user)."""
     name = body.name.strip().lower().replace(" ", "-")
     if not _SAFE_NAME_RE.match(name):
         raise HTTPException(
@@ -197,7 +215,8 @@ async def create_skill(
             "Invalid skill name. Use only letters, numbers, hyphens, underscores (1-64 chars).",
         )
 
-    skill_dir = _USER_SKILLS_DIR / name
+    skills_dir = _user_skills_dir(user)
+    skill_dir = skills_dir / name
     if skill_dir.exists() and (skill_dir / "SKILL.md").exists():
         raise HTTPException(409, f"Skill '{name}' already exists. Use PUT to update.")
 
@@ -210,7 +229,7 @@ async def create_skill(
         model_invocable=body.model_invocable,
         requires_tools=body.requires_tools,
     )
-    file_path = _write_user_skill(name, md)
+    file_path = _write_user_skill_scoped(skills_dir, name, md)
 
     _rebuild_registry(registry, settings_svc)
 
@@ -225,6 +244,7 @@ async def create_skill(
 async def get_skill(
     name: str,
     registry: Any = Depends(get_skill_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Get detailed information about a specific skill."""
     if registry is None:
@@ -256,6 +276,7 @@ async def update_skill(
     body: SkillUpdateRequest,
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Update a user-created skill's content or metadata."""
     if registry is None:
@@ -286,7 +307,8 @@ async def update_skill(
         requires_tools=requires_tools,
         version=skill.frontmatter.version,
     )
-    file_path = _write_user_skill(name, md)
+    skills_dir = _user_skills_dir(user)
+    file_path = _write_user_skill_scoped(skills_dir, name, md)
 
     _rebuild_registry(registry, settings_svc)
 
@@ -298,6 +320,7 @@ async def delete_skill(
     name: str,
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Delete a user-created skill."""
     if registry is None:
@@ -309,7 +332,8 @@ async def delete_skill(
         if source != "user":
             raise HTTPException(403, "Only user-created skills can be deleted")
 
-    skill_dir = _USER_SKILLS_DIR / name
+    skills_dir = _user_skills_dir(user)
+    skill_dir = skills_dir / name
     if skill_dir.exists():
         shutil.rmtree(skill_dir)
 
@@ -324,6 +348,7 @@ async def toggle_skill(
     body: SkillEnableRequest,
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Enable or disable a skill, persisted to settings."""
     if registry is None:
@@ -345,6 +370,7 @@ async def toggle_skill(
 async def refresh_skills(
     registry: Any = Depends(get_skill_registry),
     settings_svc: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Re-scan skill directories and reload all skills."""
     if registry is None:

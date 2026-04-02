@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/public/logo.svg" alt="PnLClaw" height="72" />
+  <img src="apps/desktop/public/logo-white.svg" alt="PnLClaw" height="120" />
   <br /><br />
   <p><strong>Chat is Quant — Local-first AI-powered crypto quantitative research</strong><br />
   Drive the entire strategy lifecycle through natural language conversation.<br />
@@ -528,6 +528,13 @@ Contributions are welcome. Please review the project structure and architecture 
 - [ ] Event-driven strategy templates (macro economy, elections, sports, crypto events)
 - [ ] Implied probability calibration & pricing deviation analysis
 - [ ] News-driven event probability estimation (Agent autonomous fetching + analysis)
+
+### AI-Driven & Alpha Discovery
+
+- [ ] LLM-driven sentiment & public opinion analysis (social media, news event extraction & quantification)
+- [ ] Reinforcement Learning & Machine Learning strategy research (deep networks, time-series prediction models)
+- [ ] Multi-dimensional trading data feature engineering (complex orderbook features, high-frequency microstructure)
+- [ ] Alternative data & Alpha factor injection (unstructured data parsing, multi-factor model construction)
 
 ### Agent Intelligence Evolution
 

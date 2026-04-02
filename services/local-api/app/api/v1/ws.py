@@ -174,6 +174,48 @@ async def ws_markets(ws: WebSocket) -> None:
 # ---------------------------------------------------------------------------
 
 
+async def _resolve_ws_user(ws: WebSocket) -> str | None:
+    """Extract user_id from the first query param ``token`` on a WS connection.
+
+    Returns the user_id string if auth is enabled and the token is valid,
+    ``"local"`` when auth is disabled (Community mode), or ``None`` on failure.
+    """
+    from app.core.dependencies import get_jwt_manager
+
+    jwt_mgr = get_jwt_manager()
+    if jwt_mgr is None:
+        return "local"
+
+    token = ws.query_params.get("token", "")
+    if not token:
+        return None
+    try:
+        payload = jwt_mgr.decode_access_token(token)
+        return payload.get("sub")
+    except Exception:
+        return None
+
+
+async def _verify_account_ownership(user_id: str, account_id: str) -> bool:
+    """Check if the given user owns the paper account (or auth is disabled)."""
+    if user_id == "local":
+        return True
+    from app.core.dependencies import get_db_manager
+    db = get_db_manager()
+    if db is None:
+        return True
+    try:
+        from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+        repo = PaperAccountRepository(db)
+        acct = await repo.get_account(account_id)
+        if acct is None:
+            return False
+        acct_user = acct.get("user_id", "local")
+        return acct_user == user_id or acct_user == "local"
+    except Exception:
+        return True
+
+
 @router.websocket("/api/v1/ws/paper")
 async def ws_paper(ws: WebSocket) -> None:
     """Paper Trading state WebSocket.
@@ -188,7 +230,8 @@ async def ws_paper(ws: WebSocket) -> None:
         ``{"type": "pnl_update", "account_id": "pa-xxx", "data": {...}}``
     """
     await _paper_manager.connect(ws)
-    logger.info("ws_paper_connected", connections=_paper_manager.active_count)
+    ws_user_id = await _resolve_ws_user(ws)
+    logger.info("ws_paper_connected", connections=_paper_manager.active_count, user=ws_user_id)
     try:
         while True:
             try:
@@ -210,6 +253,20 @@ async def ws_paper(ws: WebSocket) -> None:
             account_id = msg.get("account_id", "")
 
             if action == "subscribe" and account_id:
+                if ws_user_id is None:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "Authentication required: provide a valid token query parameter",
+                        "timestamp": int(time.time() * 1000),
+                    })
+                    continue
+                if ws_user_id != "local" and not await _verify_account_ownership(ws_user_id, account_id):
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "Access denied: account does not belong to current user",
+                        "timestamp": int(time.time() * 1000),
+                    })
+                    continue
                 _paper_manager.subscribe(ws, f"paper:{account_id}")
                 await ws.send_json(
                     {
@@ -246,6 +303,8 @@ async def ws_paper(ws: WebSocket) -> None:
 async def ws_trading(ws: WebSocket) -> None:
     """Unified trading WebSocket — receives order, fill, position, balance events.
 
+    Requires authentication in Pro mode via ``?token=`` query parameter.
+
     Client messages (JSON):
         ``{"action": "subscribe", "channels": ["orders", "positions", "balances"]}``
         ``{"action": "unsubscribe", "channels": ["orders"]}``
@@ -257,7 +316,8 @@ async def ws_trading(ws: WebSocket) -> None:
         ``{"type": "balance_update", "data": [...]}``
     """
     await _trading_manager.connect(ws)
-    logger.info("ws_trading_connected", connections=_trading_manager.active_count)
+    ws_user_id = await _resolve_ws_user(ws)
+    logger.info("ws_trading_connected", connections=_trading_manager.active_count, user=ws_user_id)
     try:
         while True:
             try:
@@ -279,6 +339,13 @@ async def ws_trading(ws: WebSocket) -> None:
             channels = msg.get("channels", [])
 
             if action == "subscribe":
+                if ws_user_id is None:
+                    await ws.send_json({
+                        "type": "error",
+                        "message": "Authentication required",
+                        "timestamp": int(time.time() * 1000),
+                    })
+                    continue
                 for ch in channels:
                     _trading_manager.subscribe(ws, f"trading:{ch}")
                 await ws.send_json(
@@ -327,6 +394,8 @@ _AGENT_EVENT_MAP: dict[str, str] = {
 async def ws_agent(ws: WebSocket) -> None:
     """Agent reasoning WebSocket — bidirectional agent interaction.
 
+    Requires authentication in Pro mode via ``?token=`` query parameter.
+
     Client messages (JSON):
         ``{"action": "chat", "message": "BTC 价格多少？", "session_id": "..."}``
 
@@ -340,8 +409,14 @@ async def ws_agent(ws: WebSocket) -> None:
         ``{"type": "done", "data": {}}``
     """
     await _agent_manager.connect(ws)
+    ws_user_id = await _resolve_ws_user(ws)
+    if ws_user_id is None:
+        await ws.send_json({"type": "error", "message": "Authentication required"})
+        _agent_manager.disconnect(ws)
+        await ws.close(code=4001, reason="Authentication required")
+        return
     _agent_manager.subscribe(ws, "agent:reasoning")
-    logger.info("ws_agent_connected", connections=_agent_manager.active_count)
+    logger.info("ws_agent_connected", connections=_agent_manager.active_count, user=ws_user_id)
     try:
         while True:
             try:

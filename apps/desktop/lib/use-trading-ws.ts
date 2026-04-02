@@ -1,9 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { getAccessToken } from "./auth"
 import type { TradingOrder, TradingPosition, TradingBalance, TradingFill } from "./api-client"
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080"
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8080"
 const RECONNECT_MS = 3000
 const STALE_AFTER_MS = 5000
 
@@ -72,7 +73,11 @@ export function useTradingWS() {
     }
 
     intentionalCloseRef.current = false
-    const ws = new WebSocket(`${WS_BASE}/api/v1/ws/trading`)
+    const token = getAccessToken()
+    const wsUrl = token
+      ? `${WS_BASE}/api/v1/ws/trading?token=${encodeURIComponent(token)}`
+      : `${WS_BASE}/api/v1/ws/trading`
+    const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
     ws.onopen = () => {

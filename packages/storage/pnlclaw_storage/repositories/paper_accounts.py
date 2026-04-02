@@ -27,7 +27,7 @@ class PaperAccountRepository:
     # Accounts
     # ------------------------------------------------------------------
 
-    async def save_account(self, account: dict[str, Any]) -> str:
+    async def save_account(self, account: dict[str, Any], *, user_id: str = "local") -> str:
         """Insert or update a paper account.
 
         Expected keys: id, name, initial_balance, current_balance, status.
@@ -39,8 +39,8 @@ class PaperAccountRepository:
         await self._db.execute(
             """
             INSERT INTO paper_accounts
-                (id, name, initial_balance, current_balance, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+                (id, name, initial_balance, current_balance, status, created_at, updated_at, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 current_balance = excluded.current_balance,
@@ -55,9 +55,30 @@ class PaperAccountRepository:
                 account.get("status", "active"),
                 now,
                 now,
+                user_id,
             ),
         )
         return str(account["id"])
+
+    async def list_accounts(self, *, user_id: str | None = None) -> list[dict[str, Any]]:
+        """List all paper accounts, optionally filtered by user.
+
+        Returns:
+            List of account dicts.
+        """
+        if user_id is not None:
+            rows = await self._db.query(
+                "SELECT id, name, initial_balance, current_balance, status, "
+                "created_at, updated_at FROM paper_accounts WHERE user_id = ? ORDER BY created_at DESC",
+                (user_id,),
+            )
+        else:
+            rows = await self._db.query(
+                "SELECT id, name, initial_balance, current_balance, status, "
+                "created_at, updated_at FROM paper_accounts ORDER BY created_at DESC",
+                (),
+            )
+        return [dict(r) for r in rows]
 
     async def get_account(self, account_id: str) -> dict[str, Any] | None:
         """Retrieve a paper account by ID.
@@ -68,7 +89,7 @@ class PaperAccountRepository:
         rows = await self._db.query(
             """
             SELECT id, name, initial_balance, current_balance, status,
-                   created_at, updated_at
+                   created_at, updated_at, user_id
             FROM paper_accounts WHERE id = ?
             """,
             (account_id,),

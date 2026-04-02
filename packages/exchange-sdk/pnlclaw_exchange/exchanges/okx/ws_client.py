@@ -111,11 +111,13 @@ class OKXWSClient(BaseWSClient):
         self._ws_business = None
 
         proxy = self._config.proxy_url or None
+        ws_kwargs: dict[str, object] = dict(proxy=proxy, ping_interval=30, ping_timeout=60)
+
         logger.info("Connecting to OKX WS public: %s (proxy=%s)", self._public_url, proxy or "none")
-        self._ws_public = await websockets.asyncio.client.connect(self._public_url, proxy=proxy)
+        self._ws_public = await websockets.asyncio.client.connect(self._public_url, **ws_kwargs)
 
         logger.info("Connecting to OKX WS business: %s (proxy=%s)", self._business_url, proxy or "none")
-        self._ws_business = await websockets.asyncio.client.connect(self._business_url, proxy=proxy)
+        self._ws_business = await websockets.asyncio.client.connect(self._business_url, **ws_kwargs)
 
         await self._dispatch_connect()
         await self._stall_watchdog.start()

@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_agent_runtime, get_settings_service
+from app.core.dependencies import AuthenticatedUser, get_agent_runtime, get_settings_service, optional_user
 from pnlclaw_types.agent import AgentStreamEventType
 
 import logging
@@ -121,14 +121,36 @@ def _cleanup_stale_turns() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _restore_context_from_db(session_id: str) -> Any | None:
+async def _verify_session_owner(session_id: str, user_id: str) -> bool:
+    """Return True if *user_id* owns *session_id* (or auth is off)."""
+    if user_id == "local":
+        return True
+    try:
+        from app.core.dependencies import get_chat_session_repo
+        repo = get_chat_session_repo()
+        if repo is None:
+            return True
+        session = await repo.get_session(session_id)
+        if session is None:
+            return True
+        owner = session.get("user_id", "local")
+        return owner == user_id or owner == "local"
+    except Exception:
+        return True
+
+
+async def _restore_context_from_db(session_id: str, *, user_id: str = "local") -> Any | None:
     """Try to restore a ContextManager from the chat session DB.
 
     Returns None if the repo is unavailable or the session has no messages.
+    Enforces ownership check when *user_id* is not ``"local"``.
     """
     if not _CTX_AVAILABLE or _ContextManager is None:
         return None
     try:
+        if not await _verify_session_owner(session_id, user_id):
+            _logger.warning("Session %s ownership check failed for user %s", session_id, user_id)
+            return None
         from app.core.dependencies import get_chat_session_repo
         repo = get_chat_session_repo()
         if repo is None:
@@ -268,22 +290,45 @@ def _enrich_message(message: str, context: dict[str, Any] | None) -> str:
     return "\n".join(parts)
 
 
-async def _try_lazy_init_runtime(settings_service: Any) -> Any | None:
-    """Attempt to build AgentRuntime on demand when it was not created at startup."""
-    from app.core.dependencies import get_tool_catalog, set_agent_runtime
+_user_runtimes: OrderedDict[str, Any] = OrderedDict()
+_MAX_USER_RUNTIMES = 20
+
+
+async def _get_user_runtime(settings_service: Any, *, user_id: str | None = None) -> Any | None:
+    """Return a cached per-user AgentRuntime, building one if needed."""
+    from app.core.dependencies import get_tool_catalog
+
+    cache_key = user_id or "local"
+    if cache_key in _user_runtimes:
+        _user_runtimes.move_to_end(cache_key)
+        return _user_runtimes[cache_key]
 
     try:
         from app.main import _build_agent_runtime
 
         tool_catalog = get_tool_catalog()
-        runtime = await _build_agent_runtime(settings_service, tool_catalog)
+        runtime = await _build_agent_runtime(settings_service, tool_catalog, user_id=user_id)
         if runtime is not None:
-            set_agent_runtime(runtime)
-            _logger.info("Agent runtime lazily initialized from current settings")
+            _user_runtimes[cache_key] = runtime
+            while len(_user_runtimes) > _MAX_USER_RUNTIMES:
+                evicted_key, _ = _user_runtimes.popitem(last=False)
+                _logger.debug("Evicted oldest user runtime: %s", evicted_key)
+            _logger.info("Built agent runtime for user %s", cache_key)
         return runtime
     except Exception:
-        _logger.debug("Lazy agent runtime init failed", exc_info=True)
+        _logger.debug("Failed to build agent runtime for user %s", cache_key, exc_info=True)
         return None
+
+
+def invalidate_user_runtime(user_id: str | None = None) -> None:
+    """Remove a user's cached runtime so it will be rebuilt on next chat."""
+    cache_key = user_id or "local"
+    _user_runtimes.pop(cache_key, None)
+
+
+async def _try_lazy_init_runtime(settings_service: Any, *, user_id: str | None = None) -> Any | None:
+    """Attempt to build AgentRuntime on demand when it was not created at startup."""
+    return await _get_user_runtime(settings_service, user_id=user_id)
 
 
 def _sse_event(event_type: str, data: dict[str, Any]) -> str:
@@ -599,6 +644,7 @@ async def agent_chat(
     body: ChatRequest,
     runtime: Any = Depends(get_agent_runtime),
     settings_service: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> StreamingResponse:
     """Start an AI conversation turn (SSE stream).
 
@@ -675,25 +721,30 @@ async def agent_chat(
                 markers, body.message[:100],
             )
 
-    # --- Per-session context management ---
+    # --- Per-session context management (namespaced by user_id) ---
     if _CTX_AVAILABLE and runtime is not None and hasattr(runtime, "_context"):
-        if session_id not in _session_contexts:
-            ctx = await _restore_context_from_db(session_id)
-            _session_contexts[session_id] = ctx or _ContextManager()
+        ctx_key = f"{user.id}:{session_id}" if user.id != "local" else session_id
+        if ctx_key not in _session_contexts:
+            ctx = await _restore_context_from_db(session_id, user_id=user.id)
+            _session_contexts[ctx_key] = ctx or _ContextManager()
             if ctx:
-                _logger.info("Restored context from DB for session %s", session_id)
+                _logger.info("Restored context from DB for session %s (user=%s)", session_id, user.id)
             else:
-                _logger.info("Created new context for session %s", session_id)
+                _logger.info("Created new context for session %s (user=%s)", session_id, user.id)
             while len(_session_contexts) > _MAX_SESSIONS:
                 evicted_key, _ = _session_contexts.popitem(last=False)
                 _logger.debug("Evicted oldest session context: %s", evicted_key)
         else:
-            _session_contexts.move_to_end(session_id)
-        runtime._context = _session_contexts[session_id]
+            _session_contexts.move_to_end(ctx_key)
+        runtime._context = _session_contexts[ctx_key]
 
-    # Lazy initialization: try to build runtime if not yet available
-    if runtime is None and settings_service is not None:
-        runtime = await _try_lazy_init_runtime(settings_service)
+    # Per-user runtime: always use the user's own LLM config
+    uid = user.id if user.id != "local" else None
+    user_runtime = await _get_user_runtime(settings_service, user_id=uid)
+    if user_runtime is not None:
+        runtime = user_runtime
+    elif runtime is None and settings_service is not None:
+        runtime = await _try_lazy_init_runtime(settings_service, user_id=uid)
 
     if runtime is not None:
         generator = _guarded_agent_stream(runtime, effective_message, session_id, settings_service)
@@ -717,6 +768,7 @@ async def agent_stream(
     body: ChatRequest,
     runtime: Any = Depends(get_agent_runtime),
     settings_service: Any = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> StreamingResponse:
     """Alias for ``POST /agent/chat`` — same SSE stream, explicit name."""
-    return await agent_chat(body, runtime, settings_service)
+    return await agent_chat(body, runtime, settings_service, user)

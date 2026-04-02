@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useCallback } from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import { updateSettings, getLLMModels, type AppSettings, type LLMModel } from "@/lib/api-client"
 import { useAppSettings } from "@/lib/hooks/use-api"
 import { mutate } from "swr"
@@ -312,6 +313,7 @@ export default function SettingsPage() {
   }
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -798,5 +800,6 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </RequireAuth>
   )
 }

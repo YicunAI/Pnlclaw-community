@@ -5,3 +5,9 @@
 .pro-only
 .github/workflows/deploy.yml
 scripts/sync-community.sh
+
+# Pro admin backend & user management
+packages/pro-storage/
+packages/pro-auth/
+services/admin-api/
+apps/admin/

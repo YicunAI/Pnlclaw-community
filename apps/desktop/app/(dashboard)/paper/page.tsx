@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -740,6 +741,7 @@ export default function PaperPage() {
   }
 
   return (
+    <RequireAuth>
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -1851,5 +1853,6 @@ export default function PaperPage() {
         </>
       )}
     </div>
+    </RequireAuth>
   )
 }

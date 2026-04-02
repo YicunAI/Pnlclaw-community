@@ -13,10 +13,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.dependencies import (
+    AuthenticatedUser,
     get_execution_engine,
     get_live_engine,
     get_execution_mode,
     get_risk_engine,
+    optional_user,
     set_execution_engine,
     set_execution_mode,
 )
@@ -77,13 +79,19 @@ class CancelOrderRequest(BaseModel):
 
 
 @router.get("/mode", response_model=TradingModeResponse)
-async def get_mode(mode: str = Depends(get_execution_mode)) -> TradingModeResponse:
+async def get_mode(
+    mode: str = Depends(get_execution_mode),
+    user: AuthenticatedUser = Depends(optional_user),
+) -> TradingModeResponse:
     """Get the current trading execution mode."""
     return TradingModeResponse(mode=mode)
 
 
 @router.put("/mode", response_model=TradingModeResponse)
-async def set_mode(req: TradingModeRequest) -> TradingModeResponse:
+async def set_mode(
+    req: TradingModeRequest,
+    user: AuthenticatedUser = Depends(optional_user),
+) -> TradingModeResponse:
     """Switch trading execution mode."""
     if req.mode == ExecutionMode.LIVE:
         raise HTTPException(
@@ -103,6 +111,7 @@ async def set_mode(req: TradingModeRequest) -> TradingModeResponse:
 async def place_order(
     req: PlaceOrderRequest,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> Order:
     """Place a new order in the live mode.
 
@@ -179,6 +188,7 @@ async def place_order(
 async def cancel_order(
     order_id: str,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> Order:
     """Cancel an open order."""
     if engine is None:
@@ -195,6 +205,7 @@ async def get_orders(
     account_id: str = DEFAULT_ACCOUNT,
     status: OrderStatus | None = None,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Order]:
     """Get orders, optionally filtered by status."""
     if engine is None:
@@ -212,6 +223,7 @@ async def get_orders(
 async def get_positions(
     account_id: str = DEFAULT_ACCOUNT,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Position]:
     """Get all open positions."""
     if engine is None:
@@ -229,6 +241,7 @@ async def get_positions(
 async def get_balances(
     account_id: str = DEFAULT_ACCOUNT,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[BalanceUpdate]:
     """Get account balances."""
     if engine is None:
@@ -246,6 +259,7 @@ async def get_balances(
 async def get_trade_history(
     account_id: str = DEFAULT_ACCOUNT,
     engine: object = Depends(get_live_engine),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Fill]:
     """Get trade execution history (fills)."""
     if engine is None:

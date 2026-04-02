@@ -41,11 +41,12 @@ class BacktestRepository:
     def __init__(self, db: AsyncSQLiteManager) -> None:
         self._db = db
 
-    async def save(self, result: BacktestResult) -> str:
+    async def save(self, result: BacktestResult, *, user_id: str = "local") -> str:
         """Insert a backtest result.
 
         Args:
             result: The backtest result to persist.
+            user_id: Owner user ID (defaults to ``'local'`` for Community).
 
         Returns:
             The backtest ID.
@@ -63,8 +64,8 @@ class BacktestRepository:
                 (id, strategy_id, start_date, end_date,
                  metrics_json, equity_curve_json, trades_count, created_at, strategy_version,
                  buy_hold_curve_json, drawdown_curve_json, trades_json,
-                 symbol, interval)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 symbol, interval, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 metrics_json = excluded.metrics_json,
                 equity_curve_json = excluded.equity_curve_json,
@@ -91,6 +92,7 @@ class BacktestRepository:
                 trades_json,
                 result.symbol,
                 result.interval,
+                user_id,
             ),
         )
         return result.id
@@ -157,83 +159,128 @@ class BacktestRepository:
             created_at=_storage_to_timestamp_ms(cast(str, row["created_at"])),
         )
 
-    async def get(self, backtest_id: str) -> BacktestResult | None:
-        """Retrieve a backtest result by ID.
+    async def get(self, backtest_id: str, *, user_id: str | None = None) -> BacktestResult | None:
+        """Retrieve a backtest result by ID, optionally scoped to a user.
 
         Args:
             backtest_id: The backtest identifier.
+            user_id: If provided, enforce ownership check.
 
         Returns:
             The backtest result, or ``None`` if not found.
         """
-        rows = await self._db.query(
-            """
-            SELECT id, strategy_id, strategy_version, start_date, end_date,
-                   metrics_json, equity_curve_json, trades_count, created_at,
-                   buy_hold_curve_json, drawdown_curve_json, trades_json,
-                   symbol, interval
-            FROM backtests WHERE id = ?
-            """,
-            (backtest_id,),
-        )
+        if user_id is not None:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests WHERE id = ? AND user_id = ?
+                """,
+                (backtest_id, user_id),
+            )
+        else:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests WHERE id = ?
+                """,
+                (backtest_id,),
+            )
         if not rows:
             return None
         return self._row_to_result(rows[0])
 
-    async def list_all(self, limit: int = 50, offset: int = 0) -> list[BacktestResult]:
+    async def list_all(self, limit: int = 50, offset: int = 0, *, user_id: str | None = None) -> list[BacktestResult]:
         """List all backtest results, newest first."""
-        rows = await self._db.query(
-            """
-            SELECT id, strategy_id, strategy_version, start_date, end_date,
-                   metrics_json, equity_curve_json, trades_count, created_at,
-                   buy_hold_curve_json, drawdown_curve_json, trades_json,
-                   symbol, interval
-            FROM backtests
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, offset),
-        )
+        if user_id is not None:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset),
+            )
+        else:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            )
         return [self._row_to_result(r) for r in rows]
 
-    async def delete(self, backtest_id: str) -> bool:
-        """Delete a backtest result by ID.
+    async def delete(self, backtest_id: str, *, user_id: str | None = None) -> bool:
+        """Delete a backtest result by ID, optionally scoped to a user.
 
         Returns:
             True if the row was found and deleted, False otherwise.
         """
-        await self._db.execute(
-            "DELETE FROM backtests WHERE id = ?",
-            (backtest_id,),
-        )
-        # aiosqlite doesn't surface rowcount easily, so we check existence first
+        if user_id is not None:
+            await self._db.execute(
+                "DELETE FROM backtests WHERE id = ? AND user_id = ?",
+                (backtest_id, user_id),
+            )
+        else:
+            await self._db.execute(
+                "DELETE FROM backtests WHERE id = ?",
+                (backtest_id,),
+            )
         rows = await self._db.query(
             "SELECT id FROM backtests WHERE id = ?",
             (backtest_id,),
         )
         return len(rows) == 0
 
-    async def list_by_strategy(self, strategy_id: str, limit: int = 20) -> list[BacktestResult]:
+    async def list_by_strategy(self, strategy_id: str, limit: int = 20, *, user_id: str | None = None) -> list[BacktestResult]:
         """List backtest results for a strategy, newest first.
 
         Args:
             strategy_id: The strategy to filter by.
             limit: Maximum number of results.
-
-        Returns:
-            List of backtest results.
+            user_id: If provided, filter by owner.
         """
-        rows = await self._db.query(
-            """
-            SELECT id, strategy_id, strategy_version, start_date, end_date,
-                   metrics_json, equity_curve_json, trades_count, created_at,
-                   buy_hold_curve_json, drawdown_curve_json, trades_json,
-                   symbol, interval
-            FROM backtests
-            WHERE strategy_id = ?
-            ORDER BY created_at DESC
-            LIMIT ?
-            """,
-            (strategy_id, limit),
-        )
+        if user_id is not None:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests
+                WHERE strategy_id = ? AND user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (strategy_id, user_id, limit),
+            )
+        else:
+            rows = await self._db.query(
+                """
+                SELECT id, strategy_id, strategy_version, start_date, end_date,
+                       metrics_json, equity_curve_json, trades_count, created_at,
+                       buy_hold_curve_json, drawdown_curve_json, trades_json,
+                       symbol, interval
+                FROM backtests
+                WHERE strategy_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (strategy_id, limit),
+            )
         return [self._row_to_result(r) for r in rows]

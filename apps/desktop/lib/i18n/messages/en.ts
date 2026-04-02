@@ -831,4 +831,11 @@ export const enMessages = {
   "runner.lastSignal": "Last Signal",
   "runner.deployedAt": "Deployed At",
   "runner.strategyRunning": "Strategy Running",
+
+  "auth.login": "Login",
+  "auth.logout": "Logout",
+  "auth.agentLoginRequired": "Login required to use AI assistant",
+  "auth.loginToChat": "Login to chat with AI assistant…",
+  "auth.loginRequired": "Login Required",
+  "auth.loginRequiredDesc": "This feature requires authentication. Please log in to continue.",
 } as const

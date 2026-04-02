@@ -122,6 +122,7 @@ class TestDepthNormalization:
         assert isinstance(result, BinanceDepthDelta)
         assert result.first_update_id == 100001
         assert result.last_update_id == 100002
+        assert result.previous_update_id is None  # spot: no pu field
         assert result.delta.exchange == "binance"
         assert result.delta.symbol == "BTC/USDT"
         assert result.delta.sequence_id == 100002
@@ -129,6 +130,25 @@ class TestDepthNormalization:
         assert len(result.delta.asks) == 2
         assert result.delta.bids[0].price == 66999.0
         assert result.delta.bids[0].quantity == 2.5
+
+    def test_futures_depth_with_pu(self, normalizer: BinanceNormalizer) -> None:
+        """Futures depth events include a ``pu`` (previous update ID) field."""
+        data = {
+            "e": "depthUpdate",
+            "E": 1711000000000,
+            "T": 1711000000000,
+            "s": "BTCUSDT",
+            "U": 200001,
+            "u": 200005,
+            "pu": 200000,
+            "b": [["66999.00", "2.50"]],
+            "a": [["67001.00", "1.50"]],
+        }
+        result = normalizer.normalize(data)
+        assert isinstance(result, BinanceDepthDelta)
+        assert result.first_update_id == 200001
+        assert result.last_update_id == 200005
+        assert result.previous_update_id == 200000
 
     def test_empty_sides(self, normalizer: BinanceNormalizer) -> None:
         data = {

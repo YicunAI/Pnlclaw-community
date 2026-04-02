@@ -10,10 +10,11 @@ from pydantic import BaseModel, Field
 
 from app.core.crypto import KeyPairManager
 from app.core.dependencies import (
+    AuthenticatedUser,
     build_response_meta,
     get_key_pair_manager,
     get_settings_service,
-    set_agent_runtime,
+    optional_user,
 )
 from app.core.settings_service import SettingsService
 from pnlclaw_types.common import APIResponse
@@ -60,8 +61,10 @@ class SettingsUpdateRequest(BaseModel):
 async def get_settings(
     request: Request,
     service: SettingsService = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
-    data = await service.get_settings()
+    uid = user.id if user.id != "local" else None
+    data = await service.get_settings(user_id=uid)
     return APIResponse(data=data, meta=build_response_meta(request), error=None)
 
 
@@ -70,10 +73,12 @@ async def update_settings(
     request: Request,
     body: SettingsUpdateRequest,
     service: SettingsService = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
+    uid = user.id if user.id != "local" else None
     payload = body.model_dump(exclude_none=True)
     try:
-        data = await service.update_settings(payload)
+        data = await service.update_settings(payload, user_id=uid)
     except SecretResolutionError as exc:
         raise PnLClawError(
             code=ErrorCode.SERVICE_UNAVAILABLE,
@@ -82,35 +87,27 @@ async def update_settings(
         ) from exc
 
     if "llm" in payload:
-        await _refresh_agent_runtime(service)
+        await _refresh_agent_runtime(service, user_id=uid)
 
     return APIResponse(data=data, meta=build_response_meta(request), error=None)
 
 
-async def _refresh_agent_runtime(service: SettingsService) -> None:
-    """Re-create the AgentRuntime with updated LLM settings."""
+async def _refresh_agent_runtime(service: SettingsService, *, user_id: str | None = None) -> None:
+    """Invalidate cached runtime so it will be rebuilt with new LLM settings."""
     import logging
 
-    from app.core.dependencies import get_tool_catalog
-    from app.main import _build_agent_runtime
+    from app.api.v1.agent import invalidate_user_runtime
 
     log = logging.getLogger(__name__)
-    try:
-        tool_catalog = get_tool_catalog()
-        runtime = await _build_agent_runtime(service, tool_catalog)
-        set_agent_runtime(runtime)
-        if runtime is not None:
-            log.info("Agent runtime refreshed after LLM settings update")
-        else:
-            log.info("LLM API key cleared, agent runtime set to None")
-    except Exception:
-        log.warning("Failed to refresh agent runtime", exc_info=True)
+    invalidate_user_runtime(user_id)
+    log.info("Invalidated agent runtime cache for user %s", user_id or "local")
 
 
 @router.get("/public-key")
 async def get_public_key(
     request: Request,
     manager: KeyPairManager = Depends(get_key_pair_manager),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Return the ephemeral RSA public key (JWK) for encrypting secrets."""
     if manager is None:
@@ -129,31 +126,20 @@ async def get_public_key(
 async def list_llm_models(
     request: Request,
     service: SettingsService = Depends(get_settings_service),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Fetch available models from the configured LLM provider."""
     import logging
 
     from pnlclaw_llm.base import LLMConfig, LLMAuthError, LLMConnectionError
     from pnlclaw_llm.openai_compat import OpenAICompatProvider
-    from pnlclaw_security.secrets import SecretRef, SecretSource
 
     log = logging.getLogger(__name__)
 
-    settings = await service.get_settings()
-    llm_config = settings.get("llm", {})
+    uid = user.id if user.id != "local" else None
+    llm_full = await service.resolve_llm_full_config(user_id=uid)
 
-    api_key = None
-    try:
-        resolved = await service._secret_manager.resolve(
-            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id="api_key")
-        )
-        api_key = resolved.use()
-    except Exception:
-        logger.debug(
-            "Could not resolve LLM API key from keyring for model listing",
-            exc_info=True,
-        )
-
+    api_key = llm_full.get("api_key")
     if not api_key:
         raise PnLClawError(
             code=ErrorCode.VALIDATION_ERROR,
@@ -161,25 +147,27 @@ async def list_llm_models(
         )
 
     config = LLMConfig(
-        model=llm_config.get("model") or "default",
+        model=llm_full.get("model") or "default",
         api_key=api_key,
-        base_url=llm_config.get("base_url") or None,
+        base_url=llm_full.get("base_url") or None,
     )
 
     provider = OpenAICompatProvider(config)
     try:
         models_data = await provider.list_models()
-        models = [
-            {
-                "id": m.get("id", ""),
-                "name": m.get("id", ""),
-                "owned_by": m.get("owned_by", ""),
-                "created": m.get("created", 0),
-            }
-            for m in models_data
-            if m.get("id")
-        ]
-        current_model = llm_config.get("model", "")
+        seen: set[str] = set()
+        models = []
+        for m in models_data:
+            mid = m.get("id", "")
+            if mid and mid not in seen:
+                seen.add(mid)
+                models.append({
+                    "id": mid,
+                    "name": mid,
+                    "owned_by": m.get("owned_by", ""),
+                    "created": m.get("created", 0),
+                })
+        current_model = llm_full.get("model", "")
         return APIResponse(
             data={
                 "models": models,

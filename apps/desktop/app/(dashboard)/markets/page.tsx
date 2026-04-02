@@ -330,8 +330,8 @@ export default function MarketsPage() {
               </CardContent>
             </Card>
 
-            <div className="space-y-4">
-              <Card>
+            <div className="flex flex-col gap-4">
+              <Card className="shrink-0">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">{t("markets.ticker")}</CardTitle>
                 </CardHeader>
@@ -340,11 +340,11 @@ export default function MarketsPage() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="flex-1 min-h-0 overflow-hidden">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">{t("markets.orderBook")}</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-y-auto">
                   <OrderbookPanel data={orderbook} baseCurrency={symbol.split("/")[0]} quoteCurrency={symbol.split("/")[1] || "USDT"} />
                 </CardContent>
               </Card>

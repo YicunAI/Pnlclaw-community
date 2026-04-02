@@ -32,6 +32,7 @@ def _make_delta(
     bids: list[tuple[float, float]] | None = None,
     asks: list[tuple[float, float]] | None = None,
     symbol: str = "BTC/USDT",
+    previous_update_id: int | None = None,
 ) -> BinanceDepthDelta:
     """Create a BinanceDepthDelta for testing."""
     bid_levels = [PriceLevel(price=p, quantity=q) for p, q in (bids or [])]
@@ -44,7 +45,12 @@ def _make_delta(
         bids=bid_levels,
         asks=ask_levels,
     )
-    return BinanceDepthDelta(delta=delta, first_update_id=first_id, last_update_id=last_id)
+    return BinanceDepthDelta(
+        delta=delta,
+        first_update_id=first_id,
+        last_update_id=last_id,
+        previous_update_id=previous_update_id,
+    )
 
 
 def _mock_http_client(snapshot_data: dict[str, Any]) -> AsyncMock:
@@ -108,24 +114,20 @@ async def test_apply_sequential_deltas() -> None:
     delta1 = _make_delta(
         100,
         101,
-        bids=[(66999.0, 3.0)],  # Update bid quantity
-        asks=[(67001.0, 0.0)],  # Remove ask level
+        bids=[(66999.0, 3.0)],
+        asks=[(67001.0, 0.0)],
     )
-    snap1 = await mgr.apply_delta("BTCUSDT", delta1)
+    assert await mgr.apply_delta("BTCUSDT", delta1) is True
+    snap1 = mgr.get_snapshot("BTCUSDT")
     assert snap1 is not None
     assert snap1.bids[0].quantity == 3.0
-    # 67001.0 was removed, best ask now 67002.0
     assert snap1.asks[0].price == 67002.0
 
     # Second delta: contiguous U=102, u=103
-    delta2 = _make_delta(
-        102,
-        103,
-        bids=[(67000.0, 1.0)],  # New bid level
-    )
-    snap2 = await mgr.apply_delta("BTCUSDT", delta2)
+    delta2 = _make_delta(102, 103, bids=[(67000.0, 1.0)])
+    assert await mgr.apply_delta("BTCUSDT", delta2) is True
+    snap2 = mgr.get_snapshot("BTCUSDT")
     assert snap2 is not None
-    # Best bid should now be 67000.0
     assert snap2.bids[0].price == 67000.0
 
 
@@ -136,15 +138,12 @@ async def test_stale_delta_dropped() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # Stale delta: u=50 < lastUpdateId=100
     stale = _make_delta(40, 50, bids=[(66999.0, 99.0)])
-    result = await mgr.apply_delta("BTCUSDT", stale)
-    assert result is None
+    assert await mgr.apply_delta("BTCUSDT", stale) is False
 
-    # Book should be unchanged.
     snap = mgr.get_snapshot("BTCUSDT")
     assert snap is not None
-    assert snap.bids[0].quantity == 2.0  # Original value
+    assert snap.bids[0].quantity == 2.0
 
 
 @pytest.mark.asyncio
@@ -154,61 +153,31 @@ async def test_first_delta_validation_passes() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # U=100 <= lastUpdateId+1=101, u=101 >= 101 → valid
     delta = _make_delta(100, 101, bids=[(66999.0, 5.0)])
-    result = await mgr.apply_delta("BTCUSDT", delta)
-    assert result is not None
-    assert result.bids[0].quantity == 5.0
+    assert await mgr.apply_delta("BTCUSDT", delta) is True
+    snap = mgr.get_snapshot("BTCUSDT")
+    assert snap is not None
+    assert snap.bids[0].quantity == 5.0
 
 
 @pytest.mark.asyncio
-async def test_first_delta_validation_fails_triggers_recovery() -> None:
-    """First delta that doesn't bridge the snapshot triggers recovery."""
+async def test_first_delta_with_gap_accepted_with_warning() -> None:
+    """First delta that doesn't perfectly bridge the snapshot is accepted."""
     http = _mock_http_client(BASIC_SNAPSHOT)
-
-    # After recovery, provide a new snapshot.
-    recovery_snapshot = {
-        "lastUpdateId": 200,
-        "bids": [["67010.00", "1.00"]],
-        "asks": [["67020.00", "1.00"]],
-    }
-    http.get = AsyncMock(
-        side_effect=[
-            # Initial snapshot
-            MagicMock(
-                status_code=200,
-                json=MagicMock(return_value=BASIC_SNAPSHOT),
-                raise_for_status=MagicMock(),
-            ),
-            # Recovery snapshot
-            MagicMock(
-                status_code=200,
-                json=MagicMock(return_value=recovery_snapshot),
-                raise_for_status=MagicMock(),
-            ),
-        ]
-    )
-
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # Gap: U=110 > lastUpdateId+1=101 → triggers recovery
     delta = _make_delta(110, 115, bids=[(66999.0, 5.0)])
-    result = await mgr.apply_delta("BTCUSDT", delta)
-    assert result is None  # Delta dropped during recovery
-
-    # Two REST calls: initial + recovery
-    assert http.get.call_count == 2
-
-    # After recovery, snapshot should reflect new data
+    assert await mgr.apply_delta("BTCUSDT", delta) is True
     snap = mgr.get_snapshot("BTCUSDT")
     assert snap is not None
-    assert snap.sequence_id == 200
+    assert snap.bids[0].quantity == 5.0
+    assert http.get.call_count == 1
 
 
 @pytest.mark.asyncio
 async def test_sequence_gap_triggers_recovery() -> None:
-    """A gap in subsequent deltas should trigger recovery."""
+    """A large gap (>500) in subsequent deltas should trigger recovery."""
     http = _mock_http_client(BASIC_SNAPSHOT)
 
     recovery_snapshot = {
@@ -234,14 +203,11 @@ async def test_sequence_gap_triggers_recovery() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # First valid delta
     delta1 = _make_delta(100, 101, bids=[(66999.0, 3.0)])
     await mgr.apply_delta("BTCUSDT", delta1)
 
-    # Gap! Expected U=102, got U=110
-    delta_gap = _make_delta(110, 115, bids=[(66999.0, 5.0)])
-    result = await mgr.apply_delta("BTCUSDT", delta_gap)
-    assert result is None
+    delta_gap = _make_delta(1110, 1115, bids=[(66999.0, 5.0)])
+    assert await mgr.apply_delta("BTCUSDT", delta_gap) is False
 
     assert http.get.call_count == 2
     snap = mgr.get_snapshot("BTCUSDT")
@@ -281,15 +247,8 @@ async def test_depth_validation_bid_ask_cross_triggers_recovery() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # Delta that causes bid >= ask (bid=68000 > ask=67001)
-    bad_delta = _make_delta(
-        100,
-        101,
-        bids=[(68000.0, 1.0)],  # Bid above ask
-    )
-    result = await mgr.apply_delta("BTCUSDT", bad_delta)
-    assert result is None  # Recovery triggered
-
+    bad_delta = _make_delta(100, 101, bids=[(68000.0, 1.0)])
+    assert await mgr.apply_delta("BTCUSDT", bad_delta) is False
     assert http.get.call_count == 2
 
 
@@ -300,13 +259,11 @@ async def test_deltas_during_recovery_are_dropped() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # Manually set recovering flag
     book = mgr._books["BTCUSDT"]
     book.recovering = True
 
     delta = _make_delta(100, 101, bids=[(66999.0, 5.0)])
-    result = await mgr.apply_delta("BTCUSDT", delta)
-    assert result is None
+    assert await mgr.apply_delta("BTCUSDT", delta) is False
 
 
 @pytest.mark.asyncio
@@ -319,42 +276,7 @@ async def test_get_snapshot_returns_none_for_unknown() -> None:
 async def test_apply_delta_warns_for_uninitialized() -> None:
     mgr = BinanceL2Manager()
     delta = _make_delta(1, 2, bids=[(100.0, 1.0)])
-    result = await mgr.apply_delta("BTCUSDT", delta)
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_on_snapshot_callback_fires() -> None:
-    """on_snapshot callback should fire after each successful delta."""
-    http = _mock_http_client(BASIC_SNAPSHOT)
-    snapshots: list[OrderBookL2Snapshot] = []
-
-    mgr = BinanceL2Manager(http_client=http, on_snapshot=lambda s: snapshots.append(s))
-    await mgr.initialize("BTCUSDT")
-
-    delta = _make_delta(100, 101, bids=[(66999.0, 5.0)])
-    await mgr.apply_delta("BTCUSDT", delta)
-
-    assert len(snapshots) == 1
-    assert snapshots[0].bids[0].quantity == 5.0
-
-
-@pytest.mark.asyncio
-async def test_on_snapshot_async_callback() -> None:
-    """on_snapshot should work with async callbacks."""
-    http = _mock_http_client(BASIC_SNAPSHOT)
-    snapshots: list[OrderBookL2Snapshot] = []
-
-    async def handler(s: OrderBookL2Snapshot) -> None:
-        snapshots.append(s)
-
-    mgr = BinanceL2Manager(http_client=http, on_snapshot=handler)
-    await mgr.initialize("BTCUSDT")
-
-    delta = _make_delta(100, 101, bids=[(66999.0, 5.0)])
-    await mgr.apply_delta("BTCUSDT", delta)
-
-    assert len(snapshots) == 1
+    assert await mgr.apply_delta("BTCUSDT", delta) is False
 
 
 @pytest.mark.asyncio
@@ -364,18 +286,17 @@ async def test_remove_level_with_zero_quantity() -> None:
     mgr = BinanceL2Manager(http_client=http)
     await mgr.initialize("BTCUSDT")
 
-    # Remove the 66999.0 bid level
     delta = _make_delta(100, 101, bids=[(66999.0, 0.0)])
-    snap = await mgr.apply_delta("BTCUSDT", delta)
+    assert await mgr.apply_delta("BTCUSDT", delta) is True
+    snap = mgr.get_snapshot("BTCUSDT")
     assert snap is not None
-    # Only 66998.0 should remain
     assert len(snap.bids) == 1
     assert snap.bids[0].price == 66998.0
 
 
 @pytest.mark.asyncio
 async def test_end_to_end_with_gap_and_recovery() -> None:
-    """Full flow: init → deltas → gap → recovery → resume."""
+    """Full flow: init -> deltas -> gap -> recovery -> resume."""
     initial = {
         "lastUpdateId": 100,
         "bids": [["50000.00", "1.00"], ["49999.00", "2.00"]],
@@ -403,43 +324,34 @@ async def test_end_to_end_with_gap_and_recovery() -> None:
     )
 
     mgr = BinanceL2Manager(http_client=http)
-    snapshots: list[OrderBookL2Snapshot] = []
-    mgr._on_snapshot = lambda s: snapshots.append(s)
 
-    # 1. Initialize
     await mgr.initialize("BTCUSDT")
     snap0 = mgr.get_snapshot("BTCUSDT")
     assert snap0 is not None
     assert snap0.sequence_id == 100
 
-    # 2. Apply valid deltas
     d1 = _make_delta(100, 101, bids=[(50000.0, 1.5)])
-    s1 = await mgr.apply_delta("BTCUSDT", d1)
+    assert await mgr.apply_delta("BTCUSDT", d1) is True
+    s1 = mgr.get_snapshot("BTCUSDT")
     assert s1 is not None
     assert s1.bids[0].quantity == 1.5
 
     d2 = _make_delta(102, 103, asks=[(50001.0, 0.5)])
-    s2 = await mgr.apply_delta("BTCUSDT", d2)
-    assert s2 is not None
+    assert await mgr.apply_delta("BTCUSDT", d2) is True
 
-    # 3. Simulate gap (expected U=104, got U=150)
-    d_gap = _make_delta(150, 155, bids=[(50000.0, 9.0)])
-    s_gap = await mgr.apply_delta("BTCUSDT", d_gap)
-    assert s_gap is None  # Recovery triggered
+    d_gap = _make_delta(1104, 1110, bids=[(50000.0, 9.0)])
+    assert await mgr.apply_delta("BTCUSDT", d_gap) is False
 
-    # 4. After recovery, snapshot reflects new data
     snap_after = mgr.get_snapshot("BTCUSDT")
     assert snap_after is not None
     assert snap_after.sequence_id == 200
     assert snap_after.bids[0].price == 50010.0
 
-    # 5. Resume with new deltas
     d3 = _make_delta(200, 201, bids=[(50010.0, 2.0)])
-    s3 = await mgr.apply_delta("BTCUSDT", d3)
+    assert await mgr.apply_delta("BTCUSDT", d3) is True
+    s3 = mgr.get_snapshot("BTCUSDT")
     assert s3 is not None
     assert s3.bids[0].quantity == 2.0
-
-    # Verify bid < ask throughout
     assert s3.bids[0].price < s3.asks[0].price
 
 
@@ -455,10 +367,84 @@ async def test_bids_sorted_descending_asks_sorted_ascending() -> None:
     mgr = BinanceL2Manager(http_client=http)
     snap = await mgr.initialize("BTCUSDT")
 
-    # Bids: highest first
     bid_prices = [level.price for level in snap.bids]
     assert bid_prices == sorted(bid_prices, reverse=True)
 
-    # Asks: lowest first
     ask_prices = [level.price for level in snap.asks]
     assert ask_prices == sorted(ask_prices)
+
+
+# ---------------------------------------------------------------------------
+# Futures protocol tests (pu-based continuity)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_futures_sequential_deltas_with_pu() -> None:
+    """Futures deltas with correct pu chain should apply without recovery."""
+    http = _mock_http_client(BASIC_SNAPSHOT)
+    mgr = BinanceL2Manager(http_client=http)
+    await mgr.initialize("BTCUSDT")
+
+    d1 = _make_delta(100, 105, bids=[(66999.0, 3.0)], previous_update_id=99)
+    assert await mgr.apply_delta("BTCUSDT", d1) is True
+
+    d2 = _make_delta(500, 510, bids=[(66999.0, 4.0)], previous_update_id=105)
+    assert await mgr.apply_delta("BTCUSDT", d2) is True
+    snap = mgr.get_snapshot("BTCUSDT")
+    assert snap is not None
+    assert snap.bids[0].quantity == 4.0
+
+    d3 = _make_delta(2000, 2010, asks=[(67001.0, 2.0)], previous_update_id=510)
+    assert await mgr.apply_delta("BTCUSDT", d3) is True
+    assert http.get.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_futures_pu_mismatch_triggers_recovery() -> None:
+    """Futures delta with wrong pu should trigger recovery."""
+    recovery_snapshot = {
+        "lastUpdateId": 300,
+        "bids": [["67015.00", "2.00"]],
+        "asks": [["67025.00", "2.00"]],
+    }
+    http = AsyncMock()
+    http.get = AsyncMock(
+        side_effect=[
+            MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=BASIC_SNAPSHOT),
+                raise_for_status=MagicMock(),
+            ),
+            MagicMock(
+                status_code=200,
+                json=MagicMock(return_value=recovery_snapshot),
+                raise_for_status=MagicMock(),
+            ),
+        ]
+    )
+
+    mgr = BinanceL2Manager(http_client=http)
+    await mgr.initialize("BTCUSDT")
+
+    d1 = _make_delta(100, 105, bids=[(66999.0, 3.0)], previous_update_id=99)
+    await mgr.apply_delta("BTCUSDT", d1)
+
+    d_bad = _make_delta(500, 510, bids=[(66999.0, 5.0)], previous_update_id=999)
+    assert await mgr.apply_delta("BTCUSDT", d_bad) is False
+    assert http.get.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_futures_large_U_gap_accepted_with_valid_pu() -> None:
+    """Futures: large U gaps are normal and should NOT trigger recovery when pu is valid."""
+    http = _mock_http_client(BASIC_SNAPSHOT)
+    mgr = BinanceL2Manager(http_client=http)
+    await mgr.initialize("BTCUSDT")
+
+    d1 = _make_delta(100, 101, bids=[(66999.0, 3.0)], previous_update_id=99)
+    await mgr.apply_delta("BTCUSDT", d1)
+
+    d2 = _make_delta(100101, 100200, bids=[(66999.0, 4.0)], previous_update_id=101)
+    assert await mgr.apply_delta("BTCUSDT", d2) is True
+    assert http.get.call_count == 1

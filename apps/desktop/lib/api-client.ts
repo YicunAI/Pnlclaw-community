@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080"
 
 interface ApiResponse<T> {
   data: T | null
@@ -46,6 +46,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse
   return _doRequest<T>(path, init)
 }
 
+function _getStoredToken(): string | null {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("pnlclaw_access_token")
+}
+
 async function _doRequest<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
   try {
     const method = (init?.method ?? "GET").toUpperCase()
@@ -53,12 +58,19 @@ async function _doRequest<T>(path: string, init?: RequestInit): Promise<ApiRespo
     if (method !== "GET" && method !== "HEAD") {
       headers["Content-Type"] ??= "application/json"
     }
+    const token = _getStoredToken()
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`
+    }
     const res = await fetch(`${API_BASE}${path}`, {
       cache: "no-store" as RequestCache,
       ...init,
       headers,
     })
     if (!res.ok) {
+      if (res.status === 401 && typeof window !== "undefined") {
+        localStorage.removeItem("pnlclaw_access_token")
+      }
       const body = await res.text()
       return { data: null, error: `HTTP ${res.status}: ${body}` }
     }
@@ -895,9 +907,14 @@ export async function sendAgentChat(
       if (resolvedSessionId) body.session_id = resolvedSessionId
       if (isResume) body.resume = true
 
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      const token = _getStoredToken()
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`
+      }
       const res = await fetch(`${API_BASE}/api/v1/agent/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(body),
         signal,
       })

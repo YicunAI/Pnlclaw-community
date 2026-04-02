@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_chat_session_repo
+from app.core.dependencies import AuthenticatedUser, get_chat_session_repo, optional_user
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -40,10 +40,12 @@ def _require_repo(repo: Any = Depends(get_chat_session_repo)) -> Any:
 async def create_session(
     body: CreateSessionBody,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     return await repo.create_session(
         strategy_id=body.strategy_id,
         title=body.title,
+        user_id=user.id,
     )
 
 
@@ -53,9 +55,10 @@ async def list_sessions(
     limit: int = 50,
     offset: int = 0,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[dict[str, Any]]:
     return await repo.list_sessions(
-        strategy_id=strategy_id, limit=limit, offset=offset,
+        strategy_id=strategy_id, limit=limit, offset=offset, user_id=user.id,
     )
 
 
@@ -63,10 +66,13 @@ async def list_sessions(
 async def get_session(
     session_id: str,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     row = await repo.get_session(session_id)
     if row is None:
         raise HTTPException(404, "Session not found")
+    if row.get("user_id") and row["user_id"] != user.id and user.id != "local":
+        raise HTTPException(403, "Access denied")
     return row
 
 
@@ -75,10 +81,13 @@ async def update_session(
     session_id: str,
     body: UpdateSessionBody,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, str]:
     existing = await repo.get_session(session_id)
     if existing is None:
         raise HTTPException(404, "Session not found")
+    if existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
+        raise HTTPException(403, "Access denied")
     await repo.update_session_title(session_id, body.title)
     return {"status": "ok"}
 
@@ -87,7 +96,13 @@ async def update_session(
 async def delete_session(
     session_id: str,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, str]:
+    existing = await repo.get_session(session_id)
+    if existing is None:
+        raise HTTPException(404, "Session not found")
+    if existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
+        raise HTTPException(403, "Access denied")
     await repo.delete_session(session_id)
     return {"status": "ok"}
 
@@ -98,7 +113,11 @@ async def get_messages(
     limit: int = 200,
     offset: int = 0,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> list[dict[str, Any]]:
+    session = await repo.get_session(session_id)
+    if session and session.get("user_id") and session["user_id"] != user.id and user.id != "local":
+        raise HTTPException(403, "Access denied")
     return await repo.get_messages(session_id, limit=limit, offset=offset)
 
 
@@ -107,10 +126,13 @@ async def save_messages(
     session_id: str,
     body: SaveMessagesBody,
     repo: Any = Depends(_require_repo),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, str]:
     """Bulk-save messages for a session (replaces existing messages)."""
     existing = await repo.get_session(session_id)
     if existing is None:
-        await repo.create_session(session_id=session_id)
+        await repo.create_session(session_id=session_id, user_id=user.id)
+    elif existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
+        raise HTTPException(403, "Access denied")
     await repo.save_messages_bulk(session_id, body.messages)
     return {"status": "ok"}

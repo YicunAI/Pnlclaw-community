@@ -7,12 +7,117 @@ instances can be overridden via ``app.dependency_overrides``.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from fastapi import Request
+from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
 from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
 from pnlclaw_types.common import Pagination, ResponseMeta
+from pnlclaw_types.errors import ErrorCode, PnLClawError
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# JWT Manager holder (shared secret with admin-api)
+# ---------------------------------------------------------------------------
+
+_jwt_manager: Any | None = None
+_auth_enabled: bool = False
+
+_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+class AuthenticatedUser(BaseModel):
+    """Represents an authenticated user extracted from a valid JWT."""
+    id: str
+    role: str = "user"
+
+
+def set_jwt_manager(mgr: Any) -> None:
+    global _jwt_manager, _auth_enabled
+    _jwt_manager = mgr
+    _auth_enabled = mgr is not None
+
+
+def get_jwt_manager() -> Any:
+    return _jwt_manager
+
+
+async def require_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> AuthenticatedUser:
+    """Validate the Bearer JWT and return the authenticated user.
+
+    When auth is disabled (Community mode), returns a default local user.
+    """
+    if not _auth_enabled:
+        return AuthenticatedUser(id="local", role="admin")
+
+    if creds is None or not creds.credentials:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message="Missing or invalid Bearer token",
+        )
+
+    try:
+        payload = _jwt_manager.decode_access_token(creds.credentials)
+    except Exception as exc:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message=f"Invalid token: {exc}",
+        )
+
+    user_id = payload.get("sub")
+    if not user_id:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message="Token missing user identity",
+        )
+
+    return AuthenticatedUser(id=user_id, role=payload.get("role", "user"))
+
+
+async def optional_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> AuthenticatedUser:
+    """Extract user from Bearer JWT.
+
+    Community mode (auth disabled): returns local/admin.
+    Pro mode (auth enabled): requires a valid Bearer token — missing or
+    invalid tokens are rejected with 401.  No silent fallback to local/admin.
+    """
+    if not _auth_enabled:
+        return AuthenticatedUser(id="local", role="admin")
+
+    if creds is None or not creds.credentials:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message="Authentication required",
+        )
+
+    try:
+        payload = _jwt_manager.decode_access_token(creds.credentials)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message="Token missing user identity",
+            )
+        return AuthenticatedUser(
+            id=user_id,
+            role=payload.get("role", "user"),
+        )
+    except PnLClawError:
+        raise
+    except Exception as exc:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message=f"Invalid token: {exc}",
+        ) from exc
+
 
 # ---------------------------------------------------------------------------
 # Singleton holders — populated during lifespan startup

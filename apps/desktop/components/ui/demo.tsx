@@ -5,8 +5,11 @@ import { SplineScene } from "@/components/ui/splite";
 import { Globe, ChevronDown } from "lucide-react";
 import { useI18n } from "@/components/i18n/use-i18n";
 
+import { useRouter } from "next/navigation";
+
 export function SplineSceneBasic() {
   const { locale, setLocale, t } = useI18n();
+  const router = useRouter();
 
   return (
     <div className="w-full h-screen bg-transparent relative overflow-hidden font-sans">
@@ -40,7 +43,10 @@ export function SplineSceneBasic() {
             {t("demo.desc3")}
           </p>
           <div className="mt-10 flex gap-4 pointer-events-auto">
-            <button className="px-8 py-3 rounded-full bg-white text-black font-semibold hover:bg-neutral-200 transition-colors">
+            <button 
+              onClick={() => router.push('/dashboard')}
+              className="px-8 py-3 rounded-full bg-white text-black font-semibold hover:bg-neutral-200 transition-colors"
+            >
               {t("demo.start")}
             </button>
             <button 

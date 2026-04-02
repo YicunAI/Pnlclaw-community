@@ -6,7 +6,7 @@
  * the matching private key in memory and decrypts on receipt.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080"
 
 const ENCRYPTED_PREFIX = "enc:"
 

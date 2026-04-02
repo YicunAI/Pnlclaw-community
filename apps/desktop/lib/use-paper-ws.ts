@@ -8,8 +8,9 @@ import type {
   PaperFillData,
   PaperEquityPoint,
 } from "./api-client"
+import { getAccessToken } from "./auth"
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080"
+const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8080"
 const RECONNECT_MS = 3000
 
 export interface StrategySignal {
@@ -87,7 +88,11 @@ export function usePaperWS(accountId: string | null) {
     }
 
     closingRef.current = false
-    const ws = new WebSocket(`${WS_BASE}/api/v1/ws/paper`)
+    const token = getAccessToken()
+    const wsUrl = token
+      ? `${WS_BASE}/api/v1/ws/paper?token=${encodeURIComponent(token)}`
+      : `${WS_BASE}/api/v1/ws/paper`
+    const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
     ws.onopen = () => {

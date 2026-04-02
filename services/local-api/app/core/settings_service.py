@@ -32,17 +32,35 @@ class SettingsService:
         self._secret_manager = secret_manager or SecretManager()
         self._key_pair_manager = key_pair_manager
 
-    async def get_settings(self) -> dict[str, Any]:
-        settings = self._load_non_sensitive()
+    def _user_config_path(self, user_id: str | None) -> Path:
+        """Return the settings.json path scoped to a user."""
+        if not user_id or user_id == "local":
+            return self._config_path
+        return Path.home() / ".pnlclaw" / "users" / user_id / "settings.json"
+
+    @staticmethod
+    def _kr_provider(base: str, user_id: str | None) -> str:
+        """Namespace a keyring provider string by user_id."""
+        if not user_id or user_id == "local":
+            return base
+        return f"{base}.u.{user_id}"
+
+    async def get_settings(self, *, user_id: str | None = None) -> dict[str, Any]:
+        settings = self._load_non_sensitive(user_id=user_id)
+
+        ex_prov = self._kr_provider("pnlclaw.exchange", user_id)
+        llm_prov = self._kr_provider("pnlclaw.llm", user_id)
+        net_prov = self._kr_provider("pnlclaw.network", user_id)
+        smart_prov = self._kr_provider("pnlclaw.llm.smart", user_id)
 
         exchange_key = await self._secret_manager.exists(
-            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_key")
+            SecretRef(source=SecretSource.KEYRING, provider=ex_prov, id="api_key")
         )
         exchange_secret = await self._secret_manager.exists(
-            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_secret")
+            SecretRef(source=SecretSource.KEYRING, provider=ex_prov, id="api_secret")
         )
         llm_key = await self._secret_manager.exists(
-            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id="api_key")
+            SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id="api_key")
         )
 
         settings["exchange"]["api_key_configured"] = exchange_key
@@ -53,19 +71,17 @@ class SettingsService:
         settings["llm"]["api_key_configured"] = llm_key
         settings["llm"]["api_key_masked"] = "\u2022" * 8 if llm_key else ""
 
-        # Restore keyring-stored LLM fields for the UI
         for field in _LLM_KEYRING_FIELDS:
-            ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id=field)
+            ref = SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field)
             try:
                 resolved = await self._secret_manager.resolve(ref)
                 settings["llm"][field] = resolved.use()
             except Exception:
                 settings["llm"].setdefault(field, "")
 
-        # Restore smart_models from keyring
         smart_models: dict[str, str] = {}
         for sm_field in _LLM_SMART_KEYRING_FIELDS:
-            ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm.smart", id=sm_field)
+            ref = SecretRef(source=SecretSource.KEYRING, provider=smart_prov, id=sm_field)
             try:
                 resolved = await self._secret_manager.resolve(ref)
                 smart_models[sm_field] = resolved.use()
@@ -73,10 +89,9 @@ class SettingsService:
                 smart_models[sm_field] = ""
         settings["llm"]["smart_models"] = smart_models
 
-        # Restore proxy_url from keyring
         try:
             resolved = await self._secret_manager.resolve(
-                SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.network", id="proxy_url")
+                SecretRef(source=SecretSource.KEYRING, provider=net_prov, id="proxy_url")
             )
             settings["network"]["proxy_url"] = resolved.use()
         except Exception:
@@ -94,8 +109,13 @@ class SettingsService:
 
         return settings
 
-    async def update_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
-        non_sensitive = self._load_non_sensitive()
+    async def update_settings(self, payload: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
+        non_sensitive = self._load_non_sensitive(user_id=user_id)
+
+        ex_prov = self._kr_provider("pnlclaw.exchange", user_id)
+        llm_prov = self._kr_provider("pnlclaw.llm", user_id)
+        smart_prov = self._kr_provider("pnlclaw.llm.smart", user_id)
+        net_prov = self._kr_provider("pnlclaw.network", user_id)
 
         if "general" in payload and isinstance(payload["general"], dict):
             non_sensitive["general"].update(
@@ -114,12 +134,12 @@ class SettingsService:
                 non_sensitive["exchange"]["market_type"] = str(exchange["market_type"])
 
             await self._upsert_secret(
-                SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_key"),
+                SecretRef(source=SecretSource.KEYRING, provider=ex_prov, id="api_key"),
                 value=exchange.get("api_key"),
                 clear=bool(exchange.get("clear_api_key", False)),
             )
             await self._upsert_secret(
-                SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_secret"),
+                SecretRef(source=SecretSource.KEYRING, provider=ex_prov, id="api_secret"),
                 value=exchange.get("api_secret"),
                 clear=bool(exchange.get("clear_api_secret", False)),
             )
@@ -127,11 +147,10 @@ class SettingsService:
         if "llm" in payload and isinstance(payload["llm"], dict):
             llm = payload["llm"]
 
-            # Store provider-identifying fields in keyring, not settings.json
             for field in _LLM_KEYRING_FIELDS:
                 if field in llm:
                     await self._upsert_secret(
-                        SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id=field),
+                        SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field),
                         value=str(llm[field]),
                         clear=False,
                     )
@@ -143,13 +162,13 @@ class SettingsService:
                 for sm_field in _LLM_SMART_KEYRING_FIELDS:
                     if sm_field in llm["smart_models"]:
                         await self._upsert_secret(
-                            SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm.smart", id=sm_field),
+                            SecretRef(source=SecretSource.KEYRING, provider=smart_prov, id=sm_field),
                             value=str(llm["smart_models"][sm_field]),
                             clear=False,
                         )
 
             await self._upsert_secret(
-                SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.llm", id="api_key"),
+                SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id="api_key"),
                 value=llm.get("api_key"),
                 clear=bool(llm.get("clear_api_key", False)),
             )
@@ -166,9 +185,8 @@ class SettingsService:
         if "network" in payload and isinstance(payload["network"], dict):
             network = payload["network"]
             if "proxy_url" in network:
-                # Store proxy_url in keyring — reveals network topology
                 await self._upsert_secret(
-                    SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.network", id="proxy_url"),
+                    SecretRef(source=SecretSource.KEYRING, provider=net_prov, id="proxy_url"),
                     value=str(network["proxy_url"]).strip(),
                     clear=not str(network["proxy_url"]).strip(),
                 )
@@ -198,8 +216,8 @@ class SettingsService:
                 val = float(ai_cfg["compaction_threshold"])
                 non_sensitive["ai"]["compaction_threshold"] = max(0.1, min(1.0, val))
 
-        self._save_non_sensitive(non_sensitive)
-        return await self.get_settings()
+        self._save_non_sensitive(non_sensitive, user_id=user_id)
+        return await self.get_settings(user_id=user_id)
 
     async def _upsert_secret(self, ref: SecretRef, *, value: Any, clear: bool) -> None:
         if clear:
@@ -216,8 +234,9 @@ class SettingsService:
                     plaintext = candidate
                 await self._secret_manager.store(ref, plaintext)
 
-    def _load_non_sensitive(self) -> dict[str, Any]:
-        defaults: dict[str, Any] = {
+    @staticmethod
+    def _defaults() -> dict[str, Any]:
+        return {
             "general": {
                 "api_url": "http://localhost:8080",
                 "default_symbol": "BTC/USDT",
@@ -228,7 +247,6 @@ class SettingsService:
                 "market_type": "spot",
             },
             "llm": {
-                # provider/base_url/model/smart_models now stored in keyring
                 "smart_mode": False,
             },
             "risk": {
@@ -237,9 +255,7 @@ class SettingsService:
                 "daily_loss_limit_pct": "5",
                 "cooldown_seconds": "300",
             },
-            "network": {
-                # proxy_url now stored in keyring
-            },
+            "network": {},
             "skills": {
                 "extra_dirs": [],
                 "enabled": {},
@@ -253,16 +269,19 @@ class SettingsService:
             },
         }
 
-        if not self._config_path.exists():
+    def _load_non_sensitive(self, *, user_id: str | None = None) -> dict[str, Any]:
+        defaults = self._defaults()
+        cfg_path = self._user_config_path(user_id)
+
+        if not cfg_path.exists():
             return defaults
 
         try:
-            loaded = json.loads(self._config_path.read_text(encoding="utf-8-sig"))
+            loaded = json.loads(cfg_path.read_text(encoding="utf-8-sig"))
         except Exception:
-            logger.warning("Failed to load settings from %s, using defaults", self._config_path)
+            logger.warning("Failed to load settings from %s, using defaults", cfg_path)
             return defaults
 
-        # Deep merge loaded over defaults
         for section, section_defaults in defaults.items():
             if section in loaded and isinstance(loaded[section], dict) and isinstance(section_defaults, dict):
                 merged = dict(section_defaults)
@@ -273,41 +292,40 @@ class SettingsService:
 
         return defaults
 
-    def _save_non_sensitive(self, data: dict[str, Any]) -> None:
-        # Strip any sensitive fields that should not be persisted to disk
+    def _save_non_sensitive(self, data: dict[str, Any], *, user_id: str | None = None) -> None:
         safe = {}
         for section, values in data.items():
             if not isinstance(values, dict):
                 safe[section] = values
                 continue
             if section == "llm":
-                # Only persist non-identifying flags
                 safe[section] = {k: v for k, v in values.items() if k == "smart_mode"}
             elif section == "network":
-                # proxy_url is in keyring; nothing to persist here
                 safe[section] = {}
             else:
                 safe[section] = values
-        atomic_write(self._config_path, json.dumps(safe, ensure_ascii=False, indent=2))
+        cfg_path = self._user_config_path(user_id)
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(cfg_path, json.dumps(safe, ensure_ascii=False, indent=2))
 
-    def get_llm_config(self) -> dict[str, Any]:
+    def get_llm_config(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Return LLM config for internal use — not exposed via API."""
-        data = self._load_non_sensitive()
+        data = self._load_non_sensitive(user_id=user_id)
         return data.get("llm", {})
 
-    def get_mcp_config(self) -> dict[str, Any]:
+    def get_mcp_config(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Return only the MCP configuration section."""
-        data = self._load_non_sensitive()
+        data = self._load_non_sensitive(user_id=user_id)
         return data.get("mcp", {"servers": {}})
 
-    def get_skills_config(self) -> dict[str, Any]:
+    def get_skills_config(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Return only the skills configuration section."""
-        data = self._load_non_sensitive()
+        data = self._load_non_sensitive(user_id=user_id)
         return data.get("skills", {"extra_dirs": [], "enabled": {}})
 
-    def get_ai_config(self) -> dict[str, Any]:
+    def get_ai_config(self, *, user_id: str | None = None) -> dict[str, Any]:
         """Return the AI configuration section (PRD supplement E)."""
-        data = self._load_non_sensitive()
+        data = self._load_non_sensitive(user_id=user_id)
         return data.get("ai", {
             "react_enabled": True,
             "max_tool_rounds": 10,
@@ -316,9 +334,34 @@ class SettingsService:
             "compaction_threshold": 0.8,
         })
 
-    def update_skills_config(self, skills_payload: dict[str, Any]) -> dict[str, Any]:
+    async def resolve_llm_api_key(self, *, user_id: str | None = None) -> str | None:
+        """Resolve the LLM API key from keyring for the given user."""
+        llm_prov = self._kr_provider("pnlclaw.llm", user_id)
+        try:
+            resolved = await self._secret_manager.resolve(
+                SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id="api_key")
+            )
+            return resolved.use()
+        except Exception:
+            return None
+
+    async def resolve_llm_full_config(self, *, user_id: str | None = None) -> dict[str, Any]:
+        """Return the full LLM config including keyring secrets for the given user."""
+        llm_prov = self._kr_provider("pnlclaw.llm", user_id)
+        config: dict[str, Any] = {}
+        for field in _LLM_KEYRING_FIELDS:
+            ref = SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field)
+            try:
+                resolved = await self._secret_manager.resolve(ref)
+                config[field] = resolved.use()
+            except Exception:
+                config[field] = ""
+        config["api_key"] = await self.resolve_llm_api_key(user_id=user_id)
+        return config
+
+    def update_skills_config(self, skills_payload: dict[str, Any], *, user_id: str | None = None) -> dict[str, Any]:
         """Update skills configuration and persist."""
-        non_sensitive = self._load_non_sensitive()
+        non_sensitive = self._load_non_sensitive(user_id=user_id)
         if "extra_dirs" in skills_payload and isinstance(skills_payload["extra_dirs"], list):
             non_sensitive["skills"]["extra_dirs"] = [
                 str(d).strip() for d in skills_payload["extra_dirs"] if str(d).strip()
@@ -327,5 +370,5 @@ class SettingsService:
             non_sensitive["skills"]["enabled"].update(
                 {str(k): bool(v) for k, v in skills_payload["enabled"].items()}
             )
-        self._save_non_sensitive(non_sensitive)
+        self._save_non_sensitive(non_sensitive, user_id=user_id)
         return non_sensitive["skills"]

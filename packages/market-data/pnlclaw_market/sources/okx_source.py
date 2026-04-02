@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time as _time
 from collections import deque
 from collections.abc import Callable
 from typing import Any
@@ -93,6 +94,8 @@ class OKXSource:
 
         self._subscribed_symbols: set[str] = set()
         self._kline_buffers: dict[str, deque[KlineEvent]] = {}
+        self._SNAPSHOT_THROTTLE_S = 0.25
+        self._last_snapshot_time: dict[str, float] = {}
 
     # -- helpers --
 
@@ -424,4 +427,10 @@ class OKXSource:
     def _on_depth(self, snapshot: OrderBookL2Snapshot) -> None:
         self._stamp(snapshot)
         self._snapshot_store.update(snapshot.symbol, snapshot)
+
+        now = _time.monotonic()
+        last = self._last_snapshot_time.get(snapshot.symbol, 0.0)
+        if now - last < self._SNAPSHOT_THROTTLE_S:
+            return
+        self._last_snapshot_time[snapshot.symbol] = now
         self._event_bus.publish(snapshot)

@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import build_response_meta, get_db_manager, get_market_service
+from app.core.dependencies import AuthenticatedUser, build_response_meta, get_db_manager, get_market_service, optional_user
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import BacktestResult
@@ -48,12 +48,15 @@ class BacktestTask(BaseModel):
     interval: str = "1h"
     status: BacktestTaskStatus = BacktestTaskStatus.PENDING
     result: BacktestResult | None = None
+    user_id: str = "local"
     error: str | None = None
     created_at: int = Field(default_factory=lambda: int(time.time() * 1000))
 
 
 _MAX_TASKS = 1000
 _tasks: dict[str, BacktestTask] = {}
+
+_result_owners: dict[str, str] = {}
 
 
 def _evict_oldest_tasks() -> None:
@@ -199,6 +202,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
         # Store in unified results cache
         from pnlclaw_agent.tools.strategy_tools import _evict_oldest_results
         _get_results_store()[result.id] = result
+        _result_owners[result.id] = task.user_id
         _evict_oldest_results()
 
         db = get_db_manager()
@@ -206,7 +210,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
             try:
                 from pnlclaw_storage.repositories.backtests import BacktestRepository
                 repo = BacktestRepository(db)
-                await repo.save(result)
+                await repo.save(result, user_id=task.user_id)
             except Exception:
                 logger.warning("Failed to persist backtest result to DB", exc_info=True)
         else:
@@ -290,16 +294,15 @@ def _resolve_strategy_symbol_interval(strategy_id: str) -> tuple[str, str]:
     return "", "1h"
 
 
-async def _ensure_strategies_loaded() -> None:
-    """Pre-warm _strategies cache from DB if it's empty."""
+async def _ensure_strategies_loaded(user_id: str = "local") -> None:
+    """Pre-warm _strategies cache from DB for a specific user."""
     from app.api.v1.strategies import _strategies
-    if _strategies:
-        return
     try:
         from app.core.dependencies import get_strategy_repo
         repo = get_strategy_repo()
         if repo is not None:
-            configs = await repo.list(limit=10000, offset=0)
+            uid = user_id if user_id != "local" else None
+            configs = await repo.list(limit=10000, offset=0, user_id=uid)
             for config in configs:
                 _strategies[config.id] = config
     except Exception:
@@ -410,10 +413,11 @@ def _task_to_frontend_dict(task: BacktestTask) -> dict[str, Any]:
 async def start_backtest(
     request: Request,
     body: RunBacktestRequest,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Start a backtest (async).  Returns 202 with a task_id."""
     task_id = f"bt-{uuid.uuid4().hex[:8]}"
-    task = BacktestTask(task_id=task_id, strategy_id=body.strategy_id)
+    task = BacktestTask(task_id=task_id, strategy_id=body.strategy_id, user_id=user.id)
     _tasks[task_id] = task
     _evict_oldest_tasks()
 
@@ -430,11 +434,14 @@ async def start_backtest(
 async def get_backtest(
     task_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Get backtest task status and result (if completed)."""
-    await _ensure_strategies_loaded()
+    await _ensure_strategies_loaded(user.id)
     task = _tasks.get(task_id)
     if task is not None:
+        if user.id != "local" and task.user_id != user.id:
+            raise NotFoundError(f"Backtest task '{task_id}' not found")
         return APIResponse(
             data=_task_to_frontend_dict(task),
             meta=build_response_meta(request),
@@ -444,6 +451,9 @@ async def get_backtest(
     # Check unified results store
     cached = _get_results_store().get(task_id)
     if cached is not None:
+        owner = _result_owners.get(task_id)
+        if user.id != "local" and owner is not None and owner != user.id:
+            raise NotFoundError(f"Backtest task '{task_id}' not found")
         return APIResponse(
             data=_result_to_frontend_dict(cached),
             meta=build_response_meta(request),
@@ -455,7 +465,7 @@ async def get_backtest(
         try:
             from pnlclaw_storage.repositories.backtests import BacktestRepository
             repo = BacktestRepository(db)
-            persisted = await repo.get(task_id)
+            persisted = await repo.get(task_id, user_id=user.id)
             if persisted is not None:
                 return APIResponse(
                     data=_result_to_frontend_dict(persisted),
@@ -474,13 +484,16 @@ async def list_backtests(
     strategy_id: str | None = Query(None, description="Filter by strategy ID"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=1000),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
     """List backtest tasks and persisted results, optionally filtered by strategy_id."""
-    await _ensure_strategies_loaded()
+    await _ensure_strategies_loaded(user.id)
     items: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
 
     tasks = list(_tasks.values())
+    if user.id != "local":
+        tasks = [t for t in tasks if t.user_id == user.id]
     if strategy_id is not None:
         tasks = [t for t in tasks if t.strategy_id == strategy_id]
     for task in tasks:
@@ -493,6 +506,9 @@ async def list_backtests(
             continue
         if result.id in seen_ids:
             continue
+        owner = _result_owners.get(result.id)
+        if user.id != "local" and owner is not None and owner != user.id:
+            continue
         payload = _result_to_frontend_dict(result)
         items.append(payload)
         seen_ids.add(result.id)
@@ -503,9 +519,9 @@ async def list_backtests(
             from pnlclaw_storage.repositories.backtests import BacktestRepository
             repo = BacktestRepository(db)
             persisted = (
-                await repo.list_by_strategy(strategy_id, limit=1000)
+                await repo.list_by_strategy(strategy_id, limit=1000, user_id=user.id)
                 if strategy_id is not None
-                else await repo.list_all(limit=1000, offset=0)
+                else await repo.list_all(limit=1000, offset=0, user_id=user.id)
             )
             for result in persisted:
                 if result.id in seen_ids:
@@ -534,22 +550,30 @@ async def list_backtests(
 async def delete_backtest(
     backtest_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Delete a backtest by ID (in-memory + persisted)."""
-    # Remove from in-memory tasks store
-    _tasks.pop(backtest_id, None)
+    # Ownership check for in-memory task
+    task = _tasks.get(backtest_id)
+    if task is not None and user.id != "local" and task.user_id != user.id:
+        raise NotFoundError(f"Backtest '{backtest_id}' not found")
 
-    # Remove from unified results store
+    owner = _result_owners.get(backtest_id)
+    if owner is not None and user.id != "local" and owner != user.id:
+        raise NotFoundError(f"Backtest '{backtest_id}' not found")
+
+    _tasks.pop(backtest_id, None)
+    _result_owners.pop(backtest_id, None)
+
     results_store = _get_results_store()
     results_store.pop(backtest_id, None)
 
-    # Remove from DB if present
     db = get_db_manager()
     if db is not None:
         try:
             from pnlclaw_storage.repositories.backtests import BacktestRepository
             repo = BacktestRepository(db)
-            await repo.delete(backtest_id)
+            await repo.delete(backtest_id, user_id=user.id)
         except Exception:
             logger.debug("Persisted backtest delete failed", exc_info=True)
 

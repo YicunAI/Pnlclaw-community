@@ -10,9 +10,26 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_mcp_registry
+from app.core.dependencies import AuthenticatedUser, get_mcp_registry, optional_user
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
+
+
+def _user_prefix(user: AuthenticatedUser, name: str) -> str:
+    """Namespace MCP server names by user_id in Pro mode."""
+    if user.id == "local":
+        return name
+    return f"{user.id}:{name}"
+
+
+def _strip_prefix(user: AuthenticatedUser, prefixed: str) -> str | None:
+    """Strip user prefix and return original name, or None if not owned."""
+    if user.id == "local":
+        return prefixed
+    prefix = f"{user.id}:"
+    if prefixed.startswith(prefix):
+        return prefixed[len(prefix):]
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -61,28 +78,30 @@ class McpToolResponse(BaseModel):
 @router.get("/servers")
 async def list_mcp_servers(
     registry: Any = Depends(get_mcp_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
-    """List all configured MCP servers and their statuses."""
+    """List MCP servers owned by the current user."""
     if registry is None:
         return {"servers": [], "message": "MCP registry not initialized"}
 
     servers = registry.list_servers()
-    return {
-        "servers": [
-            {
-                "name": s.name,
-                "connected": s.connected,
-                "tool_count": s.tool_count,
-                "error": s.error,
-                "transport": s.config.transport.value if hasattr(s.config, "transport") else "stdio",
-                "tools": [
-                    {"server_name": t.server_name, "tool_name": t.tool_name, "description": t.description}
-                    for t in s.tools
-                ],
-            }
-            for s in servers
-        ],
-    }
+    result = []
+    for s in servers:
+        display_name = _strip_prefix(user, s.name)
+        if display_name is None:
+            continue
+        result.append({
+            "name": display_name,
+            "connected": s.connected,
+            "tool_count": s.tool_count,
+            "error": s.error,
+            "transport": s.config.transport.value if hasattr(s.config, "transport") else "stdio",
+            "tools": [
+                {"server_name": display_name, "tool_name": t.tool_name, "description": t.description}
+                for t in s.tools
+            ],
+        })
+    return {"servers": result}
 
 
 @router.post("/servers/{name}")
@@ -90,8 +109,9 @@ async def add_mcp_server(
     name: str,
     body: McpServerCreateRequest,
     registry: Any = Depends(get_mcp_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
-    """Add and connect a new MCP server."""
+    """Add and connect a new MCP server (scoped to current user)."""
     if registry is None:
         raise HTTPException(503, "MCP registry not initialized")
 
@@ -113,9 +133,10 @@ async def add_mcp_server(
         risk_level=risk_level,
     )
 
-    status = await registry.add_server(name, config)
+    internal_name = _user_prefix(user, name)
+    status = await registry.add_server(internal_name, config)
     return {
-        "name": status.name,
+        "name": name,
         "connected": status.connected,
         "tool_count": status.tool_count,
         "error": status.error,
@@ -126,12 +147,14 @@ async def add_mcp_server(
 async def remove_mcp_server(
     name: str,
     registry: Any = Depends(get_mcp_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, str]:
-    """Remove an MCP server and unregister its tools."""
+    """Remove an MCP server (must be owned by current user)."""
     if registry is None:
         raise HTTPException(503, "MCP registry not initialized")
 
-    await registry.remove_server(name)
+    internal_name = _user_prefix(user, name)
+    await registry.remove_server(internal_name)
     return {"status": "removed", "name": name}
 
 
@@ -139,14 +162,16 @@ async def remove_mcp_server(
 async def refresh_mcp_server(
     name: str,
     registry: Any = Depends(get_mcp_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
-    """Reconnect to an MCP server and refresh its tools."""
+    """Reconnect to an MCP server (must be owned by current user)."""
     if registry is None:
         raise HTTPException(503, "MCP registry not initialized")
 
-    status = await registry.refresh_server(name)
+    internal_name = _user_prefix(user, name)
+    status = await registry.refresh_server(internal_name)
     return {
-        "name": status.name,
+        "name": name,
         "connected": status.connected,
         "tool_count": status.tool_count,
         "error": status.error,
@@ -156,20 +181,22 @@ async def refresh_mcp_server(
 @router.get("/tools")
 async def list_mcp_tools(
     registry: Any = Depends(get_mcp_registry),
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
-    """List all tools from all connected MCP servers."""
+    """List tools from MCP servers owned by the current user."""
     if registry is None:
         return {"tools": []}
 
     tools = registry.list_mcp_tools()
-    return {
-        "tools": [
-            {
-                "server_name": t.server_name,
-                "tool_name": t.tool_name,
-                "registered_name": f"mcp_{t.server_name}_{t.tool_name}",
-                "description": t.description,
-            }
-            for t in tools
-        ],
-    }
+    result = []
+    for t in tools:
+        display_name = _strip_prefix(user, t.server_name)
+        if display_name is None:
+            continue
+        result.append({
+            "server_name": display_name,
+            "tool_name": t.tool_name,
+            "registered_name": f"mcp_{display_name}_{t.tool_name}",
+            "description": t.description,
+        })
+    return {"tools": result}

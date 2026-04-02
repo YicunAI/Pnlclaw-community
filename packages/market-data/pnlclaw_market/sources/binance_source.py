@@ -106,6 +106,8 @@ class BinanceSource:
         self._kline_buffers: dict[str, deque[KlineEvent]] = {}
 
         self._is_futures = market_type == "futures"
+        self._SNAPSHOT_THROTTLE_S = 0.25  # max 4 snapshots/s per symbol
+        self._last_snapshot_time: dict[str, float] = {}
 
     # -- ExchangeSource protocol --
 
@@ -128,7 +130,6 @@ class BinanceSource:
         self._l2_manager = BinanceL2Manager(
             http_client=l2_http,
             symbol_normalizer=self._symbol_normalizer,
-            on_snapshot=self._on_l2_snapshot,
             rest_url=self._rest_url,
         )
 
@@ -142,6 +143,7 @@ class BinanceSource:
             on_depth_update=self._on_depth_update,
             on_liquidation=self._on_liquidation if self._is_futures else None,
             on_funding_rate=self._on_funding_rate if self._is_futures else None,
+            on_connect=self._on_ws_connect,
         )
 
         self._reconnect_manager = ReconnectManager(self._ws_client)
@@ -390,6 +392,20 @@ class BinanceSource:
             )
             return []
 
+    # -- Reconnect handler --
+
+    async def _on_ws_connect(self) -> None:
+        """Handle WebSocket (re)connection by re-initializing L2 orderbooks.
+
+        On first connection ``_subscribed_symbols`` is empty, so this is a no-op.
+        On reconnect it fetches fresh REST snapshots for every subscribed symbol
+        so that the local books don't carry stale state that would trigger false
+        gap detections in the diff depth stream.
+        """
+        if not self._l2_manager or not self._subscribed_symbols:
+            return
+        await self._l2_manager.reinitialize_all()
+
     # -- Internal handlers --
 
     def _stamp(self, event: TickerEvent | KlineEvent | OrderBookL2Snapshot) -> None:
@@ -419,7 +435,18 @@ class BinanceSource:
         if not self._l2_manager:
             return
         binance_symbol = delta.delta.symbol.replace("/", "").upper()
-        snapshot = await self._l2_manager.apply_delta(binance_symbol, delta)
+        applied = await self._l2_manager.apply_delta(binance_symbol, delta)
+        if not applied:
+            return
+
+        now = _time.monotonic()
+        sym = delta.delta.symbol
+        last = self._last_snapshot_time.get(sym, 0.0)
+        if now - last < self._SNAPSHOT_THROTTLE_S:
+            return
+
+        self._last_snapshot_time[sym] = now
+        snapshot = self._l2_manager.get_snapshot(binance_symbol)
         if snapshot:
             self._stamp(snapshot)
             self._snapshot_store.update(snapshot.symbol, snapshot)
@@ -437,7 +464,3 @@ class BinanceSource:
         self._stamp(event)
         self._event_bus.publish(event)
 
-    def _on_l2_snapshot(self, snapshot: OrderBookL2Snapshot) -> None:
-        self._stamp(snapshot)
-        self._snapshot_store.update(snapshot.symbol, snapshot)
-        self._event_bus.publish(snapshot)

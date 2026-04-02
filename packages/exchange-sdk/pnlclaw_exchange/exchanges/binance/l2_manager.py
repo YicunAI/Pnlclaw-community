@@ -104,33 +104,60 @@ class BinanceL2Manager:
         await self._fetch_and_apply_snapshot(book)
         return self._build_snapshot(book)
 
+    async def reinitialize_all(self) -> None:
+        """Re-initialize all tracked symbols via fresh REST snapshots.
+
+        Should be called after a WebSocket reconnect to discard stale
+        local state that would otherwise cause false gap detections.
+        """
+        symbols = list(self._books.keys())
+        if not symbols:
+            return
+        logger.info("Re-initializing L2 for %d symbols after reconnect", len(symbols))
+        for key in symbols:
+            book = self._books.get(key)
+            if book is None:
+                continue
+            try:
+                book.bids.clear()
+                book.asks.clear()
+                book.initialized = False
+                book.recovering = False
+                book.last_recovery_at = 0.0
+                await self._fetch_and_apply_snapshot(book)
+                logger.info("L2 re-initialized for %s (lastUpdateId=%d)", key, book.last_update_id)
+            except Exception:
+                logger.warning("L2 re-init failed for %s", key, exc_info=True)
+
     async def apply_delta(
         self, symbol: str, delta: BinanceDepthDelta
-    ) -> OrderBookL2Snapshot | None:
+    ) -> bool:
         """Apply a depth delta to the local orderbook.
 
         Implements the Binance diff depth stream protocol (steps 3-5).
+        Does NOT build a full snapshot on every delta; callers should use
+        ``get_snapshot()`` when they need the sorted book.
 
         Args:
             symbol: Binance symbol, e.g. ``"BTCUSDT"``.
             delta: The normalized depth delta from the WebSocket stream.
 
         Returns:
-            Updated snapshot, or ``None`` if the delta was dropped.
+            ``True`` if the delta was applied, ``False`` if it was dropped.
         """
         key = symbol.upper()
         book = self._books.get(key)
 
         if book is None:
             logger.warning("No local book for %s — call initialize() first", symbol)
-            return None
+            return False
 
         if book.recovering:
-            return None
+            return False
 
         # Step 3: Drop stale events.
         if delta.last_update_id <= book.last_update_id:
-            return None
+            return False
 
         # Step 4: First delta after snapshot.
         if not book.initialized:
@@ -140,11 +167,8 @@ class BinanceL2Manager:
             ):
                 book.initialized = True
             elif delta.last_update_id <= book.last_update_id:
-                return None
+                return False
             else:
-                # Gap between snapshot and first delta — accept with warning.
-                # For display-only orderbooks this is fine; the book converges
-                # within a few subsequent delta updates.
                 logger.info(
                     "Accepting first delta for %s with gap "
                     "(snapshot=%d, delta U=%d u=%d)",
@@ -155,24 +179,37 @@ class BinanceL2Manager:
                 )
                 book.initialized = True
         else:
-            # Step 5: Contiguous check — tolerate small gaps for display.
-            gap = delta.first_update_id - (book.last_update_id + 1)
-            if gap > 0 and gap > 500:
-                logger.warning(
-                    "Large sequence gap for %s (expected U=%d, got U=%d, gap=%d) — recovering",
-                    symbol,
-                    book.last_update_id + 1,
-                    delta.first_update_id,
-                    gap,
-                )
-                await self._recover(book)
-                return None
-            elif gap > 0:
-                logger.debug(
-                    "Small sequence gap for %s (gap=%d), accepting",
-                    symbol,
-                    gap,
-                )
+            # Step 5: Contiguous check.
+            if delta.previous_update_id is not None:
+                if delta.previous_update_id != book.last_update_id:
+                    pu_gap = delta.previous_update_id - book.last_update_id
+                    logger.warning(
+                        "Futures sequence break for %s (expected pu=%d, got pu=%d, diff=%d) — recovering",
+                        symbol,
+                        book.last_update_id,
+                        delta.previous_update_id,
+                        pu_gap,
+                    )
+                    await self._recover(book)
+                    return False
+            else:
+                gap = delta.first_update_id - (book.last_update_id + 1)
+                if gap > 0 and gap > 500:
+                    logger.warning(
+                        "Large sequence gap for %s (expected U=%d, got U=%d, gap=%d) — recovering",
+                        symbol,
+                        book.last_update_id + 1,
+                        delta.first_update_id,
+                        gap,
+                    )
+                    await self._recover(book)
+                    return False
+                elif gap > 0:
+                    logger.debug(
+                        "Small sequence gap for %s (gap=%d), accepting",
+                        symbol,
+                        gap,
+                    )
 
         # Apply the delta.
         self._apply_levels(book.bids, delta.delta.bids)
@@ -183,17 +220,9 @@ class BinanceL2Manager:
         if not self._validate_depth(book):
             logger.warning("Depth validation failed for %s (bid >= ask) — recovering", symbol)
             await self._recover(book)
-            return None
+            return False
 
-        snapshot = self._build_snapshot(book)
-
-        # Notify listener.
-        if self._on_snapshot is not None:
-            result = self._on_snapshot(snapshot)
-            if hasattr(result, "__await__"):
-                await result
-
-        return snapshot
+        return True
 
     def get_snapshot(self, symbol: str) -> OrderBookL2Snapshot | None:
         """Return the current snapshot for a symbol, or None."""

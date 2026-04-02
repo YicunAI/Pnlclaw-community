@@ -1,12 +1,14 @@
 "use client"
 
 import React, { useState, useCallback, useRef, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { X, Send, Trash2, Minus, History, Plus, ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { sendAgentChat, listChatSessions, getChatSessionMessages, deleteChatSession, saveChatSessionMessages, type ChatSession, type ChatMessageRecord } from "@/lib/api-client"
 import { useI18n } from "@/components/i18n/use-i18n"
 import { useDashboardRealtime } from "@/components/providers/dashboard-realtime-provider"
+import { useAuth } from "@/components/auth/AuthProvider"
 
 interface ReasoningStep {
   type: "thinking" | "tool_call" | "tool_result" | "reflection"
@@ -424,11 +426,14 @@ function TypingIndicator() {
 export function AgentChat() {
   const { t } = useI18n()
   const { marketSubscription } = useDashboardRealtime()
+  const { isAuthenticated, authEnabled } = useAuth()
+  const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | undefined>(undefined)
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -436,6 +441,8 @@ export function AgentChat() {
   const [showHistory, setShowHistory] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  const needsAuth = authEnabled && !isAuthenticated
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -501,6 +508,11 @@ export function AgentChat() {
   const handleSend = useCallback(async () => {
     const text = input.trim()
     if (!text || loading) return
+
+    if (needsAuth) {
+      setShowAuthPrompt(true)
+      return
+    }
 
     setInput("")
     if (textareaRef.current) textareaRef.current.style.height = ""
@@ -844,6 +856,16 @@ export function AgentChat() {
           </div>
         </div>
 
+        {showAuthPrompt && (
+          <div className="mx-4 mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 flex items-center gap-2.5">
+            <span className="text-sm text-amber-200">{t("auth.agentLoginRequired")}</span>
+            <a href={`/login?return=${encodeURIComponent(pathname || "/dashboard")}`} className="ml-auto shrink-0 rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
+              {t("auth.login")}
+            </a>
+            <button onClick={() => setShowAuthPrompt(false)} className="text-muted-foreground hover:text-foreground text-xs">✕</button>
+          </div>
+        )}
+
         {/* Input */}
         <div className="px-4 py-3 border-t border-border shrink-0">
           <form
@@ -855,7 +877,7 @@ export function AgentChat() {
           >
             <textarea
               ref={textareaRef}
-              placeholder={t("agent.inputPlaceholder")}
+              placeholder={needsAuth ? t("auth.loginToChat") : t("agent.inputPlaceholder")}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value)

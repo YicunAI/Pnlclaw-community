@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useRef, useState } from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import {
   Sparkles,
   RefreshCw,
@@ -264,6 +265,7 @@ export default function SkillsPage() {
   const isEditing = editingSkill !== null
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -526,5 +528,6 @@ export default function SkillsPage() {
         })}
       </div>
     </div>
+    </RequireAuth>
   )
 }

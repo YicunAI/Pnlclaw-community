@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -122,6 +123,7 @@ export default function DashboardPage() {
   )
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
@@ -368,5 +370,6 @@ export default function DashboardPage() {
       </div>
 
     </div>
+    </RequireAuth>
   )
 }

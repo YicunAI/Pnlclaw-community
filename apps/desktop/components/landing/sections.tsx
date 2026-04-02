@@ -161,8 +161,8 @@ const PHILOSOPHY_CARDS = [
   },
   {
     num: "05",
-    title: "Security by Design",
-    subtitle: "Not a general-purpose agent",
+    title: "原生安全设计",
+    subtitle: "非通用型 Agent",
     desc: "高风险能力严格管控。Shell 执行与文件写入默认禁用。Agent 不持有默认的系统权限，实盘交易需要显式开启。",
     accent: "rose",
     visual: "radar",
@@ -1498,6 +1498,12 @@ const ROADMAP = [
     phase: "Next",
     title: "预测市场专项",
     items: ["Polymarket 深度集成", "预测市场做市策略", "跨平台套利", "新闻驱动概率估算"],
+    done: false,
+  },
+  {
+    phase: "Future",
+    title: "AI 驱动与 Alpha 挖掘",
+    items: ["大语言模型舆情分析", "强化学习与 ML 策略研发", "多维交易数据特征工程", "另类数据与 Alpha 因子注入"],
     done: false,
   },
   {

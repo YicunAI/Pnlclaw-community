@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -351,6 +352,7 @@ export default function StrategiesHubPage() {
     )
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -893,5 +895,6 @@ export default function StrategiesHubPage() {
       </>
       )}
     </div>
+    </RequireAuth>
   )
 }

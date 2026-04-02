@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useState } from "react"
+import { RequireAuth } from "@/components/auth/require-auth"
 import {
   Plug,
   RefreshCw,
@@ -96,6 +97,7 @@ export default function McpPage() {
   }
 
   return (
+    <RequireAuth>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -232,5 +234,6 @@ export default function McpPage() {
         ))}
       </div>
     </div>
+    </RequireAuth>
   )
 }

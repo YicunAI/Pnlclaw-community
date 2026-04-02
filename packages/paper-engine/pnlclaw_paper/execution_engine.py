@@ -142,3 +142,11 @@ class ExecutionEngine(Protocol):
     def on_balance_update(self, callback: Callable[[list[BalanceUpdate]], Any]) -> None:
         """Register a callback for balance changes."""
         ...
+
+    def on_position_update_scoped(self, callback: Callable[[str, Position], Any]) -> None:
+        """Register a callback receiving (account_id, position) for per-account routing."""
+        ...
+
+    def on_balance_update_scoped(self, callback: Callable[[str, list[BalanceUpdate]], Any]) -> None:
+        """Register a callback receiving (account_id, balances) for per-account routing."""
+        ...
