@@ -162,9 +162,7 @@ class TestChatStream:
             "\n"
             "data: [DONE]\n"
         )
-        mock_resp = httpx.Response(
-            200, content=sse_lines.encode(), headers={"content-type": "text/event-stream"}
-        )
+        mock_resp = httpx.Response(200, content=sse_lines.encode(), headers={"content-type": "text/event-stream"})
 
         async def mock_stream(method, url, **kwargs):  # type: ignore[no-untyped-def]
             return mock_resp
@@ -181,11 +179,7 @@ class TestChatStream:
     @pytest.mark.asyncio
     async def test_stream_handles_empty_delta(self) -> None:
         sse_lines = (
-            'data: {"choices":[{"delta":{}}]}\n'
-            "\n"
-            'data: {"choices":[{"delta":{"content":"ok"}}]}\n'
-            "\n"
-            "data: [DONE]\n"
+            'data: {"choices":[{"delta":{}}]}\n\ndata: {"choices":[{"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n'
         )
         mock_resp = httpx.Response(200, content=sse_lines.encode())
         transport = httpx.MockTransport(lambda req: mock_resp)

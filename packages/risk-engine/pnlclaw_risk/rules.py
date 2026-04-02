@@ -285,8 +285,7 @@ class CooldownRule:
             return _deny(
                 self.rule_id,
                 RiskLevel.RESTRICTED,
-                f"Cooldown active for {intent.symbol}: "
-                f"{remaining:.0f}s remaining (min {self._cooldown:.0f}s)",
+                f"Cooldown active for {intent.symbol}: {remaining:.0f}s remaining (min {self._cooldown:.0f}s)",
             )
         return _allow(self.rule_id)
 
@@ -296,9 +295,7 @@ class CooldownRule:
 # ---------------------------------------------------------------------------
 
 
-RuleSet = (
-    MaxPositionRule | MaxSingleRiskRule | DailyLossLimitRule | SymbolBlacklistRule | CooldownRule
-)
+RuleSet = MaxPositionRule | MaxSingleRiskRule | DailyLossLimitRule | SymbolBlacklistRule | CooldownRule
 
 
 def create_default_rules() -> list[RuleSet]:

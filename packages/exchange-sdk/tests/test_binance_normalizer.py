@@ -21,9 +21,7 @@ def normalizer() -> BinanceNormalizer:
 
 
 class TestTickerNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_ticker: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_ticker: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_ticker)
         assert isinstance(result, TickerEvent)
         assert result.exchange == "binance"
@@ -37,9 +35,7 @@ class TestTickerNormalization:
 
 
 class TestTradeNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_trade: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_trade: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_trade)
         assert isinstance(result, TradeEvent)
         assert result.exchange == "binance"
@@ -67,9 +63,7 @@ class TestTradeNormalization:
 
 
 class TestKlineNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_kline: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_kline: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_kline)
         assert isinstance(result, KlineEvent)
         assert result.exchange == "binance"
@@ -84,7 +78,8 @@ class TestKlineNormalization:
         assert result.closed is True
 
     def test_timestamp_uses_candle_open_time(
-        self, normalizer: BinanceNormalizer,
+        self,
+        normalizer: BinanceNormalizer,
     ) -> None:
         """WS kline timestamp must be candle open time (k.t), not event time (E).
 
@@ -115,9 +110,7 @@ class TestKlineNormalization:
 
 
 class TestDepthNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_depth_update: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_depth_update: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_depth_update)
         assert isinstance(result, BinanceDepthDelta)
         assert result.first_update_id == 100001
@@ -167,9 +160,7 @@ class TestDepthNormalization:
 
 
 class TestAggTradeNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_agg_trade: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_agg_trade: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_agg_trade)
         assert isinstance(result, TradeEvent)
         assert result.exchange == "binance"
@@ -198,9 +189,7 @@ class TestAggTradeNormalization:
 
 
 class TestLiquidationNormalization:
-    def test_long_liquidation(
-        self, normalizer: BinanceNormalizer, sample_binance_force_order: dict[str, Any]
-    ) -> None:
+    def test_long_liquidation(self, normalizer: BinanceNormalizer, sample_binance_force_order: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_force_order)
         assert isinstance(result, LiquidationEvent)
         assert result.exchange == "binance"
@@ -237,9 +226,7 @@ class TestLiquidationNormalization:
 
 
 class TestFundingRateNormalization:
-    def test_basic_fields(
-        self, normalizer: BinanceNormalizer, sample_binance_mark_price: dict[str, Any]
-    ) -> None:
+    def test_basic_fields(self, normalizer: BinanceNormalizer, sample_binance_mark_price: dict[str, Any]) -> None:
         result = normalizer.normalize(sample_binance_mark_price)
         assert isinstance(result, FundingRateEvent)
         assert result.exchange == "binance"

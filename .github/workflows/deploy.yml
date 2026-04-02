@@ -5,25 +5,13 @@ on:
     branches: [main]
 
 jobs:
-  frontend-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: apps/desktop/package-lock.json
-      - name: Install dependencies
-        working-directory: apps/desktop
-        run: npm ci
-      - name: Build
-        working-directory: apps/desktop
-        run: npm run build
+  ci-gate:
+    uses: ./.github/workflows/ci.yml
 
   deploy:
-    needs: frontend-check
+    needs: ci-gate
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1

@@ -24,9 +24,7 @@ _RE_OS = re.compile(
     r"(?i)(Windows NT [\d.]+|Mac OS X [\d_.]+|Linux|Android [\d.]+|"
     r"iPhone OS [\d_]+|iPad OS [\d_]+|CrOS)"
 )
-_RE_BROWSER = re.compile(
-    r"(?i)(Chrome|Firefox|Safari|Edge|OPR|Opera|MSIE|Trident|Brave)"
-)
+_RE_BROWSER = re.compile(r"(?i)(Chrome|Firefox|Safari|Edge|OPR|Opera|MSIE|Trident|Brave)")
 
 
 def _fallback_parse(user_agent: str) -> DeviceInfo:

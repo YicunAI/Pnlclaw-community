@@ -7,7 +7,7 @@ to prevent algorithm-confusion attacks.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import jwt
@@ -50,7 +50,7 @@ class JWTManager:
             A ``(token, jti)`` tuple.
         """
         jti = uuid4().hex
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         exp = now + (expires_delta or timedelta(minutes=15))
         payload: dict = {
             "sub": user_id,
@@ -77,7 +77,7 @@ class JWTManager:
         expires_delta: timedelta | None = None,
     ) -> str:
         """Create a signed refresh token bound to a session."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         exp = now + (expires_delta or timedelta(days=7))
         payload = {
             "sid": session_id,
@@ -100,7 +100,7 @@ class JWTManager:
         **extra_claims: str,
     ) -> str:
         """Create a short-lived state token for OAuth flows."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         exp = now + (expires_delta or timedelta(minutes=5))
         payload: dict = {
             "provider": provider,
@@ -162,8 +162,7 @@ class JWTManager:
             InvalidTokenError: If the token is malformed or signature is invalid.
         """
         logger.warning(
-            "decode_token() called without type checking — "
-            "prefer decode_access_token() or decode_refresh_token()"
+            "decode_token() called without type checking — prefer decode_access_token() or decode_refresh_token()"
         )
         return self._decode(token)
 
@@ -184,7 +183,5 @@ class JWTManager:
             raise InvalidTokenError(str(exc))
 
         if expected_type is not None and payload.get("type") != expected_type:
-            raise InvalidTokenError(
-                f"Expected token type '{expected_type}', got '{payload.get('type')}'"
-            )
+            raise InvalidTokenError(f"Expected token type '{expected_type}', got '{payload.get('type')}'")
         return payload

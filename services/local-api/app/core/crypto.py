@@ -92,4 +92,4 @@ def decrypt_if_encrypted(manager: KeyPairManager | None, value: str) -> str:
         return value
     if not value.startswith(ENCRYPTED_PREFIX):
         return value
-    return manager.decrypt(value[len(ENCRYPTED_PREFIX):])
+    return manager.decrypt(value[len(ENCRYPTED_PREFIX) :])

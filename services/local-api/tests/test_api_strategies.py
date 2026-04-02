@@ -84,8 +84,6 @@ async def test_list_strategies_with_pagination():
     assert body["meta"]["pagination"]["limit"] == 1
 
 
-
-
 @pytest.mark.asyncio
 async def test_list_strategies_filter_by_tags():
     app = _app()
@@ -190,8 +188,6 @@ async def test_confirm_and_deploy_strategy_to_paper():
     assert deploy_resp.status_code == 200
     payload = deploy_resp.json()["data"]
     assert payload["strategy"]["lifecycle_state"] in ("running", "confirmed")
-
-
 
 
 @pytest.mark.asyncio

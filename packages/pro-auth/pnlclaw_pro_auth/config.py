@@ -26,15 +26,9 @@ class AuthConfig(BaseSettings):
             raise ValueError(f"jwt_algorithm must be one of {allowed}, got {v!r}")
         return v
 
-    access_token_expire_minutes: int = Field(
-        15, description="Access token lifetime in minutes"
-    )
-    refresh_token_expire_days: int = Field(
-        7, description="Refresh token lifetime in days"
-    )
-    oauth_state_expire_minutes: int = Field(
-        5, description="OAuth state token lifetime in minutes"
-    )
+    access_token_expire_minutes: int = Field(15, description="Access token lifetime in minutes")
+    refresh_token_expire_days: int = Field(7, description="Refresh token lifetime in days")
+    oauth_state_expire_minutes: int = Field(5, description="OAuth state token lifetime in minutes")
 
     # Google OAuth
     google_client_id: str = Field("", description="Google OAuth client ID")
@@ -54,6 +48,4 @@ class AuthConfig(BaseSettings):
     )
 
     # Bootstrap
-    initial_admin_email: str = Field(
-        "", description="Email address of the first admin user"
-    )
+    initial_admin_email: str = Field("", description="Email address of the first admin user")

@@ -87,17 +87,21 @@ class TestOKXWSClientRouting:
         received: list[TickerEvent] = []
         client = OKXWSClient(on_ticker=received.append)
 
-        await client._route_message({
-            "arg": {"channel": "tickers", "instId": "BTC-USDT"},
-            "data": [{
-                "last": "70000",
-                "bidPx": "69999",
-                "askPx": "70001",
-                "open24h": "69000",
-                "vol24h": "5000",
-                "ts": "1700000000000",
-            }],
-        })
+        await client._route_message(
+            {
+                "arg": {"channel": "tickers", "instId": "BTC-USDT"},
+                "data": [
+                    {
+                        "last": "70000",
+                        "bidPx": "69999",
+                        "askPx": "70001",
+                        "open24h": "69000",
+                        "vol24h": "5000",
+                        "ts": "1700000000000",
+                    }
+                ],
+            }
+        )
 
         assert len(received) == 1
         assert received[0].symbol == "BTC/USDT"
@@ -108,12 +112,12 @@ class TestOKXWSClientRouting:
         received: list[KlineEvent] = []
         client = OKXWSClient(on_kline=received.append)
 
-        await client._route_message({
-            "arg": {"channel": "candle1H", "instId": "ETH-USDT"},
-            "data": [
-                ["1700000000000", "2200", "2250", "2180", "2240", "500", "1100000", "1100000", "1"]
-            ],
-        })
+        await client._route_message(
+            {
+                "arg": {"channel": "candle1H", "instId": "ETH-USDT"},
+                "data": [["1700000000000", "2200", "2250", "2180", "2240", "500", "1100000", "1100000", "1"]],
+            }
+        )
 
         assert len(received) == 1
         assert received[0].symbol == "ETH/USDT"
@@ -126,10 +130,12 @@ class TestOKXWSClientRouting:
         received: list[TickerEvent] = []
         client = OKXWSClient(on_ticker=received.append)
 
-        await client._route_message({
-            "event": "subscribe",
-            "arg": {"channel": "tickers", "instId": "BTC-USDT"},
-        })
+        await client._route_message(
+            {
+                "event": "subscribe",
+                "arg": {"channel": "tickers", "instId": "BTC-USDT"},
+            }
+        )
 
         assert len(received) == 0
 

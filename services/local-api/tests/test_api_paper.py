@@ -62,9 +62,7 @@ async def test_get_account(managers):
     app = _make_app(managers)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        create = await c.post(
-            "/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000}
-        )
+        create = await c.post("/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000})
         aid = create.json()["data"]["id"]
         resp = await c.get(f"/api/v1/paper/accounts/{aid}")
     assert resp.status_code == 200
@@ -85,9 +83,7 @@ async def test_place_order(managers):
     app = _make_app(managers)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        create = await c.post(
-            "/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000}
-        )
+        create = await c.post("/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000})
         aid = create.json()["data"]["id"]
 
         resp = await c.post(
@@ -112,9 +108,7 @@ async def test_list_orders(managers):
     app = _make_app(managers)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        create = await c.post(
-            "/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000}
-        )
+        create = await c.post("/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000})
         aid = create.json()["data"]["id"]
         await c.post(
             "/api/v1/paper/orders",
@@ -137,9 +131,7 @@ async def test_list_positions(managers):
     app = _make_app(managers)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        create = await c.post(
-            "/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000}
-        )
+        create = await c.post("/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000})
         aid = create.json()["data"]["id"]
         resp = await c.get(f"/api/v1/paper/positions?account_id={aid}")
     assert resp.status_code == 200
@@ -151,9 +143,7 @@ async def test_get_pnl(managers):
     app = _make_app(managers)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        create = await c.post(
-            "/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000}
-        )
+        create = await c.post("/api/v1/paper/accounts", json={"name": "A1", "initial_balance": 1000})
         aid = create.json()["data"]["id"]
         resp = await c.get(f"/api/v1/paper/pnl?account_id={aid}")
     assert resp.status_code == 200

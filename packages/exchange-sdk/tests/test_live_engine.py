@@ -58,9 +58,13 @@ class MockLiveTradingClient(TradingClient):
 
     async def get_order(self, *, symbol: str, order_id: str) -> OrderResponse:
         return OrderResponse(
-            exchange="mock-live", order_id=order_id, symbol=symbol,
-            side=OrderSide.BUY, order_type=OrderType.LIMIT,
-            status=OrderStatus.ACCEPTED, quantity=0,
+            exchange="mock-live",
+            order_id=order_id,
+            symbol=symbol,
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            status=OrderStatus.ACCEPTED,
+            quantity=0,
         )
 
     async def get_open_orders(self, symbol=None) -> list[OrderResponse]:  # type: ignore[override]
@@ -123,7 +127,7 @@ class TestLiveExecutionEngine:
         fill_events: list[Fill] = []
         engine.on_fill(lambda f: fill_events.append(f))
 
-        order = await engine.place_order(
+        await engine.place_order(
             account_id="test",
             symbol="BTC/USDT",
             side=OrderSide.BUY,

@@ -60,14 +60,14 @@ class TestOKXNormalizeCandle:
         norm = OKXNormalizer()
         candle = [
             "1700000000000",  # ts
-            "70000.0",        # open
-            "71000.0",        # high
-            "69000.0",        # low
-            "70500.0",        # close
-            "1234.5",         # vol
-            "86000000",       # volCcy
-            "86000000",       # volCcyQuote
-            "1",              # confirm (closed)
+            "70000.0",  # open
+            "71000.0",  # high
+            "69000.0",  # low
+            "70500.0",  # close
+            "1234.5",  # vol
+            "86000000",  # volCcy
+            "86000000",  # volCcyQuote
+            "1",  # confirm (closed)
         ]
         event = norm.normalize_candle(candle, "BTC-USDT", "candle1H")
         assert event.exchange == "okx"

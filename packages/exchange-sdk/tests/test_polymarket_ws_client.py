@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -17,7 +16,6 @@ from pnlclaw_exchange.exchanges.polymarket.ws_client import (
     PolymarketTradeStatus,
     PolymarketWSClient,
 )
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -58,9 +56,7 @@ class TestPolymarketWSClientConstruction:
         assert ws._user_url == POLYMARKET_WS_USER
 
     def test_custom_urls(self) -> None:
-        ws = PolymarketWSClient(
-            market_url="wss://custom/market", user_url="wss://custom/user"
-        )
+        ws = PolymarketWSClient(market_url="wss://custom/market", user_url="wss://custom/user")
         assert ws._market_url == "wss://custom/market"
         assert ws._user_url == "wss://custom/user"
 
@@ -74,9 +70,7 @@ class TestPolymarketWSClientConstruction:
 
     def test_callbacks_assigned(self) -> None:
         cb = MagicMock()
-        ws = PolymarketWSClient(
-            on_book=cb, on_order=cb, on_trade=cb
-        )
+        ws = PolymarketWSClient(on_book=cb, on_order=cb, on_trade=cb)
         assert ws.on_book is cb
         assert ws.on_order is cb
         assert ws.on_trade is cb
@@ -240,7 +234,9 @@ class TestPolymarketUserSubscription:
 
         asyncio.run(
             ws.subscribe_user(
-                api_key="key", api_secret="secret", api_passphrase="pass",
+                api_key="key",
+                api_secret="secret",
+                api_passphrase="pass",
                 markets=["0xcondition1"],
             )
         )
@@ -263,7 +259,9 @@ class TestPolymarketUserSubscription:
 
         asyncio.run(
             ws.subscribe_user(
-                api_key="k", api_secret="s", api_passphrase="p",
+                api_key="k",
+                api_secret="s",
+                api_passphrase="p",
             )
         )
 

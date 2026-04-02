@@ -240,9 +240,7 @@ class TestMACD:
         full = macd.calculate_full(price_df)
         valid_mask = full.macd_line.notna()
         diff = full.macd_line[valid_mask] - full.signal_line[valid_mask]
-        np.testing.assert_array_almost_equal(
-            full.histogram[valid_mask].values, diff.values, decimal=10
-        )
+        np.testing.assert_array_almost_equal(full.histogram[valid_mask].values, diff.values, decimal=10)
 
     def test_macd_uptrend_positive(self, price_df: pd.DataFrame) -> None:
         """In an uptrend, MACD line should be positive (fast > slow)."""

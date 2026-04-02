@@ -125,6 +125,7 @@ class BacktestRepository:
 
         if not drawdown_curve and len(equity_curve) >= 2:
             import numpy as np
+
             eq = np.asarray(equity_curve, dtype=np.float64)
             peak = np.maximum.accumulate(eq)
             dd = ((eq - peak) / peak).tolist()
@@ -247,7 +248,9 @@ class BacktestRepository:
         )
         return len(rows) == 0
 
-    async def list_by_strategy(self, strategy_id: str, limit: int = 20, *, user_id: str | None = None) -> list[BacktestResult]:
+    async def list_by_strategy(
+        self, strategy_id: str, limit: int = 20, *, user_id: str | None = None
+    ) -> list[BacktestResult]:
         """List backtest results for a strategy, newest first.
 
         Args:

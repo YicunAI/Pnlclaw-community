@@ -86,8 +86,6 @@ async def test_chat_with_session_id():
     assert resp2.headers["x-session-id"] == session_id
 
 
-
-
 @pytest.mark.asyncio
 async def test_chat_with_backtest_explain_context_returns_sse():
     app = _app(None)

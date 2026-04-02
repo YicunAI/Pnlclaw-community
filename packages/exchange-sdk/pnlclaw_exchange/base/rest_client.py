@@ -15,10 +15,8 @@ import httpx
 from pnlclaw_exchange.base.auth import BaseAuthenticator
 from pnlclaw_exchange.base.rate_limiter import SlidingWindowRateLimiter
 from pnlclaw_exchange.exceptions import (
-    ExchangeAPIError,
     AuthenticationError,
-    InsufficientBalanceError,
-    OrderNotFoundError,
+    ExchangeAPIError,
     RateLimitExceededError,
 )
 
@@ -89,6 +87,7 @@ class BaseRESTClient:
         body_str: str | None = None
         if body is not None:
             import json
+
             body_str = json.dumps(body)
 
         if signed:

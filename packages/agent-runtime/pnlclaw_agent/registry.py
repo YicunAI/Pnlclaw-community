@@ -36,8 +36,7 @@ class ComponentRegistry:
         """
         if name in self._components:
             raise KeyError(
-                f"Component '{name}' is already registered. "
-                f"Use replace() to override existing implementations."
+                f"Component '{name}' is already registered. Use replace() to override existing implementations."
             )
         self._components[name] = implementation
         logger.info("Registered component: %s (%s)", name, type(implementation).__name__)
@@ -62,23 +61,19 @@ class ComponentRegistry:
             KeyError: If the component is not already registered.
         """
         if name not in self._components:
-            raise KeyError(
-                f"Cannot replace '{name}': not registered. "
-                f"Use register() first."
-            )
+            raise KeyError(f"Cannot replace '{name}': not registered. Use register() first.")
         old_type = type(self._components[name]).__name__
         self._components[name] = implementation
         logger.info(
             "Replaced component: %s (%s → %s)",
-            name, old_type, type(implementation).__name__,
+            name,
+            old_type,
+            type(implementation).__name__,
         )
 
     def list_registered(self) -> dict[str, str]:
         """Return all registered component names mapped to implementation class names."""
-        return {
-            name: type(impl).__name__
-            for name, impl in sorted(self._components.items())
-        }
+        return {name: type(impl).__name__ for name, impl in sorted(self._components.items())}
 
     def is_registered(self, name: str) -> bool:
         """Check if a component is registered."""

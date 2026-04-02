@@ -197,8 +197,7 @@ class PnLAttributionEngine:
             for evt in attribution.by_event:
                 etype = "Win" if evt["type"] == "win" else "Loss"
                 lines.append(
-                    f"  {etype}: {evt['pnl']:+,.2f} on {evt['symbol']} "
-                    f"({evt['side']}) at {evt.get('time', 'N/A')}"
+                    f"  {etype}: {evt['pnl']:+,.2f} on {evt['symbol']} ({evt['side']}) at {evt.get('time', 'N/A')}"
                 )
             lines.append("")
 
@@ -214,9 +213,7 @@ class PnLAttributionEngine:
 
     # -- internal ------------------------------------------------------------
 
-    def _filter_by_period(
-        self, trades: list[dict[str, Any]], start: str, end: str
-    ) -> list[dict[str, Any]]:
+    def _filter_by_period(self, trades: list[dict[str, Any]], start: str, end: str) -> list[dict[str, Any]]:
         """Filter trades by date range."""
         try:
             start_dt = datetime.fromisoformat(start)

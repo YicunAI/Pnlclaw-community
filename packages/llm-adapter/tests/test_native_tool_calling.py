@@ -23,7 +23,7 @@ from pnlclaw_llm.base import (
 from pnlclaw_llm.ollama import OllamaProvider
 from pnlclaw_llm.openai_compat import OpenAICompatProvider
 from pnlclaw_llm.router import LLMRouter
-from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+from pnlclaw_llm.schemas import ToolCallResult
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -143,9 +143,7 @@ class TestToolCallsParsing:
         ]
         resp_data = _make_tool_call_response(tool_calls=tool_calls_data)
 
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="btc price")],
@@ -172,9 +170,7 @@ class TestToolCallsParsing:
             },
         ]
         resp_data = _make_tool_call_response(tool_calls=tool_calls_data)
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="compare")],
@@ -196,9 +192,7 @@ class TestUsageParsing:
         usage = {"prompt_tokens": 42, "completion_tokens": 13, "total_tokens": 55}
         resp_data = _make_tool_call_response(content="done", usage=usage, model="gpt-4o-mini")
 
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="hi")],
@@ -218,9 +212,7 @@ class TestTextOnlyResponse:
     @pytest.mark.asyncio
     async def test_returns_text_when_no_tool_calls(self) -> None:
         resp_data = _make_tool_call_response(content="BTC is at $67,234")
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="price?")],
@@ -240,9 +232,7 @@ class TestBaseClassFallback:
     async def test_base_class_fallback_returns_text(self) -> None:
         """LLMProvider base fallback should return text-only ToolCallResult."""
         resp_data = {"choices": [{"message": {"role": "assistant", "content": "fallback text"}}]}
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
 
         # Call base class method directly via super (simulate unsupported provider)
@@ -302,9 +292,7 @@ class TestErrorPaths:
             }
         ]
         resp_data = _make_tool_call_response(tool_calls=tool_calls_data)
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         provider = _make_openai_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="hi")],
@@ -340,9 +328,7 @@ class TestOllamaToolCalling:
             "prompt_eval_count": 20,
             "eval_count": 8,
         }
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=ollama_resp))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=ollama_resp)))
         provider = _make_ollama_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="btc price")],
@@ -360,9 +346,7 @@ class TestOllamaToolCalling:
             "message": {"role": "assistant", "content": "just text"},
             "done": True,
         }
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=ollama_resp))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=ollama_resp)))
         provider = _make_ollama_provider(client)
         result = await provider.chat_with_tools(
             [LLMMessage(role=LLMRole.USER, content="hi")],
@@ -381,9 +365,7 @@ class TestRouterToolCalling:
     @pytest.mark.asyncio
     async def test_router_routes_to_first_provider(self) -> None:
         resp_data = _make_tool_call_response(content="from primary")
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data))
-        )
+        client = httpx.AsyncClient(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=resp_data)))
         primary = _make_openai_provider(client)
         router = LLMRouter(providers=[("primary", primary)])
 
@@ -396,9 +378,7 @@ class TestRouterToolCalling:
     @pytest.mark.asyncio
     async def test_router_falls_back_on_error(self) -> None:
         error_client = httpx.AsyncClient(
-            transport=httpx.MockTransport(
-                lambda req: (_ for _ in ()).throw(httpx.ConnectError("fail"))
-            )
+            transport=httpx.MockTransport(lambda req: (_ for _ in ()).throw(httpx.ConnectError("fail")))
         )
         success_resp = _make_tool_call_response(content="from fallback")
         success_client = httpx.AsyncClient(

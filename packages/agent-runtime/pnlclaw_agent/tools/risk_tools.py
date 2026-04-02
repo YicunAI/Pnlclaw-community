@@ -42,8 +42,7 @@ class RiskCheckTool(BaseTool):
                 "intent": {
                     "type": "object",
                     "description": (
-                        "Trade intent dict with: symbol, side, quantity, "
-                        "order_type, reasoning, confidence, risk_params"
+                        "Trade intent dict with: symbol, side, quantity, order_type, reasoning, confidence, risk_params"
                     ),
                 },
             },
@@ -100,8 +99,7 @@ class RiskReportTool(BaseTool):
     @property
     def description(self) -> str:
         return (
-            "List all configured risk management rules with their current "
-            "status (enabled/disabled) and descriptions."
+            "List all configured risk management rules with their current status (enabled/disabled) and descriptions."
         )
 
     @property

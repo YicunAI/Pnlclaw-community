@@ -7,7 +7,7 @@ PostgreSQL database separate from the community SQLite store.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import (
@@ -24,7 +24,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _new_uuid() -> uuid.UUID:
@@ -43,9 +43,7 @@ class Base(DeclarativeBase):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(Text)
     email: Mapped[str | None] = mapped_column(String(320), index=True)
@@ -53,18 +51,14 @@ class User(Base):
     locale: Mapped[str | None] = mapped_column(String(10))
     timezone: Mapped[str | None] = mapped_column(String(50))
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", index=True)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="active", index=True
-    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", index=True)
     ban_reason: Mapped[str | None] = mapped_column(Text)
     last_ip: Mapped[str | None] = mapped_column(String(45))
     last_country: Mapped[str | None] = mapped_column(String(100))
     last_city: Mapped[str | None] = mapped_column(String(100))
     totp_secret: Mapped[str | None] = mapped_column(Text)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
@@ -73,14 +67,11 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
-    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
-    sessions: Mapped[list[Session]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
-    )
+    oauth_accounts: Mapped[list[OAuthAccount]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[list[Session]] = relationship(back_populates="user", cascade="all, delete-orphan")
     tag_assignments: Mapped[list[UserTagAssignment]] = relationship(
-        back_populates="user", cascade="all, delete-orphan",
+        back_populates="user",
+        cascade="all, delete-orphan",
         foreign_keys="[UserTagAssignment.user_id]",
     )
 
@@ -92,13 +83,9 @@ class User(Base):
 
 class OAuthAccount(Base):
     __tablename__ = "oauth_accounts"
-    __table_args__ = (
-        UniqueConstraint("provider", "provider_user_id", name="uq_oauth_provider_uid"),
-    )
+    __table_args__ = (UniqueConstraint("provider", "provider_user_id", name="uq_oauth_provider_uid"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -110,9 +97,7 @@ class OAuthAccount(Base):
     access_token: Mapped[str | None] = mapped_column(Text)
     refresh_token: Mapped[str | None] = mapped_column(Text)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
@@ -128,27 +113,19 @@ class OAuthAccount(Base):
 class Session(Base):
     __tablename__ = "sessions"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     jti: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="sessions")
-    refresh_tokens: Mapped[list[RefreshToken]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
+    refresh_tokens: Mapped[list[RefreshToken]] = relationship(back_populates="session", cascade="all, delete-orphan")
 
 
 # ---------------------------------------------------------------------------
@@ -159,25 +136,17 @@ class Session(Base):
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("sessions.id", ondelete="CASCADE"),
         nullable=False,
     )
-    token_hash: Mapped[str] = mapped_column(
-        String(64), nullable=False, unique=True, index=True
-    )
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     session: Mapped[Session] = relationship(back_populates="refresh_tokens")
 
@@ -190,21 +159,15 @@ class RefreshToken(Base):
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
     event_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     user_agent: Mapped[str | None] = mapped_column(Text)
     path: Mapped[str | None] = mapped_column(Text)
     method: Mapped[str | None] = mapped_column(String(10))
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -215,21 +178,13 @@ class ActivityLog(Base):
 class AdminAudit(Base):
     __tablename__ = "admin_audit"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
-    admin_user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    admin_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
+    target_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     ip_address: Mapped[str | None] = mapped_column(String(45))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -240,9 +195,7 @@ class AdminAudit(Base):
 class LoginHistory(Base):
     __tablename__ = "login_history"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -259,9 +212,7 @@ class LoginHistory(Base):
     browser: Mapped[str | None] = mapped_column(String(50))
     success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     failure_reason: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow, index=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -272,22 +223,14 @@ class LoginHistory(Base):
 class UserTag(Base):
     __tablename__ = "user_tags"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
     color: Mapped[str | None] = mapped_column(String(7))  # hex color e.g. #FF5733
     description: Mapped[str | None] = mapped_column(String(500), nullable=True, default=None)
-    created_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
-    assignments: Mapped[list[UserTagAssignment]] = relationship(
-        back_populates="tag", cascade="all, delete-orphan"
-    )
+    assignments: Mapped[list[UserTagAssignment]] = relationship(back_populates="tag", cascade="all, delete-orphan")
 
 
 class UserTagAssignment(Base):
@@ -303,15 +246,12 @@ class UserTagAssignment(Base):
         ForeignKey("user_tags.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    assigned_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
-    assigned_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    assigned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
     user: Mapped[User] = relationship(
-        back_populates="tag_assignments", foreign_keys=[user_id],
+        back_populates="tag_assignments",
+        foreign_keys=[user_id],
     )
     tag: Mapped[UserTag] = relationship(back_populates="assignments")
 
@@ -324,22 +264,16 @@ class UserTagAssignment(Base):
 class AdminNote(Base):
     __tablename__ = "admin_notes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    admin_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
-    )
+    admin_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
     )
@@ -353,21 +287,11 @@ class AdminNote(Base):
 class Invitation(Base):
     __tablename__ = "invitations"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=_new_uuid
-    )
-    code: Mapped[str] = mapped_column(
-        String(32), nullable=False, unique=True, index=True
-    )
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
-    )
-    used_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id")
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_new_uuid)
+    code: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    used_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
     max_uses: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_utcnow)

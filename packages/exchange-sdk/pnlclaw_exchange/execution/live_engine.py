@@ -20,7 +20,6 @@ from typing import Any
 
 from pnlclaw_exchange.base.reconciliation import ReconciliationManager
 from pnlclaw_exchange.trading import (
-    BalanceInfo,
     OrderRequest,
     OrderResponse,
     TradingClient,
@@ -164,18 +163,14 @@ class LiveExecutionEngine:
 
         exchange_oid = self._find_exchange_order_id(order_id)
         if exchange_oid:
-            await self._client.cancel_order(
-                symbol=order.symbol, order_id=exchange_oid
-            )
+            await self._client.cancel_order(symbol=order.symbol, order_id=exchange_oid)
 
         order.status = OrderStatus.CANCELLED
         order.updated_at = int(time.time() * 1000)
         await self._fire_order_update(order)
         return order
 
-    async def get_orders(
-        self, account_id: str, *, status: OrderStatus | None = None
-    ) -> list[Order]:
+    async def get_orders(self, account_id: str, *, status: OrderStatus | None = None) -> list[Order]:
         orders = list(self._orders.values())
         if status is not None:
             orders = [o for o in orders if o.status == status]
@@ -219,9 +214,8 @@ class LiveExecutionEngine:
 
         This is the PRIMARY path for order tracking.
         """
-        internal_id = (
-            self._exchange_to_internal.get(update.exchange_order_id)
-            or self._client_to_internal.get(update.client_order_id or "")
+        internal_id = self._exchange_to_internal.get(update.exchange_order_id) or self._client_to_internal.get(
+            update.client_order_id or ""
         )
 
         status_map = {

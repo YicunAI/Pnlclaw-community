@@ -58,8 +58,7 @@ class McpToolWrapper(BaseTool):
         """Description prefixed with the MCP server source."""
         source = f"[MCP: {self._info.server_name}] "
         return source + (
-            self._info.description
-            or f"Tool '{self._info.tool_name}' from MCP server '{self._info.server_name}'"
+            self._info.description or f"Tool '{self._info.tool_name}' from MCP server '{self._info.server_name}'"
         )
 
     @property

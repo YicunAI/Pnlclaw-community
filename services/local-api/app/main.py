@@ -18,8 +18,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.agent import router as agent_router
-from app.api.v1.chat_sessions import router as chat_sessions_router
 from app.api.v1.backtests import router as backtests_router
+from app.api.v1.chat_sessions import router as chat_sessions_router
 from app.api.v1.derivatives import router as derivatives_router
 from app.api.v1.health import router as health_router
 from app.api.v1.markets import router as markets_router
@@ -64,11 +64,12 @@ async def _seed_template_strategies(
 ) -> None:
     """Seed template strategies from YAML files if not already in store."""
     import pathlib
+
     try:
         import yaml
     except ImportError:
         try:
-            from pnlclaw_strategy.models import EngineStrategyConfig  # noqa: F811
+            from pnlclaw_strategy.models import EngineStrategyConfig  # noqa: F401,F811
         except ImportError:
             return
         # PyYAML not available — skip seeding
@@ -77,7 +78,9 @@ async def _seed_template_strategies(
 
     from pnlclaw_types.strategy import StrategyConfig
 
-    templates_dir = pathlib.Path(__file__).resolve().parents[3] / "packages" / "strategy-engine" / "pnlclaw_strategy" / "templates"
+    templates_dir = (
+        pathlib.Path(__file__).resolve().parents[3] / "packages" / "strategy-engine" / "pnlclaw_strategy" / "templates"
+    )
     if not templates_dir.is_dir():
         logger.debug("Templates directory not found: %s", templates_dir)
         return
@@ -120,17 +123,17 @@ async def _seed_template_strategies(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown hooks."""
-    from pnlclaw_market import BinanceSource, MarketDataService, OKXSource
-    from pnlclaw_security.secrets import SecretManager
-
     from app.core.crypto import KeyPairManager
     from app.core.settings_service import SettingsService
+    from pnlclaw_market import BinanceSource, MarketDataService, OKXSource
+    from pnlclaw_security.secrets import SecretManager
 
     # --- JWT (Pro mode: verify tokens from admin-api) ---
     jwt_secret = os.environ.get("PNLCLAW_AUTH_JWT_SECRET", "")
     if jwt_secret:
         try:
             from pnlclaw_pro_auth.jwt_manager import JWTManager
+
             jwt_mgr = JWTManager(secret_key=jwt_secret)
             set_jwt_manager(jwt_mgr)
             logger.info("JWT auth enabled — local-api will verify admin-api tokens")
@@ -175,8 +178,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         strategy_repo = StrategyRepository(db_manager)
         set_strategy_repo(strategy_repo)
 
-        from pnlclaw_storage.repositories.chat_sessions import ChatSessionRepository
         from app.core.dependencies import set_chat_session_repo
+        from pnlclaw_storage.repositories.chat_sessions import ChatSessionRepository
+
         chat_session_repo = ChatSessionRepository(db_manager)
         set_chat_session_repo(chat_session_repo)
 
@@ -197,11 +201,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # --- Market Data Service (multi-source) ---
     # Multi-interval: PNLCLAW_KLINE_INTERVALS takes priority over PNLCLAW_DEFAULT_INTERVAL
-    _intervals_raw = (
-        os.environ.get("PNLCLAW_KLINE_INTERVALS")
-        or os.environ.get("PNLCLAW_DEFAULT_INTERVAL")
-        or "30m,1h"
-    )
+    _intervals_raw = os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "30m,1h"
     kline_intervals = [i.strip() for i in _intervals_raw.split(",") if i.strip()]
     if not kline_intervals:
         kline_intervals = ["30m", "1h"]
@@ -212,12 +212,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     saved_settings = settings_service._load_non_sensitive()
     saved_proxy = saved_settings.get("network", {}).get("proxy_url", "")
     proxy_url = (
-        os.environ.get("PNLCLAW_PROXY_URL")
-        or os.environ.get("https_proxy")
-        or (saved_proxy if saved_proxy else None)
+        os.environ.get("PNLCLAW_PROXY_URL") or os.environ.get("https_proxy") or (saved_proxy if saved_proxy else None)
     )
     if not proxy_url:
         from pnlclaw_exchange.exchanges.polymarket.client import detect_local_proxy
+
         proxy_url = detect_local_proxy()
     if proxy_url:
         logger.info("Using WebSocket proxy: %s", proxy_url)
@@ -225,36 +224,44 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     market_svc = MarketDataService()
 
     # Binance Spot
-    market_svc.register_source(BinanceSource(
-        market_type="spot",
-        ws_url=os.environ.get("PNLCLAW_BINANCE_WS_URL", None),
-        rest_url=os.environ.get("PNLCLAW_BINANCE_REST_URL", None),
-        proxy_url=proxy_url,
-        kline_intervals=kline_intervals,
-    ))
+    market_svc.register_source(
+        BinanceSource(
+            market_type="spot",
+            ws_url=os.environ.get("PNLCLAW_BINANCE_WS_URL", None),
+            rest_url=os.environ.get("PNLCLAW_BINANCE_REST_URL", None),
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
 
     # Binance USDT-M Futures
-    market_svc.register_source(BinanceSource(
-        market_type="futures",
-        ws_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_WS_URL", None),
-        rest_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_REST_URL", None),
-        proxy_url=proxy_url,
-        kline_intervals=kline_intervals,
-    ))
+    market_svc.register_source(
+        BinanceSource(
+            market_type="futures",
+            ws_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_WS_URL", None),
+            rest_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_REST_URL", None),
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
 
     # OKX Spot
-    market_svc.register_source(OKXSource(
-        market_type="spot",
-        proxy_url=proxy_url,
-        kline_intervals=kline_intervals,
-    ))
+    market_svc.register_source(
+        OKXSource(
+            market_type="spot",
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
 
     # OKX Futures (Perpetual Swap)
-    market_svc.register_source(OKXSource(
-        market_type="futures",
-        proxy_url=proxy_url,
-        kline_intervals=kline_intervals,
-    ))
+    market_svc.register_source(
+        OKXSource(
+            market_type="futures",
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
 
     # --- Funding Rate Fetcher (bulk REST, all exchanges) ---
     from pnlclaw_market.funding_rate_fetcher import FundingRateFetcher
@@ -272,10 +279,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         # Subscribe default symbols on ALL sources so large-trade and
         # liquidation monitors see data from every exchange.
-        default_symbols = (
-            os.environ.get("PNLCLAW_DEFAULT_SYMBOLS")
-            or "BTC/USDT,ETH/USDT,SOL/USDT"
-        )
+        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
         if default_symbols:
             all_sources: list[tuple[str, str]] = [
                 ("binance", "spot"),
@@ -294,7 +298,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     except Exception:
                         logger.warning(
                             "Failed to subscribe %s on %s/%s (may be unreachable)",
-                            sym, ex, mt, exc_info=True,
+                            sym,
+                            ex,
+                            mt,
+                            exc_info=True,
                         )
                     await asyncio.sleep(0.3)
 
@@ -328,12 +335,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from pnlclaw_paper.paper_execution import PaperExecutionEngine
 
         paper_engine = PaperExecutionEngine(
-            initial_balance=float(
-                os.environ.get("PNLCLAW_PAPER_BALANCE", "100000")
-            ),
+            initial_balance=float(os.environ.get("PNLCLAW_PAPER_BALANCE", "100000")),
         )
 
         from pnlclaw_paper.state import PaperState
+
         paper_state = PaperState()
         try:
             fills, _meta = paper_state.load_state(
@@ -399,16 +405,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         # --- Live Execution Engine (Real Trading) ---
         from app.core.dependencies import set_live_engine
-        
+
         try:
             exchange_provider = saved_settings.get("exchange", {}).get("provider", "binance")
-            
+
             from pnlclaw_security.secrets import SecretManager, SecretRef, SecretSource
+
             sm = SecretManager()
             api_key_ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_key")
             api_secret_ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="api_secret")
             passphrase_ref = SecretRef(source=SecretSource.KEYRING, provider="pnlclaw.exchange", id="passphrase")
-            
+
             api_key = ""
             api_secret = ""
             passphrase = ""
@@ -421,34 +428,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                     passphrase = (await sm.resolve(passphrase_ref)).use()
             except Exception as e:
                 logger.warning("Failed to resolve exchange secrets: %s", e)
-                
+
             if api_key and api_secret:
-                from pnlclaw_exchange.base.auth import ExchangeCredentials
                 from pydantic import SecretStr
+
+                from pnlclaw_exchange.base.auth import ExchangeCredentials
+
                 creds = ExchangeCredentials(
                     api_key=SecretStr(api_key),
                     api_secret=SecretStr(api_secret),
                     passphrase=SecretStr(passphrase) if passphrase else None,
                 )
-                
+
                 client = None
                 if exchange_provider == "binance":
                     from pnlclaw_exchange.exchanges.binance.rest_client import BinanceRESTClient
                     from pnlclaw_exchange.trading import BinanceTradingAdapter
+
                     bc = BinanceRESTClient(credentials=creds, testnet=False)
                     client = BinanceTradingAdapter(bc)
                 elif exchange_provider == "okx":
                     from pnlclaw_exchange.exchanges.okx.rest_client import OKXRESTClient
                     from pnlclaw_exchange.trading import OKXTradingAdapter
+
                     oc = OKXRESTClient(credentials=creds, demo=False)
                     client = OKXTradingAdapter(oc)
-                    
+
                 if client is not None:
                     from pnlclaw_exchange.execution.live_engine import LiveExecutionEngine
-                    live_engine_instance = LiveExecutionEngine(
-                        client=client,
-                        reconciliation_interval_s=60.0
-                    )
+
+                    live_engine_instance = LiveExecutionEngine(client=client, reconciliation_interval_s=60.0)
                     set_live_engine(live_engine_instance)
                     asyncio.create_task(live_engine_instance.start())
                     _bridge_execution_events(live_engine_instance)
@@ -503,6 +512,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         # FX09: Create a single ToolCatalog shared by MCP and Agent
         from pnlclaw_agent import ToolCatalog as _TC
+
         tool_catalog = _TC()
 
         # --- MCP Registry (uses the shared tool_catalog) ---
@@ -527,14 +537,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             logger.warning("Failed to initialize MCP registry", exc_info=True)
 
         # --- Component Registry (Open Core architecture) ---
-        from pnlclaw_agent.registry import ComponentRegistry
         from pnlclaw_agent.implementations import (
             BasicContextManager as BasicCtxMgr,
+        )
+        from pnlclaw_agent.implementations import (
             FixedModelRouter,
             KeywordMemoryBackend,
             RuleBasedFeedback,
             SingleAgentRunner,
         )
+        from pnlclaw_agent.registry import ComponentRegistry
 
         component_registry = ComponentRegistry()
         component_registry.register("memory", KeywordMemoryBackend())
@@ -662,10 +674,10 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
     """
     from app.api.v1.strategies import (
         _get_strategy,
-        _save_deployment,
-        _strategy_deployments,
-        _strategies,
         _persist_save,
+        _save_deployment,
+        _strategies,
+        _strategy_deployments,
     )
     from app.core.dependencies import get_strategy_runner
 
@@ -681,8 +693,7 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
         )
 
     existing_running = next(
-        (d for d in _strategy_deployments
-         if d.strategy_id == strategy_id and d.status == "running"),
+        (d for d in _strategy_deployments if d.strategy_id == strategy_id and d.status == "running"),
         None,
     )
     if existing_running:
@@ -709,6 +720,7 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
 
     try:
         from pnlclaw_types.strategy import StrategyDeployment
+
         dep = StrategyDeployment(
             id=deployment_id,
             strategy_id=strategy_id,
@@ -734,8 +746,8 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
 
 async def _stop_strategy_callback(strategy_id: str) -> str:
     """Callback for StrategyStopTool: stop running deployments for a strategy."""
-    from app.core.dependencies import get_strategy_runner
     from app.api.v1.strategies import _strategy_deployments
+    from app.core.dependencies import get_strategy_runner
 
     runner = get_strategy_runner()
     if runner is None:
@@ -758,7 +770,9 @@ async def _stop_strategy_callback(strategy_id: str) -> str:
 
 
 async def _save_strategy_version_callback(
-    strategy_id: str, config: dict, changelog: str,
+    strategy_id: str,
+    config: dict,
+    changelog: str,
 ) -> str:
     """Callback for StrategySaveVersionTool: update strategy & create version snapshot."""
     from app.api.v1.strategies import (
@@ -780,9 +794,9 @@ async def _save_strategy_version_callback(
 
     if not config or not isinstance(config, dict):
         return (
-            f"ERROR: 'config' parameter is empty or invalid. "
-            f"You MUST provide a complete config dict with entry_rules, "
-            f"exit_rules, risk_params, name, symbols, interval, etc."
+            "ERROR: 'config' parameter is empty or invalid. "
+            "You MUST provide a complete config dict with entry_rules, "
+            "exit_rules, risk_params, name, symbols, interval, etc."
         )
 
     _PARSED_TO_RAW = {
@@ -802,9 +816,7 @@ async def _save_strategy_version_callback(
             config[raw_key] = parsed_val
 
     known_fields = set(existing.model_fields.keys())
-    update_fields = {
-        k: v for k, v in config.items() if v is not None and k in known_fields
-    }
+    update_fields = {k: v for k, v in config.items() if v is not None and k in known_fields}
 
     entry = update_fields.get("entry_rules") or existing.entry_rules
     exit_ = update_fields.get("exit_rules") or existing.exit_rules
@@ -828,10 +840,12 @@ async def _save_strategy_version_callback(
     await _save_version_snapshot(updated, changelog or "AI-generated update")
 
     logger.info(
-        "save_strategy_version_callback done: name=%s, version=%d, "
-        "entry_rules=%s, exit_rules=%s, risk_params=%s",
-        updated.name, new_version,
-        bool(updated.entry_rules), bool(updated.exit_rules), bool(updated.risk_params),
+        "save_strategy_version_callback done: name=%s, version=%d, entry_rules=%s, exit_rules=%s, risk_params=%s",
+        updated.name,
+        new_version,
+        bool(updated.entry_rules),
+        bool(updated.exit_rules),
+        bool(updated.risk_params),
     )
 
     return (
@@ -921,20 +935,24 @@ def _register_agent_tools(
             db = None
             try:
                 from app.core.dependencies import get_db_manager
+
                 db = get_db_manager()
                 if db is not None:
                     from pnlclaw_storage.repositories.backtests import BacktestRepository
+
                     backtest_repo = BacktestRepository(db)
             except Exception:
                 logger.debug(
                     "Optional backtest repository not wired for BacktestRunTool",
                     exc_info=True,
                 )
-            tc.register(BacktestRunTool(
-                bt_engine,
-                backtest_repo=backtest_repo,
-                market_service=market_service,
-            ))
+            tc.register(
+                BacktestRunTool(
+                    bt_engine,
+                    backtest_repo=backtest_repo,
+                    market_service=market_service,
+                )
+            )
         except ImportError:
             logger.debug("BacktestRunTool not available (missing pnlclaw_backtest)")
     except ImportError:
@@ -954,14 +972,13 @@ async def _build_agent_runtime(
     user_id: str | None = None,
 ) -> object | None:
     """Build an AgentRuntime from persisted LLM settings, or return None."""
+    from app.core.settings_service import SettingsService
     from pnlclaw_security.secrets import (
         SecretManager,
         SecretRef,
         SecretResolutionError,
         SecretSource,
     )
-
-    from app.core.settings_service import SettingsService
 
     svc: SettingsService = settings_service  # type: ignore[assignment]
     settings = svc._load_non_sensitive(user_id=user_id)
@@ -984,9 +1001,7 @@ async def _build_agent_runtime(
     _keyring_fields = {"base_url": "", "model": "", "provider": ""}
     for field in _keyring_fields:
         try:
-            r = await sm.resolve(
-                SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field)
-            )
+            r = await sm.resolve(SecretRef(source=SecretSource.KEYRING, provider=llm_prov, id=field))
             _keyring_fields[field] = r.use() or ""
         except SecretResolutionError:
             pass
@@ -999,9 +1014,7 @@ async def _build_agent_runtime(
     smart_models_kr: dict[str, str] = {}
     for sf in _smart_fields:
         try:
-            r = await sm.resolve(
-                SecretRef(source=SecretSource.KEYRING, provider=smart_prov, id=sf)
-            )
+            r = await sm.resolve(SecretRef(source=SecretSource.KEYRING, provider=smart_prov, id=sf))
             val = r.use() or ""
             if val:
                 smart_models_kr[sf] = val
@@ -1016,9 +1029,7 @@ async def _build_agent_runtime(
 
     proxy_url = ""
     try:
-        r = await sm.resolve(
-            SecretRef(source=SecretSource.KEYRING, provider=net_prov, id="proxy_url")
-        )
+        r = await sm.resolve(SecretRef(source=SecretSource.KEYRING, provider=net_prov, id="proxy_url"))
         proxy_url = r.use() or ""
     except SecretResolutionError:
         pass
@@ -1045,7 +1056,8 @@ async def _build_agent_runtime(
 
     logger.info(
         "Building agent runtime: model=%s, base_url=%s",
-        model, llm_section.get("base_url", "")[:40],
+        model,
+        llm_section.get("base_url", "")[:40],
     )
 
     config = LLMConfig(
@@ -1058,11 +1070,13 @@ async def _build_agent_runtime(
     transport = None
     if proxy_url:
         import httpx
+
         transport = httpx.AsyncHTTPTransport(proxy=proxy_url)
 
     client = None
     if transport:
         import httpx
+
         client = httpx.AsyncClient(transport=transport, timeout=60.0)
 
     llm_provider = OpenAICompatProvider(config, client=client)
@@ -1077,8 +1091,8 @@ async def _build_agent_runtime(
 
     # FX01: Inject skills prompt into agent context (fixed: pass skills list)
     try:
-        from pnlclaw_agent.skills.prompt import format_skills_for_prompt
         from app.core.dependencies import get_skill_registry
+        from pnlclaw_agent.skills.prompt import format_skills_for_prompt
 
         skill_registry = get_skill_registry()
         if skill_registry is not None:
@@ -1110,7 +1124,7 @@ def _bridge_market_events(market_svc: object) -> None:
     import asyncio
     import time as _time
 
-    from app.api.v1.ws import broadcast_market_event, _market_manager
+    from app.api.v1.ws import _market_manager, broadcast_market_event
     from pnlclaw_types.derivatives import (
         FundingRateEvent,
         LargeOrderEvent,
@@ -1142,9 +1156,13 @@ def _bridge_market_events(market_svc: object) -> None:
                 now = _time.monotonic()
                 for key, snap in batch.items():
                     _last_ob_broadcast[key] = now
-                    asyncio.ensure_future(broadcast_market_event(
-                        snap.symbol, "depth", snap.model_dump(),
-                    ))
+                    asyncio.ensure_future(
+                        broadcast_market_event(
+                            snap.symbol,
+                            "depth",
+                            snap.model_dump(),
+                        )
+                    )
         except asyncio.CancelledError:
             pass
         finally:
@@ -1153,16 +1171,24 @@ def _bridge_market_events(market_svc: object) -> None:
     def _on_ticker(event: TickerEvent) -> None:
         if _market_manager.active_count == 0:
             return
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "ticker", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "ticker",
+                event.model_dump(),
+            )
+        )
 
     def _on_kline(event: KlineEvent) -> None:
         if _market_manager.active_count == 0:
             return
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "kline", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "kline",
+                event.model_dump(),
+            )
+        )
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
         nonlocal _ob_flush_running
@@ -1174,29 +1200,49 @@ def _bridge_market_events(market_svc: object) -> None:
             asyncio.ensure_future(_flush_pending_orderbooks())
 
     def _on_large_trade(event: LargeTradeEvent) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "large_trade", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "large_trade",
+                event.model_dump(),
+            )
+        )
 
     def _on_large_order(event: LargeOrderEvent) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "large_order", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "large_order",
+                event.model_dump(),
+            )
+        )
 
     def _on_liquidation(event: LiquidationEvent) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "liquidation", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "liquidation",
+                event.model_dump(),
+            )
+        )
 
     def _on_liquidation_stats(event: LiquidationStats) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            "ALL", "liquidation_stats", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                "ALL",
+                "liquidation_stats",
+                event.model_dump(),
+            )
+        )
 
     def _on_funding_rate(event: FundingRateEvent) -> None:
-        asyncio.ensure_future(broadcast_market_event(
-            event.symbol, "funding_rate", event.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_market_event(
+                event.symbol,
+                "funding_rate",
+                event.model_dump(),
+            )
+        )
 
     from pnlclaw_market import MarketDataService as _MDS
 
@@ -1236,25 +1282,41 @@ def _bridge_execution_events(engine: object) -> None:
     from pnlclaw_types.trading import BalanceUpdate, Fill, Order, Position
 
     def _on_order(order: Order) -> None:
-        asyncio.ensure_future(broadcast_trading_event(
-            "orders", "order_update", order.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_trading_event(
+                "orders",
+                "order_update",
+                order.model_dump(),
+            )
+        )
 
     def _on_fill(fill: Fill) -> None:
-        asyncio.ensure_future(broadcast_trading_event(
-            "orders", "fill", fill.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_trading_event(
+                "orders",
+                "fill",
+                fill.model_dump(),
+            )
+        )
         asyncio.ensure_future(_paper_snapshot_after_fill(engine, fill))
 
     def _on_position(pos: Position) -> None:
-        asyncio.ensure_future(broadcast_trading_event(
-            "positions", "position_update", pos.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_trading_event(
+                "positions",
+                "position_update",
+                pos.model_dump(),
+            )
+        )
 
     def _on_balance(balances: list[BalanceUpdate]) -> None:
-        asyncio.ensure_future(broadcast_trading_event(
-            "balances", "balance_update", [b.model_dump() for b in balances],
-        ))
+        asyncio.ensure_future(
+            broadcast_trading_event(
+                "balances",
+                "balance_update",
+                [b.model_dump() for b in balances],
+            )
+        )
 
     engine.on_order_update(_on_order)  # type: ignore[union-attr]
     engine.on_fill(_on_fill)  # type: ignore[union-attr]
@@ -1291,14 +1353,22 @@ def _bridge_paper_engine_events(engine: object) -> None:
             asyncio.ensure_future(_paper_snapshot_after_fill(engine, fill, aid))
 
     def _on_position_scoped(account_id: str, pos: Position) -> None:
-        asyncio.ensure_future(broadcast_paper_event(
-            account_id, "position_update", pos.model_dump(),
-        ))
+        asyncio.ensure_future(
+            broadcast_paper_event(
+                account_id,
+                "position_update",
+                pos.model_dump(),
+            )
+        )
 
     def _on_balance_scoped(account_id: str, balances: list[BalanceUpdate]) -> None:
-        asyncio.ensure_future(broadcast_paper_event(
-            account_id, "balance_update", [b.model_dump() for b in balances],
-        ))
+        asyncio.ensure_future(
+            broadcast_paper_event(
+                account_id,
+                "balance_update",
+                [b.model_dump() for b in balances],
+            )
+        )
 
     engine.on_order_update(_on_order)  # type: ignore[union-attr]
     engine.on_fill(_on_fill)  # type: ignore[union-attr]
@@ -1335,19 +1405,21 @@ async def _paper_snapshot_after_fill(engine: object, fill: object, account_id: s
             snapshot["unrealized_pnl"] = unrealized
             snapshot["realized_pnl"] = account.total_realized_pnl
 
-            positions = [
-                p.model_dump() for p in pos_mgr.get_open_positions(account.id)
-            ]
+            positions = [p.model_dump() for p in pos_mgr.get_open_positions(account.id)]
             snapshot["positions"] = positions
 
             await broadcast_paper_event(account.id, "account_snapshot", snapshot)
 
             try:
                 await _record_equity(account.id, equity)
-                await broadcast_paper_event(account.id, "equity_point", {
-                    "timestamp": int(__import__("time").time() * 1000),
-                    "equity": equity,
-                })
+                await broadcast_paper_event(
+                    account.id,
+                    "equity_point",
+                    {
+                        "timestamp": int(__import__("time").time() * 1000),
+                        "equity": equity,
+                    },
+                )
             except Exception:
                 logger.debug("Equity record/broadcast failed for %s", account.id, exc_info=True)
     except Exception:

@@ -63,11 +63,7 @@ TOOL_GROUPS: dict[str, list[str]] = {
 
 # Build group:safe as union of read/info groups
 TOOL_GROUPS["group:safe"] = sorted(
-    set(
-        TOOL_GROUPS["group:market-read"]
-        + TOOL_GROUPS["group:strategy-read"]
-        + TOOL_GROUPS["group:info"]
-    )
+    set(TOOL_GROUPS["group:market-read"] + TOOL_GROUPS["group:strategy-read"] + TOOL_GROUPS["group:info"])
 )
 
 # Reverse lookup: tool_name → group label (for classification)

@@ -15,10 +15,10 @@ from pnlclaw_agent.skills.registry import SkillRegistry
 from pnlclaw_agent.skills.types import (
     Skill,
     SkillFrontmatter,
-    SkillSnapshot,
-    SkillSource,
     SkillsConfig,
     SkillsLimits,
+    SkillSnapshot,
+    SkillSource,
     SkillSummary,
 )
 

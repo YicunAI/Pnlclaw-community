@@ -7,7 +7,6 @@ engine validator.  ``BacktestRunTool`` compiles and runs a backtest.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import pandas as pd
@@ -41,12 +40,28 @@ def _evict_oldest_results() -> None:
 # Config sanitizer — bridge AI-generated YAML to engine-compatible format
 # ---------------------------------------------------------------------------
 
-_KNOWN_CONFIG_FIELDS = frozenset({
-    "id", "name", "type", "description", "symbols", "interval", "direction",
-    "parameters", "entry_rules", "exit_rules", "risk_params", "tags",
-    "source", "version", "lifecycle_state",
-    "parsed_entry_rules", "parsed_exit_rules", "parsed_risk_params",
-})
+_KNOWN_CONFIG_FIELDS = frozenset(
+    {
+        "id",
+        "name",
+        "type",
+        "description",
+        "symbols",
+        "interval",
+        "direction",
+        "parameters",
+        "entry_rules",
+        "exit_rules",
+        "risk_params",
+        "tags",
+        "source",
+        "version",
+        "lifecycle_state",
+        "parsed_entry_rules",
+        "parsed_exit_rules",
+        "parsed_risk_params",
+    }
+)
 
 
 def _sanitize_config(cfg: dict) -> None:
@@ -192,16 +207,11 @@ class StrategyValidateTool(BaseTool):
         result = validate(engine_config)
 
         if result.valid:
-            return ToolResult(
-                output=f"Strategy '{engine_config.name}' is valid. All checks passed."
-            )
+            return ToolResult(output=f"Strategy '{engine_config.name}' is valid. All checks passed.")
 
         errors_text = "\n".join(f"  - {e}" for e in result.errors)
         return ToolResult(
-            output=(
-                f"Strategy '{engine_config.name}' has {len(result.errors)} "
-                f"validation error(s):\n{errors_text}"
-            )
+            output=(f"Strategy '{engine_config.name}' has {len(result.errors)} validation error(s):\n{errors_text}")
         )
 
 
@@ -266,15 +276,18 @@ class BacktestRunTool(BaseTool):
                         "direction": {"type": "string"},
                         "parameters": {"type": "object", "additionalProperties": True},
                         "entry_rules": {
-                            "type": "object", "additionalProperties": True,
+                            "type": "object",
+                            "additionalProperties": True,
                             "description": "REQUIRED. Entry conditions as structured dict.",
                         },
                         "exit_rules": {
-                            "type": "object", "additionalProperties": True,
+                            "type": "object",
+                            "additionalProperties": True,
                             "description": "REQUIRED. Exit conditions as structured dict.",
                         },
                         "risk_params": {
-                            "type": "object", "additionalProperties": True,
+                            "type": "object",
+                            "additionalProperties": True,
                             "description": "REQUIRED. Risk parameters (stop_loss_pct, take_profit_pct, etc.).",
                         },
                     },
@@ -389,10 +402,15 @@ class BacktestRunTool(BaseTool):
             return ToolResult(output=f"Data conversion failed: {exc}", error="Data error")
 
         import dataclasses as _dc
+
         config_updates: dict[str, str] = {}
         if strategy_id:
             config_updates["strategy_id"] = strategy_id
-        cfg_symbol = config_dict.get("symbols", [""])[0] if isinstance(config_dict.get("symbols"), list) and config_dict.get("symbols") else args.get("symbol", "")
+        cfg_symbol = (
+            config_dict.get("symbols", [""])[0]
+            if isinstance(config_dict.get("symbols"), list) and config_dict.get("symbols")
+            else args.get("symbol", "")
+        )
         cfg_interval = config_dict.get("interval", "") or args.get("interval", "")
         if cfg_symbol:
             config_updates["symbol"] = cfg_symbol
@@ -465,16 +483,30 @@ class BacktestRunTool(BaseTool):
         days = min(args.get("days", 90), 365)
 
         interval_minutes = {
-            "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30,
-            "1h": 60, "2h": 120, "4h": 240, "6h": 360, "8h": 480,
-            "12h": 720, "1d": 1440,
+            "1m": 1,
+            "3m": 3,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "1h": 60,
+            "2h": 120,
+            "4h": 240,
+            "6h": 360,
+            "8h": 480,
+            "12h": 720,
+            "1d": 1440,
         }
         minutes_per_candle = interval_minutes.get(interval, 60)
         total_candles = (days * 24 * 60) // minutes_per_candle
 
         _log.info(
             "Auto-fetching %d candles (%d days, %s) for %s on %s/%s",
-            total_candles, days, interval, symbol, exchange, market_type,
+            total_candles,
+            days,
+            interval,
+            symbol,
+            exchange,
+            market_type,
         )
 
         try:
@@ -496,14 +528,16 @@ class BacktestRunTool(BaseTool):
 
         data_list = []
         for k in klines:
-            data_list.append({
-                "timestamp": getattr(k, "timestamp", 0),
-                "open": k.open,
-                "high": k.high,
-                "low": k.low,
-                "close": k.close,
-                "volume": k.volume,
-            })
+            data_list.append(
+                {
+                    "timestamp": getattr(k, "timestamp", 0),
+                    "open": k.open,
+                    "high": k.high,
+                    "low": k.low,
+                    "close": k.close,
+                    "volume": k.volume,
+                }
+            )
         return data_list
 
 
@@ -524,10 +558,7 @@ class BacktestResultTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return (
-            "Retrieve a previously run backtest result by its ID, "
-            "showing performance metrics and trade count."
-        )
+        return "Retrieve a previously run backtest result by its ID, showing performance metrics and trade count."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -605,7 +636,7 @@ class StrategySaveVersionTool(BaseTool):
             "entry_rules, exit_rules, and risk_params as structured dicts. "
             "Do NOT pass an empty config — include ALL strategy logic. "
             "entry_rules and exit_rules should be structured objects describing "
-            "the conditions, e.g. {\"conditions\": [...], \"logic\": \"AND\"}. "
+            'the conditions, e.g. {"conditions": [...], "logic": "AND"}. '
             "risk_params should include stop_loss, take_profit, max_position_size etc."
         )
 
@@ -632,18 +663,25 @@ class StrategySaveVersionTool(BaseTool):
                         "type": {"type": "string", "description": "Strategy type, e.g. 'custom'"},
                         "interval": {"type": "string", "description": "Kline interval, e.g. '1h'"},
                         "direction": {"type": "string", "description": "long_only, short_only, or neutral"},
-                        "parameters": {"type": "object", "additionalProperties": True, "description": "Strategy-specific parameters"},
+                        "parameters": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "description": "Strategy-specific parameters",
+                        },
                         "entry_rules": {
-                            "type": "object", "additionalProperties": True,
-                            "description": "REQUIRED. Entry conditions as structured dict. Example: {\"conditions\": [{\"indicator\": \"EMA\", \"params\": {\"fast\": 12, \"slow\": 26}, \"comparison\": \"cross_above\"}], \"logic\": \"AND\"}",
+                            "type": "object",
+                            "additionalProperties": True,
+                            "description": 'REQUIRED. Entry conditions as structured dict. Example: {"conditions": [{"indicator": "EMA", "params": {"fast": 12, "slow": 26}, "comparison": "cross_above"}], "logic": "AND"}',
                         },
                         "exit_rules": {
-                            "type": "object", "additionalProperties": True,
+                            "type": "object",
+                            "additionalProperties": True,
                             "description": "REQUIRED. Exit conditions as structured dict. Same format as entry_rules.",
                         },
                         "risk_params": {
-                            "type": "object", "additionalProperties": True,
-                            "description": "REQUIRED. Risk parameters. Example: {\"stop_loss_pct\": 0.02, \"take_profit_pct\": 0.05, \"max_position_pct\": 0.35}",
+                            "type": "object",
+                            "additionalProperties": True,
+                            "description": 'REQUIRED. Risk parameters. Example: {"stop_loss_pct": 0.02, "take_profit_pct": 0.05, "max_position_pct": 0.35}',
                         },
                     },
                     "required": ["name", "symbols", "interval", "entry_rules", "exit_rules", "risk_params"],
@@ -770,10 +808,7 @@ class StrategyExplainTool(BaseTool):
 
     @property
     def description(self) -> str:
-        return (
-            "Explain a strategy's logic, entry/exit conditions, and risk "
-            "parameters in plain language."
-        )
+        return "Explain a strategy's logic, entry/exit conditions, and risk parameters in plain language."
 
     @property
     def parameters(self) -> dict[str, Any]:
@@ -810,6 +845,7 @@ class StrategyExplainTool(BaseTool):
 
         try:
             from pnlclaw_strategy.models import EngineStrategyConfig
+
             config = EngineStrategyConfig.model_validate(config_dict)
         except Exception as exc:
             return ToolResult(output=f"Cannot parse config: {exc}", error="Invalid config")

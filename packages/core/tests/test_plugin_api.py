@@ -30,6 +30,4 @@ class TestPnLClawPluginAPI:
         assert actual == expected
 
     def test_is_runtime_checkable(self):
-        assert hasattr(PnLClawPluginAPI, "__protocol_attrs__") or hasattr(
-            PnLClawPluginAPI, "__abstractmethods__"
-        )
+        assert hasattr(PnLClawPluginAPI, "__protocol_attrs__") or hasattr(PnLClawPluginAPI, "__abstractmethods__")

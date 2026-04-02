@@ -16,7 +16,7 @@ from pnlclaw_agent.prompt_builder import AgentContext
 from pnlclaw_agent.react import ReActAgentRuntime
 from pnlclaw_agent.tool_catalog import ToolCatalog
 from pnlclaw_agent.tools.base import BaseTool, ToolResult
-from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+from pnlclaw_llm.schemas import TokenUsage, ToolCall, ToolCallResult
 from pnlclaw_types.agent import AgentStreamEventType
 from pnlclaw_types.risk import RiskLevel
 
@@ -87,7 +87,7 @@ def _make_runtime(
     react_enabled: bool = True,
 ) -> ReActAgentRuntime:
     catalog = ToolCatalog()
-    for name in (tool_names or ["market_ticker"]):
+    for name in tool_names or ["market_ticker"]:
         catalog.register(_make_tool(name, f"{name} result"))
     ctx = AgentContext(react_enabled=react_enabled, max_tool_rounds=max_rounds)
     return ReActAgentRuntime(
@@ -114,13 +114,15 @@ async def _collect_events(runtime: ReActAgentRuntime, message: str) -> list[Any]
 class TestBasicReActCycle:
     @pytest.mark.asyncio
     async def test_think_act_reflect_answer(self) -> None:
-        llm = MockReActLLM([
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
-                usage=TokenUsage(total_tokens=20),
-            ),
-            ToolCallResult(text="BTC is at $67,000.", usage=TokenUsage(total_tokens=15)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
+                    usage=TokenUsage(total_tokens=20),
+                ),
+                ToolCallResult(text="BTC is at $67,000.", usage=TokenUsage(total_tokens=15)),
+            ]
+        )
         runtime = _make_runtime(llm)
         events = await _collect_events(runtime, "BTC price?")
 
@@ -145,17 +147,19 @@ class TestBasicReActCycle:
 class TestMultiRoundToolCalling:
     @pytest.mark.asyncio
     async def test_two_rounds_then_answer(self) -> None:
-        llm = MockReActLLM([
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
-                usage=TokenUsage(total_tokens=20),
-            ),
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c2", name="market_ticker", arguments={"symbol": "ETH"})],
-                usage=TokenUsage(total_tokens=20),
-            ),
-            ToolCallResult(text="BTC and ETH prices fetched.", usage=TokenUsage(total_tokens=15)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
+                    usage=TokenUsage(total_tokens=20),
+                ),
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c2", name="market_ticker", arguments={"symbol": "ETH"})],
+                    usage=TokenUsage(total_tokens=20),
+                ),
+                ToolCallResult(text="BTC and ETH prices fetched.", usage=TokenUsage(total_tokens=15)),
+            ]
+        )
         runtime = _make_runtime(llm)
         events = await _collect_events(runtime, "compare BTC and ETH")
 
@@ -276,13 +280,15 @@ class TestToolExecutionError:
         catalog = ToolCatalog()
         catalog.register(ErrorTool())
 
-        llm = MockReActLLM([
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c1", name="broken_tool", arguments={})],
-                usage=TokenUsage(total_tokens=10),
-            ),
-            ToolCallResult(text="The tool failed, but I can still help.", usage=TokenUsage(total_tokens=10)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c1", name="broken_tool", arguments={})],
+                    usage=TokenUsage(total_tokens=10),
+                ),
+                ToolCallResult(text="The tool failed, but I can still help.", usage=TokenUsage(total_tokens=10)),
+            ]
+        )
         ctx = AgentContext(react_enabled=True)
         runtime = ReActAgentRuntime(
             llm=llm,
@@ -307,19 +313,13 @@ class TestToolExecutionError:
 class TestNoProgressAbort:
     @pytest.mark.asyncio
     async def test_three_rounds_no_progress_aborts(self) -> None:
-        empty_responses = [
-            ToolCallResult(text="", usage=TokenUsage(total_tokens=5))
-            for _ in range(5)
-        ]
+        empty_responses = [ToolCallResult(text="", usage=TokenUsage(total_tokens=5)) for _ in range(5)]
         llm = MockReActLLM(empty_responses)
         runtime = _make_runtime(llm, max_rounds=10)
         events = await _collect_events(runtime, "empty loop")
 
         text_events = [e for e in events if e.type == AgentStreamEventType.TEXT_DELTA]
-        found_progress_msg = any(
-            "progress" in e.data.get("text", "").lower()
-            for e in text_events
-        )
+        found_progress_msg = any("progress" in e.data.get("text", "").lower() for e in text_events)
         assert found_progress_msg
         assert events[-1].type == AgentStreamEventType.DONE
 
@@ -333,9 +333,11 @@ class TestReactDisabled:
     @pytest.mark.asyncio
     async def test_react_disabled_no_thinking_events(self) -> None:
         """When react_enabled=False, prompt should not contain ReAct protocol."""
-        llm = MockReActLLM([
-            ToolCallResult(text="Simple answer without reasoning.", usage=TokenUsage(total_tokens=10)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(text="Simple answer without reasoning.", usage=TokenUsage(total_tokens=10)),
+            ]
+        )
         runtime = _make_runtime(llm, react_enabled=False)
         events = await _collect_events(runtime, "hi")
 
@@ -354,13 +356,15 @@ class TestReactDisabled:
 class TestEventEmission:
     @pytest.mark.asyncio
     async def test_thinking_before_tool_call(self) -> None:
-        llm = MockReActLLM([
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
-                usage=TokenUsage(total_tokens=20),
-            ),
-            ToolCallResult(text="Done.", usage=TokenUsage(total_tokens=10)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
+                    usage=TokenUsage(total_tokens=20),
+                ),
+                ToolCallResult(text="Done.", usage=TokenUsage(total_tokens=10)),
+            ]
+        )
         runtime = _make_runtime(llm)
         events = await _collect_events(runtime, "check")
 
@@ -373,13 +377,15 @@ class TestEventEmission:
 
     @pytest.mark.asyncio
     async def test_reflection_after_tool_result(self) -> None:
-        llm = MockReActLLM([
-            ToolCallResult(
-                tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
-                usage=TokenUsage(total_tokens=20),
-            ),
-            ToolCallResult(text="Answer.", usage=TokenUsage(total_tokens=10)),
-        ])
+        llm = MockReActLLM(
+            [
+                ToolCallResult(
+                    tool_calls=[ToolCall(id="c1", name="market_ticker", arguments={"symbol": "BTC"})],
+                    usage=TokenUsage(total_tokens=20),
+                ),
+                ToolCallResult(text="Answer.", usage=TokenUsage(total_tokens=10)),
+            ]
+        )
         runtime = _make_runtime(llm)
         events = await _collect_events(runtime, "check")
 

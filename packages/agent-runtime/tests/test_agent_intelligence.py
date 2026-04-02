@@ -162,9 +162,7 @@ class TestTradingMemory:
         mem = TradingMemory(memory_dir=tmp_path)
         msgs = [
             ChatMessage(role="user", content="Analyze BTC/USDT", timestamp=1_700_000_000_000),
-            ChatMessage(
-                role="assistant", content="BTC is trending up", timestamp=1_700_000_001_000
-            ),
+            ChatMessage(role="assistant", content="BTC is trending up", timestamp=1_700_000_001_000),
         ]
         mem.save_context("session-001", msgs, summary="BTC analysis session")
 

@@ -106,10 +106,7 @@ class StrategyRepository:
             strategies = [s for s in strategies if s.source == source]
         if tags:
             tag_set = {t.strip().lower() for t in tags if t.strip()}
-            strategies = [
-                s for s in strategies
-                if tag_set & {tag.lower() for tag in s.tags}
-            ]
+            strategies = [s for s in strategies if tag_set & {tag.lower() for tag in s.tags}]
         return strategies
 
     async def delete(self, strategy_id: str, *, user_id: str | None = None) -> bool:

@@ -58,7 +58,10 @@ async def list_sessions(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[dict[str, Any]]:
     return await repo.list_sessions(
-        strategy_id=strategy_id, limit=limit, offset=offset, user_id=user.id,
+        strategy_id=strategy_id,
+        limit=limit,
+        offset=offset,
+        user_id=user.id,
     )
 
 

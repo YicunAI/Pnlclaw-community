@@ -21,15 +21,15 @@ from typing import Any, Protocol, runtime_checkable
 class MemoryBackend(Protocol):
     """Memory backend — Community: keyword matching; Pro: vector semantic search."""
 
-    async def store(self, entry: "MemoryEntry") -> None:
+    async def store(self, entry: MemoryEntry) -> None:
         """Store a memory entry."""
         ...
 
-    async def recall(self, query: str, limit: int = 10) -> list["MemoryEntry"]:
+    async def recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         """Recall memory entries matching the query."""
         ...
 
-    async def semantic_recall(self, query: str, limit: int = 10) -> list["MemoryEntry"]:
+    async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         """PRO RESERVED: Semantic vector similarity search."""
         raise NotImplementedError("Semantic recall requires PnLClaw Pro")
 
@@ -42,7 +42,7 @@ class AgentOrchestrator(Protocol):
         """Run a task with a single agent."""
         ...
 
-    async def delegate(self, request: "DelegationRequest") -> "ConsensusResult":
+    async def delegate(self, request: DelegationRequest) -> ConsensusResult:
         """PRO RESERVED: Delegate task to multiple agents for consensus."""
         raise NotImplementedError("Multi-agent delegation requires PnLClaw Pro")
 
@@ -55,7 +55,7 @@ class ModelRouter(Protocol):
         """Return the model identifier to use for the given messages."""
         ...
 
-    def select_for_task(self, task_type: "TaskType") -> "ModelProfile":
+    def select_for_task(self, task_type: TaskType) -> ModelProfile:
         """PRO RESERVED: Select optimal model based on task type."""
         raise NotImplementedError("Smart model routing requires PnLClaw Pro")
 
@@ -89,7 +89,7 @@ class FeedbackEngine(Protocol):
         """Analyze a strategy/backtest result."""
         ...
 
-    async def iterate(self, plan: "IterationPlan") -> "OptimizationResult":
+    async def iterate(self, plan: IterationPlan) -> OptimizationResult:
         """PRO RESERVED: AI-driven iterative optimization."""
         raise NotImplementedError("AI feedback iteration requires PnLClaw Pro")
 
@@ -102,7 +102,7 @@ class MarketScanner(Protocol):
     register an implementation.
     """
 
-    async def scan(self, symbols: list[str]) -> list["ScanResult"]:
+    async def scan(self, symbols: list[str]) -> list[ScanResult]:
         """PRO RESERVED: Scan markets for anomalies."""
         raise NotImplementedError("Market scanning requires PnLClaw Pro")
 
@@ -181,7 +181,7 @@ class ScanResult:
     """Market scan result with detected anomalies."""
 
     symbol: str = ""
-    anomalies: list["Anomaly"] = field(default_factory=list)
+    anomalies: list[Anomaly] = field(default_factory=list)
     timestamp: str = ""
 
 

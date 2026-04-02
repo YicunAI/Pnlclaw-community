@@ -100,9 +100,7 @@ class ContextCompactor:
         # Keep system messages and the last few messages intact
         protected_count = min(6, len(messages))
         compactable = messages[:-protected_count] if protected_count < len(messages) else []
-        protected = (
-            messages[-protected_count:] if protected_count < len(messages) else list(messages)
-        )
+        protected = messages[-protected_count:] if protected_count < len(messages) else list(messages)
 
         if not compactable:
             return list(messages)
@@ -122,9 +120,7 @@ class ContextCompactor:
 
             # Try partial summarization (only the largest chunk)
             try:
-                largest_idx = max(
-                    range(len(chunks)), key=lambda i: sum(len(m.content) for m in chunks[i])
-                )
+                largest_idx = max(range(len(chunks)), key=lambda i: sum(len(m.content) for m in chunks[i]))
                 partial = list(chunks)
                 partial[largest_idx] = [await self._summarize_single(chunks[largest_idx])]
                 flat = [m for chunk in partial for m in chunk]
@@ -138,18 +134,14 @@ class ContextCompactor:
         total_compacted_tokens = self._total_tokens(compactable)
         marker = ChatMessage(
             role="system",
-            content=(
-                f"[{len(compactable)} messages compacted, ~{total_compacted_tokens} tokens freed]"
-            ),
+            content=(f"[{len(compactable)} messages compacted, ~{total_compacted_tokens} tokens freed]"),
             timestamp=int(time.time() * 1000),
         )
         return [marker] + protected
 
     # -- internal ------------------------------------------------------------
 
-    def _build_chunks(
-        self, messages: list[ChatMessage], chunk_size: int = 4
-    ) -> list[list[ChatMessage]]:
+    def _build_chunks(self, messages: list[ChatMessage], chunk_size: int = 4) -> list[list[ChatMessage]]:
         """Group messages into chunks of approximately ``chunk_size``."""
         chunks: list[list[ChatMessage]] = []
         current: list[ChatMessage] = []

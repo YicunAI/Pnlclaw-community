@@ -4,12 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from pnlclaw_agent.mcp.config import load_mcp_config
 from pnlclaw_agent.mcp.types import McpTransport
 from pnlclaw_types.risk import RiskLevel
-
 
 # ---------------------------------------------------------------------------
 # Valid config loading

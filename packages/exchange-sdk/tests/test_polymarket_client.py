@@ -117,9 +117,7 @@ class TestPolymarketPrices:
     async def test_get_last_trade_price(self) -> None:
         client = PolymarketClient()
         client._http = MagicMock()
-        client._http.get = AsyncMock(
-            return_value=_mock_response({"price": "0.65", "side": "BUY"})
-        )
+        client._http.get = AsyncMock(return_value=_mock_response({"price": "0.65", "side": "BUY"}))
 
         result = await client.get_last_trade_price("0x111")
         assert result.price == 0.65

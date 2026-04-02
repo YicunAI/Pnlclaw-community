@@ -45,11 +45,7 @@ class AdminNoteRepository:
     async def list_for_user(self, user_id: uuid.UUID) -> list[AdminNote]:
         """Return all admin notes for a user, newest first."""
         async with self._db.session() as session:
-            stmt = (
-                select(AdminNote)
-                .where(AdminNote.user_id == user_id)
-                .order_by(AdminNote.created_at.desc())
-            )
+            stmt = select(AdminNote).where(AdminNote.user_id == user_id).order_by(AdminNote.created_at.desc())
             result = await session.execute(stmt)
             return list(result.scalars().all())
 

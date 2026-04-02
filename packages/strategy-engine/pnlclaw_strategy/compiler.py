@@ -138,9 +138,7 @@ def _resolve_indicator(
     try:
         instance = cls(**kwargs) if kwargs else cls(period=14)
     except (TypeError, ValueError) as exc:
-        raise CompilationError(
-            f"Cannot instantiate indicator '{name}' with params {params}: {exc}"
-        ) from exc
+        raise CompilationError(f"Cannot instantiate indicator '{name}' with params {params}: {exc}") from exc
 
     cache[col_name] = instance
 
@@ -185,9 +183,7 @@ def _compile_condition(
         comp_name = rule.comparator.get("indicator", "")
         comp_params = rule.comparator.get("params", {})
         if comp_name:
-            comp_ind, comp_col = _resolve_indicator(
-                comp_name, comp_params, registry, indicator_cache
-            )
+            comp_ind, comp_col = _resolve_indicator(comp_name, comp_params, registry, indicator_cache)
         else:
             raise CompilationError(f"Comparator dict must have 'indicator' key: {rule.comparator}")
     else:

@@ -45,8 +45,7 @@ def validate_price(
     deviation = abs(target - current_price) / current_price
     if deviation > max_deviation:
         errors.append(
-            f"Price {target:.2f} deviates {deviation:.1%} from current "
-            f"{current_price:.2f} (max {max_deviation:.0%})"
+            f"Price {target:.2f} deviates {deviation:.1%} from current {current_price:.2f} (max {max_deviation:.0%})"
         )
     return errors
 

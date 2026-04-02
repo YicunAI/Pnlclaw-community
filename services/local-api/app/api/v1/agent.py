@@ -19,21 +19,26 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 import uuid
 from collections import OrderedDict
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field as dc_field
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import AuthenticatedUser, get_agent_runtime, get_settings_service, optional_user
+from app.core.dependencies import (
+    AuthenticatedUser,
+    get_agent_runtime,
+    get_settings_service,
+    optional_user,
+)
 from pnlclaw_types.agent import AgentStreamEventType
-
-import logging
 
 _logger = logging.getLogger(__name__)
 
@@ -48,8 +53,9 @@ try:
     )
     from pnlclaw_security.sanitizer import (
         detect_injection_markers,
-        sanitize_for_prompt,
+        sanitize_for_prompt,  # noqa: F401
     )
+
     _content_guard = ContentScopeGuard()
     _SECURITY_AVAILABLE = True
 except ImportError:
@@ -68,6 +74,7 @@ _MAX_SESSIONS = 64
 
 try:
     from pnlclaw_agent.context.manager import ContextManager as _ContextManager
+
     _CTX_AVAILABLE = True
 except ImportError:
     _ContextManager = None  # type: ignore[assignment,misc]
@@ -106,7 +113,8 @@ def _cleanup_stale_turns() -> None:
     """Remove turns that have been completed/failed for > TTL."""
     now = time.monotonic()
     stale = [
-        sid for sid, ts in _active_turns.items()
+        sid
+        for sid, ts in _active_turns.items()
         if ts.status != "running" and (now - ts.last_checkpoint_at) > _TURN_TTL_SECONDS
     ]
     for sid in stale:
@@ -127,6 +135,7 @@ async def _verify_session_owner(session_id: str, user_id: str) -> bool:
         return True
     try:
         from app.core.dependencies import get_chat_session_repo
+
         repo = get_chat_session_repo()
         if repo is None:
             return True
@@ -152,6 +161,7 @@ async def _restore_context_from_db(session_id: str, *, user_id: str = "local") -
             _logger.warning("Session %s ownership check failed for user %s", session_id, user_id)
             return None
         from app.core.dependencies import get_chat_session_repo
+
         repo = get_chat_session_repo()
         if repo is None:
             return None
@@ -180,6 +190,7 @@ async def _persist_context_to_db(session_id: str, context: Any) -> None:
     """Write current ContextManager messages to the chat session DB."""
     try:
         from app.core.dependencies import get_chat_session_repo
+
         repo = get_chat_session_repo()
         if repo is None or not hasattr(context, "serialize"):
             return
@@ -219,17 +230,75 @@ class ChatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-_MARKET_KEYWORDS = frozenset([
-    "分析", "行情", "趋势", "价格", "涨", "跌", "多", "空", "买", "卖",
-    "支撑", "阻力", "K线", "k线", "均线", "macd", "rsi", "ema", "sma",
-    "止损", "止盈", "仓位", "交易", "开仓", "平仓", "持仓", "下单",
-    "策略", "回测", "backtest", "strategy", "analyze", "analysis",
-    "market", "price", "trade", "order", "position", "long", "short",
-    "btc", "eth", "sol", "usdt", "bnb", "doge", "xrp",
-    "binance", "okx", "orderbook", "订单簿", "盘口",
-    "波动", "突破", "震荡", "反转", "动量", "成交量", "volume",
-    "生成", "写一个", "帮我", "优化", "改进", "建议",
-])
+_MARKET_KEYWORDS = frozenset(
+    [
+        "分析",
+        "行情",
+        "趋势",
+        "价格",
+        "涨",
+        "跌",
+        "多",
+        "空",
+        "买",
+        "卖",
+        "支撑",
+        "阻力",
+        "K线",
+        "k线",
+        "均线",
+        "macd",
+        "rsi",
+        "ema",
+        "sma",
+        "止损",
+        "止盈",
+        "仓位",
+        "交易",
+        "开仓",
+        "平仓",
+        "持仓",
+        "下单",
+        "策略",
+        "回测",
+        "backtest",
+        "strategy",
+        "analyze",
+        "analysis",
+        "market",
+        "price",
+        "trade",
+        "order",
+        "position",
+        "long",
+        "short",
+        "btc",
+        "eth",
+        "sol",
+        "usdt",
+        "bnb",
+        "doge",
+        "xrp",
+        "binance",
+        "okx",
+        "orderbook",
+        "订单簿",
+        "盘口",
+        "波动",
+        "突破",
+        "震荡",
+        "反转",
+        "动量",
+        "成交量",
+        "volume",
+        "生成",
+        "写一个",
+        "帮我",
+        "优化",
+        "改进",
+        "建议",
+    ]
+)
 
 
 def _is_market_related(message: str) -> bool:
@@ -390,8 +459,12 @@ async def _canned_stream(text: str, session_id: str) -> AsyncIterator[str]:
 
 
 async def _guarded_agent_stream(
-    runtime: Any, message: str, session_id: str, settings_service: Any = None,
-    *, resume: bool = False,
+    runtime: Any,
+    message: str,
+    session_id: str,
+    settings_service: Any = None,
+    *,
+    resume: bool = False,
 ) -> AsyncIterator[str]:
     """Wrapper that applies output filtering on the real agent stream."""
     async for chunk in _agent_stream(runtime, message, session_id, settings_service, resume=resume):
@@ -424,6 +497,7 @@ def _resolve_model_override(message: str, settings_service: Any) -> str | None:
         return None
     try:
         from app.core.settings_service import SettingsService
+
         svc: SettingsService = settings_service  # type: ignore[assignment]
         settings = svc._load_non_sensitive()
         llm_section = settings.get("llm", {})
@@ -487,10 +561,12 @@ def _start_producer(
 
                 if evt_type == "tool_result" and on_checkpoint:
                     try:
-                        on_checkpoint({
-                            "session_id": session_id,
-                            "event_count": len(turn.collected_events),
-                        })
+                        on_checkpoint(
+                            {
+                                "session_id": session_id,
+                                "event_count": len(turn.collected_events),
+                            }
+                        )
                     except Exception:
                         pass
 
@@ -548,15 +624,18 @@ async def _consume_turn_stream(
     while True:
         try:
             item = await asyncio.wait_for(turn.queue.get(), timeout=_HEARTBEAT_INTERVAL)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             tool_label = turn.active_tool
-            yield _sse_event("heartbeat", {
-                "type": "heartbeat",
-                "data": {
-                    "step": f"executing: {tool_label}" if tool_label else "processing",
+            yield _sse_event(
+                "heartbeat",
+                {
+                    "type": "heartbeat",
+                    "data": {
+                        "step": f"executing: {tool_label}" if tool_label else "processing",
+                    },
+                    "timestamp": int(time.time() * 1000),
                 },
-                "timestamp": int(time.time() * 1000),
-            })
+            )
             continue
 
         if item is None:
@@ -566,8 +645,12 @@ async def _consume_turn_stream(
 
 
 async def _agent_stream(
-    runtime: Any, message: str, session_id: str, settings_service: Any = None,
-    *, resume: bool = False,
+    runtime: Any,
+    message: str,
+    session_id: str,
+    settings_service: Any = None,
+    *,
+    resume: bool = False,
 ) -> AsyncIterator[str]:
     """Stream events from the real AgentRuntime with heartbeat keepalive.
 
@@ -586,7 +669,9 @@ async def _agent_stream(
         replay_from = existing.consumer_cursor
         _logger.info(
             "Resuming turn for session %s (buffered %d events, cursor %d)",
-            session_id, len(existing.collected_events), replay_from,
+            session_id,
+            len(existing.collected_events),
+            replay_from,
         )
         # The consumer disconnected but the producer kept running.
         # Drain any leftover items from the old queue into collected_events,
@@ -610,7 +695,8 @@ async def _agent_stream(
     if resume and existing and existing.status != "running":
         _logger.info(
             "Resume requested but turn already %s for session %s — replaying",
-            existing.status, session_id,
+            existing.status,
+            session_id,
         )
         for sse_str in existing.collected_events:
             yield sse_str
@@ -668,7 +754,11 @@ async def agent_chat(
     if body.resume and session_id in _active_turns:
         _logger.info("Resume request for session %s", session_id)
         generator = _guarded_agent_stream(
-            runtime, body.message, session_id, settings_service, resume=True,
+            runtime,
+            body.message,
+            session_id,
+            settings_service,
+            resume=True,
         )
         return StreamingResponse(
             generator,
@@ -700,7 +790,9 @@ async def agent_chat(
         if guard_result.action == GuardAction.BLOCK:
             _logger.warning(
                 "Content guard blocked: topic=%s, reason=%s, msg=%s",
-                guard_result.topic.value, guard_result.reason, body.message[:80],
+                guard_result.topic.value,
+                guard_result.reason,
+                body.message[:80],
             )
             return StreamingResponse(
                 _canned_stream(guard_result.canned_response or "", session_id),
@@ -718,7 +810,8 @@ async def agent_chat(
         if markers:
             _logger.warning(
                 "Injection markers detected: %s in message: %s",
-                markers, body.message[:100],
+                markers,
+                body.message[:100],
             )
 
     # --- Per-session context management (namespaced by user_id) ---

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 
@@ -81,14 +81,11 @@ class ActivityLogRepository:
 
     async def count_active_users(self, period: timedelta) -> int:
         """Count distinct users with activity within the given period."""
-        since = datetime.now(timezone.utc) - period
+        since = datetime.now(UTC) - period
         async with self._db.session() as session:
-            stmt = (
-                select(func.count(func.distinct(ActivityLog.user_id)))
-                .where(
-                    ActivityLog.created_at >= since,
-                    ActivityLog.user_id.isnot(None),
-                )
+            stmt = select(func.count(func.distinct(ActivityLog.user_id))).where(
+                ActivityLog.created_at >= since,
+                ActivityLog.user_id.isnot(None),
             )
             result = await session.execute(stmt)
             return result.scalar_one()
@@ -115,7 +112,7 @@ class ActivityLogRepository:
         list[dict]
             Each dict has ``{"bucket": <datetime-string>, "count": int}``.
         """
-        since = datetime.now(timezone.utc) - period
+        since = datetime.now(UTC) - period
         trunc_map = {
             "hour": "hour",
             "day": "day",
@@ -136,7 +133,4 @@ class ActivityLogRepository:
                 .order_by(bucket)
             )
             result = await session.execute(stmt)
-            return [
-                {"bucket": str(row.bucket), "count": row.count}
-                for row in result.all()
-            ]
+            return [{"bucket": str(row.bucket), "count": row.count} for row in result.all()]

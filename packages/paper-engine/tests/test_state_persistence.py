@@ -11,7 +11,7 @@ from pnlclaw_paper.accounts import AccountManager
 from pnlclaw_paper.orders import PaperOrderManager
 from pnlclaw_paper.positions import PositionManager
 from pnlclaw_paper.state import PaperState
-from pnlclaw_types.trading import Fill, MarginMode, OrderSide, PositionSide
+from pnlclaw_types.trading import Fill
 
 
 def _make_fill(

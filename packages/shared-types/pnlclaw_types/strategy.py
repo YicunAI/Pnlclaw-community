@@ -45,9 +45,7 @@ class StrategyConfig(BaseModel):
     name: str = Field(..., min_length=1, description="Human-readable strategy name")
     type: StrategyType = Field(..., description="Strategy archetype")
     description: str = Field("", description="Strategy description")
-    symbols: list[Symbol] = Field(
-        ..., min_length=1, description="Trading pairs this strategy applies to"
-    )
+    symbols: list[Symbol] = Field(..., min_length=1, description="Trading pairs this strategy applies to")
     interval: str = Field(..., description="Kline interval, e.g. '1h', '4h', '1d'")
     direction: StrategyDirection = Field(
         StrategyDirection.LONG_ONLY, description="Strategy direction: long_only, short_only, neutral"
@@ -56,12 +54,8 @@ class StrategyConfig(BaseModel):
         default_factory=dict,
         description="Strategy-specific parameters (e.g. sma_short=10, sma_long=50)",
     )
-    entry_rules: dict[str, Any] = Field(
-        default_factory=dict, description="Entry condition configuration"
-    )
-    exit_rules: dict[str, Any] = Field(
-        default_factory=dict, description="Exit condition configuration"
-    )
+    entry_rules: dict[str, Any] = Field(default_factory=dict, description="Entry condition configuration")
+    exit_rules: dict[str, Any] = Field(default_factory=dict, description="Exit condition configuration")
     risk_params: dict[str, Any] = Field(
         default_factory=dict,
         description="Risk parameters (stop_loss, take_profit, max_position_size, etc.)",
@@ -125,9 +119,7 @@ class Signal(BaseModel):
     strategy_id: str = Field(..., description="Source strategy ID")
     symbol: Symbol = Field(..., description="Target trading pair")
     side: OrderSide = Field(..., description="Signal direction")
-    strength: float = Field(
-        ..., ge=0.0, le=1.0, description="Signal strength / confidence (0.0 to 1.0)"
-    )
+    strength: float = Field(..., ge=0.0, le=1.0, description="Signal strength / confidence (0.0 to 1.0)")
     timestamp: Timestamp = Field(..., description="Signal generation time (ms epoch)")
     reason: str = Field("", description="Human-readable reason for the signal")
 
@@ -158,9 +150,7 @@ class BacktestMetrics(BaseModel):
     total_return: float = Field(..., description="Total return as a decimal (0.15 = 15%)")
     annual_return: float = Field(..., description="Annualized return as a decimal")
     sharpe_ratio: float = Field(..., description="Sharpe ratio (risk-free rate = 0)")
-    max_drawdown: float = Field(
-        ..., le=0, description="Maximum drawdown as a negative decimal (-0.1 = -10%)"
-    )
+    max_drawdown: float = Field(..., le=0, description="Maximum drawdown as a negative decimal (-0.1 = -10%)")
     win_rate: float = Field(..., ge=0, le=1, description="Winning trades / total trades")
     profit_factor: float = Field(..., ge=0, description="Gross profit / gross loss")
     total_trades: int = Field(..., ge=0, description="Total number of trades executed")
@@ -203,9 +193,7 @@ class BacktestResult(BaseModel):
     start_date: datetime = Field(..., description="Backtest period start (inclusive)")
     end_date: datetime = Field(..., description="Backtest period end (inclusive)")
     metrics: BacktestMetrics = Field(..., description="Performance metrics")
-    equity_curve: list[float] = Field(
-        default_factory=list, description="Equity values at each time step"
-    )
+    equity_curve: list[float] = Field(default_factory=list, description="Equity values at each time step")
     drawdown_curve: list[float] = Field(
         default_factory=list, description="Drawdown values at each time step (0 to negative)"
     )
@@ -213,9 +201,7 @@ class BacktestResult(BaseModel):
         default_factory=list,
         description="Buy & Hold equity curve based on actual close prices during the backtest period",
     )
-    trades: list[dict[str, Any]] = Field(
-        default_factory=list, description="Individual trade records for analysis"
-    )
+    trades: list[dict[str, Any]] = Field(default_factory=list, description="Individual trade records for analysis")
     trades_count: int = Field(..., ge=0, description="Total trades executed")
     created_at: Timestamp = Field(..., description="When this backtest was run (ms epoch)")
 

@@ -7,7 +7,6 @@ protection, and multi-source loading with priority ordering.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -16,8 +15,8 @@ import yaml
 from pnlclaw_agent.skills.types import (
     Skill,
     SkillFrontmatter,
-    SkillSource,
     SkillsLimits,
+    SkillSource,
 )
 
 try:

@@ -190,14 +190,20 @@ class MarketKlineTool(BaseTool):
         if limit > 200 and hasattr(self._service, "fetch_klines_batch"):
             try:
                 klines = await self._service.fetch_klines_batch(
-                    symbol, interval=interval, total=limit, **route,
+                    symbol,
+                    interval=interval,
+                    total=limit,
+                    **route,
                 )
             except Exception:
                 klines = []
         elif hasattr(self._service, "fetch_klines_rest"):
             try:
                 klines = await self._service.fetch_klines_rest(
-                    symbol, interval=interval, limit=limit, **route,
+                    symbol,
+                    interval=interval,
+                    limit=limit,
+                    **route,
                 )
             except Exception:
                 return None
@@ -215,8 +221,7 @@ class MarketKlineTool(BaseTool):
             display_klines = head + tail
 
         lines = [
-            f"{symbol} Klines ({klines[0].exchange if klines else '?'}, {interval}, "
-            f"{len(klines)} candles fetched)",
+            f"{symbol} Klines ({klines[0].exchange if klines else '?'}, {interval}, {len(klines)} candles fetched)",
             "",
         ]
 
@@ -231,7 +236,7 @@ class MarketKlineTool(BaseTool):
             status = "C" if k.closed else "O"
             ts_label = ""
             if hasattr(k, "timestamp") and k.timestamp:
-                dt = datetime.datetime.fromtimestamp(k.timestamp / 1000, tz=datetime.timezone.utc)
+                dt = datetime.datetime.fromtimestamp(k.timestamp / 1000, tz=datetime.UTC)
                 ts_label = dt.strftime("%m-%d %H:%M") + " "
             lines.append(
                 f"  {ts_label}[{status}] O:{_fmt_price(k.open)} H:{_fmt_price(k.high)} "
@@ -264,12 +269,14 @@ class MarketKlineTool(BaseTool):
 def _format_single_kline(kline: Any) -> str:
     """Format a single kline event for LLM consumption."""
     status = "closed" if kline.closed else "open"
-    return "\n".join([
-        f"{kline.symbol} Kline ({kline.exchange}, {kline.interval}, {status})",
-        f"  Open: {_fmt_price(kline.open)} | High: {_fmt_price(kline.high)}",
-        f"  Low: {_fmt_price(kline.low)} | Close: {_fmt_price(kline.close)}",
-        f"  Volume: {_fmt_qty(kline.volume)}",
-    ])
+    return "\n".join(
+        [
+            f"{kline.symbol} Kline ({kline.exchange}, {kline.interval}, {status})",
+            f"  Open: {_fmt_price(kline.open)} | High: {_fmt_price(kline.high)}",
+            f"  Low: {_fmt_price(kline.low)} | Close: {_fmt_price(kline.close)}",
+            f"  Volume: {_fmt_qty(kline.volume)}",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------

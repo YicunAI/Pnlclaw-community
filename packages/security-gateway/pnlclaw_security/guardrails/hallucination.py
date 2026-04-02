@@ -199,11 +199,14 @@ class HallucinationDetector:
             if not _claim_supported_by_tools(claim, tool_text):
                 result.warnings.append(f"⚠️ 此数据未经工具验证: {claim}")
                 result.triggered = True
-                logger.warning("hallucination_detected", extra={
-                    "type": "unverified_claim",
-                    "matched_text": claim,
-                    "action": "appended_warning",
-                })
+                logger.warning(
+                    "hallucination_detected",
+                    extra={
+                        "type": "unverified_claim",
+                        "matched_text": claim,
+                        "action": "appended_warning",
+                    },
+                )
 
         return result
 
@@ -219,11 +222,14 @@ class HallucinationDetector:
                     "Investment involves risk; past performance does not guarantee future results."
                 )
                 result.triggered = True
-                logger.warning("hallucination_detected", extra={
-                    "type": "investment_promise",
-                    "matched_text": match.group(0),
-                    "action": "appended_disclaimer",
-                })
+                logger.warning(
+                    "hallucination_detected",
+                    extra={
+                        "type": "investment_promise",
+                        "matched_text": match.group(0),
+                        "action": "appended_disclaimer",
+                    },
+                )
                 break  # One disclaimer is enough
 
         return result
@@ -234,11 +240,14 @@ class HallucinationDetector:
 
         redacted = redact_text(text)
         if redacted != text:
-            logger.warning("hallucination_detected", extra={
-                "type": "secret_leak",
-                "matched_text": "[redacted content]",
-                "action": "redacted",
-            })
+            logger.warning(
+                "hallucination_detected",
+                extra={
+                    "type": "secret_leak",
+                    "matched_text": "[redacted content]",
+                    "action": "redacted",
+                },
+            )
         return redacted
 
     def scan_output(

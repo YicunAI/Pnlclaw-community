@@ -17,9 +17,9 @@ from app.core.dependencies import (
     optional_user,
 )
 from app.core.settings_service import SettingsService
+from pnlclaw_security.secrets import SecretResolutionError
 from pnlclaw_types.common import APIResponse
 from pnlclaw_types.errors import ErrorCode, PnLClawError
-from pnlclaw_security.secrets import SecretResolutionError
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ async def list_llm_models(
     """Fetch available models from the configured LLM provider."""
     import logging
 
-    from pnlclaw_llm.base import LLMConfig, LLMAuthError, LLMConnectionError
+    from pnlclaw_llm.base import LLMAuthError, LLMConfig, LLMConnectionError
     from pnlclaw_llm.openai_compat import OpenAICompatProvider
 
     log = logging.getLogger(__name__)
@@ -161,12 +161,14 @@ async def list_llm_models(
             mid = m.get("id", "")
             if mid and mid not in seen:
                 seen.add(mid)
-                models.append({
-                    "id": mid,
-                    "name": mid,
-                    "owned_by": m.get("owned_by", ""),
-                    "created": m.get("created", 0),
-                })
+                models.append(
+                    {
+                        "id": mid,
+                        "name": mid,
+                        "owned_by": m.get("owned_by", ""),
+                        "created": m.get("created", 0),
+                    }
+                )
         current_model = llm_full.get("model", "")
         return APIResponse(
             data={

@@ -137,15 +137,19 @@ class StrategyRuntime:
         allow_short = self._direction in (StrategyDirection.SHORT_ONLY, StrategyDirection.NEUTRAL)
 
         if self._position == "flat":
-            if allow_long and self._compiled.long_entry_conditions and self._all_conditions_met(
-                df, self._compiled.long_entry_conditions
+            if (
+                allow_long
+                and self._compiled.long_entry_conditions
+                and self._all_conditions_met(df, self._compiled.long_entry_conditions)
             ):
                 signal = self._make_signal(event, OrderSide.BUY, "Long entry conditions met")
                 self._position = "long"
                 self._entry_price = event.close
 
-            elif allow_short and self._compiled.short_entry_conditions and self._all_conditions_met(
-                df, self._compiled.short_entry_conditions
+            elif (
+                allow_short
+                and self._compiled.short_entry_conditions
+                and self._all_conditions_met(df, self._compiled.short_entry_conditions)
             ):
                 signal = self._make_signal(event, OrderSide.SELL, "Short entry conditions met")
                 self._position = "short"

@@ -27,7 +27,7 @@ from pnlclaw_llm.base import (
     LLMRateLimitError,
     LLMRole,
 )
-from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+from pnlclaw_llm.schemas import TokenUsage, ToolCall, ToolCallResult
 
 logger = logging.getLogger(__name__)
 
@@ -174,14 +174,16 @@ def _wrap_tool_definitions(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if tool.get("type") == "function" and "function" in tool:
             wrapped.append(tool)
         else:
-            wrapped.append({
-                "type": "function",
-                "function": {
-                    "name": tool.get("name", ""),
-                    "description": tool.get("description", ""),
-                    "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
-                },
-            })
+            wrapped.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.get("name", ""),
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
+                    },
+                }
+            )
     return wrapped
 
 
@@ -256,9 +258,7 @@ class OpenAICompatProvider(LLMProvider):
                     f"Provider returned HTML instead of JSON. Check your base_url configuration. "
                     f"Expected: {self._base_url}/models"
                 ) from exc
-            raise LLMError(
-                f"Failed to parse models response as JSON: {resp.text[:200]}"
-            ) from exc
+            raise LLMError(f"Failed to parse models response as JSON: {resp.text[:200]}") from exc
 
         data = cast(dict[str, Any], raw_data)
         models_raw = data.get("data", [])
@@ -296,9 +296,7 @@ class OpenAICompatProvider(LLMProvider):
                         f"check base_url (current: {self._base_url}). "
                         f"It may need '/v1' appended."
                     ) from exc
-                raise LLMError(
-                    f"Provider returned non-JSON response: {resp.text[:200]}"
-                ) from exc
+                raise LLMError(f"Provider returned non-JSON response: {resp.text[:200]}") from exc
 
             data = cast(dict[str, Any], raw_data)
             return self._extract_content(data)
@@ -336,7 +334,7 @@ class OpenAICompatProvider(LLMProvider):
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue
-                    data_str = line[len("data: "):]
+                    data_str = line[len("data: ") :]
                     if data_str.strip() == "[DONE]":
                         break
                     try:
@@ -422,9 +420,7 @@ class OpenAICompatProvider(LLMProvider):
             try:
                 parsed = json.loads(raw_text)
             except json.JSONDecodeError as exc:
-                raise LLMError(
-                    f"Failed to parse structured output as JSON: {raw_text[:200]}"
-                ) from exc
+                raise LLMError(f"Failed to parse structured output as JSON: {raw_text[:200]}") from exc
             if not isinstance(parsed, dict):
                 raise LLMError("Structured output must be a JSON object")
             return cast(dict[str, Any], parsed)
@@ -509,9 +505,7 @@ class OpenAICompatProvider(LLMProvider):
             try:
                 raw_data = resp.json()
             except (json.JSONDecodeError, ValueError) as exc:
-                raise LLMError(
-                    f"Provider returned non-JSON response: {resp.text[:200]}"
-                ) from exc
+                raise LLMError(f"Provider returned non-JSON response: {resp.text[:200]}") from exc
 
             data = cast(dict[str, Any], raw_data)
             return self._parse_tool_call_response(data)

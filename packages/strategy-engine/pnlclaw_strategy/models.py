@@ -24,21 +24,15 @@ class ConditionRule(BaseModel):
     """
 
     indicator: str = Field(..., description="Indicator name (e.g. 'sma', 'rsi')")
-    params: dict[str, Any] = Field(
-        default_factory=dict, description="Indicator parameters (e.g. {'period': 20})"
-    )
+    params: dict[str, Any] = Field(default_factory=dict, description="Indicator parameters (e.g. {'period': 20})")
     operator: str = Field(
         ...,
-        description=(
-            "Comparison operator: 'crosses_above', 'crosses_below', "
-            "'greater_than', 'less_than', 'equal'"
-        ),
+        description=("Comparison operator: 'crosses_above', 'crosses_below', 'greater_than', 'less_than', 'equal'"),
     )
     comparator: dict[str, Any] | float = Field(
         ...,
         description=(
-            "What to compare against — either a numeric value or "
-            "another indicator dict with 'indicator' and 'params'"
+            "What to compare against — either a numeric value or another indicator dict with 'indicator' and 'params'"
         ),
     )
 
@@ -90,9 +84,7 @@ class EntryRules(BaseModel):
 class ExitRules(BaseModel):
     """Exit rule configuration for a strategy."""
 
-    close_long: list[ConditionRule] = Field(
-        default_factory=list, description="Conditions for closing a long position"
-    )
+    close_long: list[ConditionRule] = Field(default_factory=list, description="Conditions for closing a long position")
     close_short: list[ConditionRule] = Field(
         default_factory=list, description="Conditions for closing a short position"
     )
@@ -119,15 +111,9 @@ class ExitRules(BaseModel):
 class RiskParams(BaseModel):
     """Risk parameter configuration for a strategy."""
 
-    stop_loss_pct: float | None = Field(
-        None, ge=0, le=1, description="Stop loss as decimal (0.02 = 2%)"
-    )
-    take_profit_pct: float | None = Field(
-        None, ge=0, le=1, description="Take profit as decimal (0.05 = 5%)"
-    )
-    max_position_pct: float = Field(
-        0.1, ge=0, le=1, description="Maximum position size as fraction of portfolio"
-    )
+    stop_loss_pct: float | None = Field(None, ge=0, le=1, description="Stop loss as decimal (0.02 = 2%)")
+    take_profit_pct: float | None = Field(None, ge=0, le=1, description="Take profit as decimal (0.05 = 5%)")
+    max_position_pct: float = Field(0.1, ge=0, le=1, description="Maximum position size as fraction of portfolio")
     max_open_positions: int = Field(1, ge=1, description="Maximum concurrent open positions")
 
     model_config = ConfigDict(

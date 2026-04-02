@@ -7,22 +7,21 @@ and PnL calculation through the ``pnlclaw_paper`` package managers.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-import logging
-
 from app.core.dependencies import (
     AuthenticatedUser,
     build_response_meta,
+    get_db_manager,
     get_execution_engine,
     get_market_service,
     get_paper_account_manager,
     get_paper_order_manager,
     get_paper_position_manager,
-    get_db_manager,
     optional_user,
 )
 from pnlclaw_types.common import APIResponse, Pagination
@@ -68,9 +67,7 @@ async def _ensure_owners_loaded() -> None:
         db = get_db_manager()
         if db is None:
             return
-        rows = await db.query(
-            "SELECT id, user_id FROM paper_accounts WHERE user_id IS NOT NULL", ()
-        )
+        rows = await db.query("SELECT id, user_id FROM paper_accounts WHERE user_id IS NOT NULL", ())
         for r in rows:
             _account_owners[r["id"]] = r["user_id"]
         logger.info("Loaded %d paper account owner mappings from DB", len(rows))
@@ -151,8 +148,6 @@ def _get_positions(mgr: Any = Depends(get_paper_position_manager)) -> Any:
 # ---------------------------------------------------------------------------
 # Request bodies
 # ---------------------------------------------------------------------------
-
-
 
 
 class CreateAccountRequest(BaseModel):
@@ -238,6 +233,7 @@ async def list_accounts(
             if db is not None:
                 try:
                     from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
                     repo = PaperAccountRepository(db)
                     await repo.save_account(new_acct.model_dump(), user_id=user.id)
                 except Exception:
@@ -249,10 +245,7 @@ async def list_accounts(
     for a in accounts:
         _refresh_unrealized_pnl(a.id, pos_mgr)
         data = a.model_dump()
-        unrealized = sum(
-            p.unrealized_pnl
-            for p in pos_mgr.get_open_positions(a.id)
-        )
+        unrealized = sum(p.unrealized_pnl for p in pos_mgr.get_open_positions(a.id))
         wallet_balance = a.initial_balance + a.total_realized_pnl - a.total_fee
         equity = wallet_balance + unrealized
         data["equity"] = equity
@@ -310,6 +303,7 @@ async def create_account(
     if db is not None:
         try:
             from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
             repo = PaperAccountRepository(db)
             await repo.save_account(account.model_dump(), user_id=user.id)
         except Exception:
@@ -358,6 +352,7 @@ async def reset_account(
         db = request.app.state.db if hasattr(request.app.state, "db") else None
         if db:
             from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
             repo = PaperAccountRepository(db)
             await repo.clear_equity_history(account_id)
             await repo.save_equity_point(account_id, account.initial_balance)
@@ -387,10 +382,7 @@ async def get_account(
         raise NotFoundError(f"Account '{account_id}' not found")
     _refresh_unrealized_pnl(account_id, pos_mgr)
     data = account.model_dump()
-    unrealized = sum(
-        p.unrealized_pnl
-        for p in pos_mgr.get_open_positions(account_id)
-    )
+    unrealized = sum(p.unrealized_pnl for p in pos_mgr.get_open_positions(account_id))
     wallet_balance = account.initial_balance + account.total_realized_pnl - account.total_fee
     data["equity"] = wallet_balance + unrealized
     asyncio.create_task(_record_equity(account_id, data["equity"]))
@@ -424,7 +416,6 @@ def _swap_symbol_to_ticker(symbol: str) -> str:
         parts = s.split("-", 1)
         return f"{parts[0]}/{parts[1]}"
     return s
-
 
 
 @router.post("/orders")
@@ -471,6 +462,7 @@ async def place_order(
             )
         except ValueError as exc:
             from fastapi import HTTPException
+
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Engine not available — direct order manager fallback
@@ -516,6 +508,7 @@ async def place_order(
     try:
         unrealized = 0.0
         from app.core.dependencies import get_paper_position_manager
+
         pos_mgr = get_paper_position_manager()
         if pos_mgr:
             unrealized = sum(p.unrealized_pnl for p in pos_mgr.get_open_positions(body.account_id))
@@ -602,6 +595,7 @@ async def cancel_order_endpoint(
         if account is not None and account_id is not None:
             unrealized = 0.0
             from app.core.dependencies import get_paper_position_manager
+
             pos_mgr = get_paper_position_manager()
             if pos_mgr:
                 unrealized = sum(p.unrealized_pnl for p in pos_mgr.get_open_positions(account_id))
@@ -617,6 +611,7 @@ async def cancel_order_endpoint(
         raise NotFoundError(f"Order '{order_id}' not found")
     except Exception as exc:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -676,7 +671,7 @@ async def close_position(
             reduce_only=True,
             mark_price=body.mark_price,
         )
-        
+
         try:
             _refresh_unrealized_pnl(body.account_id, getattr(engine, "_position_mgr", None))
             unrealized = sum(p.unrealized_pnl for p in engine._position_mgr.get_open_positions(body.account_id))
@@ -692,6 +687,7 @@ async def close_position(
         )
     except ValueError as exc:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
@@ -736,6 +732,7 @@ async def list_positions(
 
         if p.leverage > 1 and p.avg_entry_price > 0:
             from pnlclaw_paper.positions import _estimate_liquidation_price
+
             p.liquidation_price = _estimate_liquidation_price(
                 p.avg_entry_price,
                 p.leverage,
@@ -940,8 +937,9 @@ async def get_equity_history_endpoint(
     db = get_db_manager()
     if not db:
         return APIResponse(data=[], meta=build_response_meta(request))
-    
+
     from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
     repo = PaperAccountRepository(db)
     history = await repo.get_equity_history(account_id, limit)
     return APIResponse(
@@ -952,7 +950,7 @@ async def get_equity_history_endpoint(
 
 async def _record_equity(account_id: str, equity: float):
     """Internal helper to save a snapshot of account equity.
-    
+
     Ensures the account exists in the database first to satisfy foreign key constraints,
     as the PaperExecutionEngine only persists to file by default.
     """
@@ -961,10 +959,11 @@ async def _record_equity(account_id: str, equity: float):
         if not db:
             logger.debug("Record equity skipped: No DB manager")
             return
-            
+
         from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
         repo = PaperAccountRepository(db)
-        
+
         # 1. Sync account to DB and check for initial record
         try:
             acct_mgr = get_paper_account_manager()
@@ -973,7 +972,7 @@ async def _record_equity(account_id: str, equity: float):
                 if account:
                     owner_id = _owner_of(account_id) or "local"
                     await repo.save_account(account.model_dump(), user_id=owner_id)
-                    
+
                     # If this is the VERY FIRST record, insert initial_balance as the starting point
                     if not await repo.has_equity_history(account_id):
                         initial_equity = getattr(account, "initial_balance", 100000.0)
@@ -981,7 +980,7 @@ async def _record_equity(account_id: str, equity: float):
                         logger.info("Recorded initial equity for %s: %.2f", account_id, initial_equity)
         except Exception as e:
             logger.warning("Account sync/history check failed for %s: %s", account_id, e)
-        
+
         # 2. Save the current equity point
         await repo.save_equity_point(account_id, equity)
         logger.info("Recorded current equity for %s: %.2f", account_id, equity)

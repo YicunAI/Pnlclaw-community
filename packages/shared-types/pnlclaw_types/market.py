@@ -155,12 +155,8 @@ class OrderBookL2Snapshot(BaseModel):
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Snapshot time in millisecond epoch")
     sequence_id: int = Field(..., description="Sequence number for ordering / gap detection")
-    bids: list[PriceLevel] = Field(
-        default_factory=list, description="Bid levels sorted by price descending"
-    )
-    asks: list[PriceLevel] = Field(
-        default_factory=list, description="Ask levels sorted by price ascending"
-    )
+    bids: list[PriceLevel] = Field(default_factory=list, description="Bid levels sorted by price descending")
+    asks: list[PriceLevel] = Field(default_factory=list, description="Ask levels sorted by price ascending")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -197,12 +193,8 @@ class OrderBookL2Delta(BaseModel):
     symbol: Symbol = Field(..., description="Normalized trading pair")
     timestamp: Timestamp = Field(..., description="Delta time in millisecond epoch")
     sequence_id: int = Field(..., description="Sequence number for ordering / gap detection")
-    bids: list[PriceLevel] = Field(
-        default_factory=list, description="Updated bid levels (quantity=0 means remove)"
-    )
-    asks: list[PriceLevel] = Field(
-        default_factory=list, description="Updated ask levels (quantity=0 means remove)"
-    )
+    bids: list[PriceLevel] = Field(default_factory=list, description="Updated bid levels (quantity=0 means remove)")
+    asks: list[PriceLevel] = Field(default_factory=list, description="Updated ask levels (quantity=0 means remove)")
 
     model_config = ConfigDict(
         json_schema_extra={

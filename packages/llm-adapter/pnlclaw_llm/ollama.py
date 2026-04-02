@@ -21,7 +21,7 @@ from pnlclaw_llm.base import (
     LLMProvider,
     LLMRole,
 )
-from pnlclaw_llm.schemas import ToolCall, ToolCallResult, TokenUsage
+from pnlclaw_llm.schemas import TokenUsage, ToolCall, ToolCallResult
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +83,7 @@ class OllamaProvider(LLMProvider):
             )
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise LLMConnectionError(
-                f"Cannot connect to Ollama at {self._base_url}. "
-                "Is Ollama running? Start it with: ollama serve"
+                f"Cannot connect to Ollama at {self._base_url}. Is Ollama running? Start it with: ollama serve"
             ) from exc
 
         if resp.status_code != 200:
@@ -130,8 +129,7 @@ class OllamaProvider(LLMProvider):
                         break
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise LLMConnectionError(
-                f"Cannot connect to Ollama at {self._base_url}. "
-                "Is Ollama running? Start it with: ollama serve"
+                f"Cannot connect to Ollama at {self._base_url}. Is Ollama running? Start it with: ollama serve"
             ) from exc
 
     # ----- chat_with_tools -----
@@ -161,8 +159,7 @@ class OllamaProvider(LLMProvider):
             )
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise LLMConnectionError(
-                f"Cannot connect to Ollama at {self._base_url}. "
-                "Is Ollama running? Start it with: ollama serve"
+                f"Cannot connect to Ollama at {self._base_url}. Is Ollama running? Start it with: ollama serve"
             ) from exc
 
         if resp.status_code != 200:
@@ -188,11 +185,13 @@ class OllamaProvider(LLMProvider):
                 func = tc.get("function", {})
                 if not isinstance(func, dict):
                     continue
-                parsed_calls.append(ToolCall(
-                    id=f"ollama_call_{i}",
-                    name=func.get("name", ""),
-                    arguments=func.get("arguments", {}),
-                ))
+                parsed_calls.append(
+                    ToolCall(
+                        id=f"ollama_call_{i}",
+                        name=func.get("name", ""),
+                        arguments=func.get("arguments", {}),
+                    )
+                )
 
         usage_data = data.get("prompt_eval_count", 0), data.get("eval_count", 0)
         token_usage = TokenUsage(
@@ -233,8 +232,7 @@ class OllamaProvider(LLMProvider):
             )
         except (httpx.ConnectError, httpx.TimeoutException) as exc:
             raise LLMConnectionError(
-                f"Cannot connect to Ollama at {self._base_url}. "
-                "Is Ollama running? Start it with: ollama serve"
+                f"Cannot connect to Ollama at {self._base_url}. Is Ollama running? Start it with: ollama serve"
             ) from exc
 
         if resp.status_code != 200:

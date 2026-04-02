@@ -92,9 +92,7 @@ class BinanceRESTClient(BaseRESTClient):
     ) -> None:
         url = base_url or (BINANCE_TESTNET_URL if testnet else BINANCE_API_URL)
         auth = BinanceAuthenticator(credentials)
-        limiter = rate_limiter or SlidingWindowRateLimiter(
-            calls_per_window=1200, window_ms=60_000
-        )
+        limiter = rate_limiter or SlidingWindowRateLimiter(calls_per_window=1200, window_ms=60_000)
         super().__init__(
             base_url=url,
             authenticator=auth,
@@ -130,21 +128,15 @@ class BinanceRESTClient(BaseRESTClient):
         if self._recv_window is not None:
             params["recvWindow"] = str(self._recv_window)
 
-        auth_headers = self._auth.sign_request(
-            method=method, path=path, params=params
-        )
+        auth_headers = self._auth.sign_request(method=method, path=path, params=params)
 
         url = f"{self._base_url}{path}"
         logger.debug("Binance REST %s %s", method, path)
 
         if method.upper() in ("POST", "PUT"):
-            resp = await self._http.request(
-                method=method, url=url, data=params, headers=auth_headers
-            )
+            resp = await self._http.request(method=method, url=url, data=params, headers=auth_headers)
         else:
-            resp = await self._http.request(
-                method=method, url=url, params=params, headers=auth_headers
-            )
+            resp = await self._http.request(method=method, url=url, params=params, headers=auth_headers)
 
         retry_after = resp.headers.get("Retry-After")
         if retry_after:
@@ -171,9 +163,7 @@ class BinanceRESTClient(BaseRESTClient):
         msg = data.get("msg", str(data))
 
         if resp.status_code == 429:
-            raise RateLimitExceededError(
-                f"Binance rate limit: {msg}", exchange="binance", status_code=429
-            )
+            raise RateLimitExceededError(f"Binance rate limit: {msg}", exchange="binance", status_code=429)
 
         if resp.status_code in (401, 403) or code in (-2015, -2014, -1022):
             raise AuthenticationError(
@@ -183,19 +173,13 @@ class BinanceRESTClient(BaseRESTClient):
             )
 
         if code == -2010:
-            raise InsufficientBalanceError(
-                f"Insufficient balance: {msg}", exchange="binance"
-            )
+            raise InsufficientBalanceError(f"Insufficient balance: {msg}", exchange="binance")
 
         if code in (-2011, -2013):
-            raise OrderNotFoundError(
-                f"Order not found: {msg}", exchange="binance"
-            )
+            raise OrderNotFoundError(f"Order not found: {msg}", exchange="binance")
 
         if code in (-1013, -1111, -1116, -1117, -1121):
-            raise OrderRejectedError(
-                f"Order rejected: {msg}", exchange="binance", details=data
-            )
+            raise OrderRejectedError(f"Order rejected: {msg}", exchange="binance", details=data)
 
         raise ExchangeAPIError(
             f"Binance API error ({code}): {msg}",
@@ -286,9 +270,7 @@ class BinanceRESTClient(BaseRESTClient):
             params["origClientOrderId"] = client_order_id
 
         if "orderId" not in params and "origClientOrderId" not in params:
-            raise InvalidOrderError(
-                "Either order_id or client_order_id is required", exchange="binance"
-            )
+            raise InvalidOrderError("Either order_id or client_order_id is required", exchange="binance")
 
         return await self._signed_request("DELETE", "/api/v3/order", params=params)
 
@@ -316,9 +298,7 @@ class BinanceRESTClient(BaseRESTClient):
             params["origClientOrderId"] = client_order_id
         return await self._signed_request("GET", "/api/v3/order", params=params)
 
-    async def get_open_orders(
-        self, *, symbol: str | None = None
-    ) -> list[dict[str, Any]]:
+    async def get_open_orders(self, *, symbol: str | None = None) -> list[dict[str, Any]]:
         """Get all open orders, optionally filtered by symbol.
 
         Args:
@@ -422,9 +402,7 @@ class BinanceRESTClient(BaseRESTClient):
         if order_type == "LIMIT":
             for field in ("quantity", "price", "timeInForce"):
                 if field not in params:
-                    raise InvalidOrderError(
-                        f"LIMIT order requires '{field}'", exchange="binance"
-                    )
+                    raise InvalidOrderError(f"LIMIT order requires '{field}'", exchange="binance")
 
         elif order_type == "MARKET":
             if "quantity" not in params and "quoteOrderQty" not in params:
@@ -435,17 +413,11 @@ class BinanceRESTClient(BaseRESTClient):
 
         elif order_type in ("STOP_LOSS", "TAKE_PROFIT"):
             if "quantity" not in params:
-                raise InvalidOrderError(
-                    f"{order_type} order requires 'quantity'", exchange="binance"
-                )
+                raise InvalidOrderError(f"{order_type} order requires 'quantity'", exchange="binance")
             if "stopPrice" not in params:
-                raise InvalidOrderError(
-                    f"{order_type} order requires 'stopPrice'", exchange="binance"
-                )
+                raise InvalidOrderError(f"{order_type} order requires 'stopPrice'", exchange="binance")
 
         elif order_type in ("STOP_LOSS_LIMIT", "TAKE_PROFIT_LIMIT"):
             for field in ("quantity", "price", "timeInForce", "stopPrice"):
                 if field not in params:
-                    raise InvalidOrderError(
-                        f"{order_type} order requires '{field}'", exchange="binance"
-                    )
+                    raise InvalidOrderError(f"{order_type} order requires '{field}'", exchange="binance")

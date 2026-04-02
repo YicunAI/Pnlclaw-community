@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, select, update
 
 from pnlclaw_pro_storage.models import RefreshToken, Session
 from pnlclaw_pro_storage.postgres import AsyncPostgresManager
@@ -52,7 +52,7 @@ class SessionRepository:
 
     async def get_active_for_user(self, user_id: uuid.UUID) -> list[Session]:
         """Return all non-revoked, non-expired sessions for a user."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
             stmt = (
                 select(Session)
@@ -68,13 +68,9 @@ class SessionRepository:
 
     async def revoke(self, session_id: uuid.UUID) -> None:
         """Mark a single session as revoked."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
-            stmt = (
-                update(Session)
-                .where(Session.id == session_id)
-                .values(revoked_at=now)
-            )
+            stmt = update(Session).where(Session.id == session_id).values(revoked_at=now)
             await session.execute(stmt)
 
     async def revoke_all_for_user(self, user_id: uuid.UUID) -> int:
@@ -82,7 +78,7 @@ class SessionRepository:
 
         Returns the number of sessions revoked.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
             stmt = (
                 update(Session)
@@ -100,7 +96,7 @@ class SessionRepository:
 
         Returns the number of rows removed.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
             stmt = delete(Session).where(Session.expires_at < now)
             result = await session.execute(stmt)
@@ -141,11 +137,7 @@ class SessionRepository:
 
     async def use_refresh_token(self, token_hash: str) -> None:
         """Mark a refresh token as used (single-use rotation)."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         async with self._db.session() as session:
-            stmt = (
-                update(RefreshToken)
-                .where(RefreshToken.token_hash == token_hash)
-                .values(used_at=now)
-            )
+            stmt = update(RefreshToken).where(RefreshToken.token_hash == token_hash).values(used_at=now)
             await session.execute(stmt)

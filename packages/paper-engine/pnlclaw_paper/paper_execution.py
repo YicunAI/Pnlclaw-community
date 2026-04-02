@@ -305,9 +305,7 @@ class PaperExecutionEngine:
             return order
         raise ValueError(f"Order {order_id} not found")
 
-    async def get_orders(
-        self, account_id: str, *, status: OrderStatus | None = None
-    ) -> list[Order]:
+    async def get_orders(self, account_id: str, *, status: OrderStatus | None = None) -> list[Order]:
         return self._order_mgr.get_orders(account_id, status=status)
 
     async def get_open_orders(self, account_id: str) -> list[Order]:
@@ -324,9 +322,7 @@ class PaperExecutionEngine:
             self._order_mgr.clear_orders(account_id)
             self._position_mgr.clear_positions(account_id)
             # Filter in-memory fills
-            self._fills = [
-                f for f in self._fills if not self._fill_belongs_to(f, account_id)
-            ]
+            self._fills = [f for f in self._fills if not self._fill_belongs_to(f, account_id)]
             logger.info("Deleted paper account %s and cleaned up history", account_id)
         return exists
 
@@ -337,9 +333,7 @@ class PaperExecutionEngine:
             # Cleanup related data
             self._order_mgr.clear_orders(account_id)
             self._position_mgr.clear_positions(account_id)
-            self._fills = [
-                f for f in self._fills if not self._fill_belongs_to(f, account_id)
-            ]
+            self._fills = [f for f in self._fills if not self._fill_belongs_to(f, account_id)]
             logger.info("Reset paper account %s and cleared history", account_id)
         return success
 
@@ -420,13 +414,18 @@ class PaperExecutionEngine:
     # ------------------------------------------------------------------
 
     async def _try_fill_order(
-        self, order: Order, current_price: float, *, timestamp_ms: int | None = None,
+        self,
+        order: Order,
+        current_price: float,
+        *,
+        timestamp_ms: int | None = None,
     ) -> None:
         account_id = self._get_order_account(order.id)
         maker_rate, taker_rate = self._get_fee_rates(account_id)
 
         fill = try_fill(
-            order, current_price,
+            order,
+            current_price,
             maker_fee_rate=maker_rate,
             taker_fee_rate=taker_rate,
             timestamp_ms=timestamp_ms,

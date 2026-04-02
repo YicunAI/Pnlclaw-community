@@ -112,7 +112,7 @@ def parse_rule_string(rule: str) -> ConditionRule:
     m = _COMPOUND_INDICATORS.match(rule)
     if m:
         left_token = m.group(1)
-        remainder = rule[m.end():].strip()
+        remainder = rule[m.end() :].strip()
     else:
         parts = rule.split(None, 1)
         if len(parts) < 2:
@@ -132,7 +132,7 @@ def parse_rule_string(rule: str) -> ConditionRule:
             if prefix:
                 left_token = left_token + " " + prefix
             operator = _OPERATOR_MAP[op_str]
-            right_part = remainder[idx + len(op_str):].strip()
+            right_part = remainder[idx + len(op_str) :].strip()
             break
 
     if operator is None:
@@ -140,11 +140,11 @@ def parse_rule_string(rule: str) -> ConditionRule:
             pattern = re.compile(r"\b" + re.escape(op_str) + r"\b", re.IGNORECASE)
             match = pattern.search(remainder)
             if match:
-                prefix = remainder[:match.start()].strip()
+                prefix = remainder[: match.start()].strip()
                 if prefix:
                     left_token = left_token + " " + prefix
                 operator = op_name
-                right_part = remainder[match.end():].strip()
+                right_part = remainder[match.end() :].strip()
                 break
 
     if operator is None:
@@ -164,7 +164,7 @@ def parse_rule_string(rule: str) -> ConditionRule:
     m2 = _COMPOUND_INDICATORS.match(right_part)
     if m2:
         right_token = m2.group(1)
-        extra = right_part[m2.end():].strip()
+        extra = right_part[m2.end() :].strip()
         if extra:
             right_token = right_token + " " + extra
     else:

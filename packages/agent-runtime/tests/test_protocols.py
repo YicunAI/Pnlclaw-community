@@ -20,7 +20,6 @@ from pnlclaw_agent.protocols import (
     ContextEngine,
     DelegationRequest,
     FeedbackEngine,
-    MarketScanner,
     MemoryBackend,
     MemoryEntry,
     ModelRouter,
@@ -155,6 +154,7 @@ class TestProReservedMethods:
         feedback = RuleBasedFeedback()
         with pytest.raises(NotImplementedError, match="PnLClaw Pro"):
             from pnlclaw_agent.protocols import IterationPlan
+
             await feedback.iterate(IterationPlan(strategy_id="test"))
 
 

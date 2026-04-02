@@ -70,8 +70,7 @@ def _validate_parameter_ranges(config: EngineStrategyConfig, result: ValidationR
                     if pname in _POSITIVE_INT_PARAMS:
                         if not isinstance(pval, (int, float)) or pval <= 0:
                             result.add_error(
-                                f"{section_name}.{direction}[{i}]: "
-                                f"parameter '{pname}' must be positive, got {pval!r}"
+                                f"{section_name}.{direction}[{i}]: parameter '{pname}' must be positive, got {pval!r}"
                             )
 
                 # Validate comparator params if it's an indicator reference
@@ -104,8 +103,7 @@ def _validate_logic_consistency(config: EngineStrategyConfig, result: Validation
         exit_sigs = {(r.indicator, r.operator, str(r.params)) for r in exit_.close_long}
         if entry_sigs == exit_sigs:
             result.add_error(
-                "Long entry and close_long exit conditions are identical — "
-                "positions would close immediately"
+                "Long entry and close_long exit conditions are identical — positions would close immediately"
             )
 
     if entry.short and exit_.close_short:
@@ -113,8 +111,7 @@ def _validate_logic_consistency(config: EngineStrategyConfig, result: Validation
         exit_sigs = {(r.indicator, r.operator, str(r.params)) for r in exit_.close_short}
         if entry_sigs == exit_sigs:
             result.add_error(
-                "Short entry and close_short exit conditions are identical — "
-                "positions would close immediately"
+                "Short entry and close_short exit conditions are identical — positions would close immediately"
             )
 
 

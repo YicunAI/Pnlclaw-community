@@ -103,12 +103,8 @@ class MarketState(BaseModel):
 
     symbol: Symbol = Field(..., description="Trading pair")
     regime: MarketRegime = Field(..., description="Current market regime")
-    trend_strength: float = Field(
-        ..., ge=0.0, le=1.0, description="Trend strength (0 = no trend, 1 = strong)"
-    )
-    volatility: float = Field(
-        ..., ge=0.0, description="Volatility measure (annualized or normalized)"
-    )
+    trend_strength: float = Field(..., ge=0.0, le=1.0, description="Trend strength (0 = no trend, 1 = strong)")
+    volatility: float = Field(..., ge=0.0, description="Volatility measure (annualized or normalized)")
     timestamp: Timestamp = Field(..., description="State assessment time (ms epoch)")
 
     model_config = ConfigDict(
@@ -137,9 +133,7 @@ class ChatMessage(BaseModel):
     role: str = Field(..., description="Message role: 'user', 'assistant', 'system', or 'tool'")
     content: str = Field(..., description="Message content")
     timestamp: Timestamp = Field(..., description="Message time (ms epoch)")
-    metadata: dict[str, Any] | None = Field(
-        None, description="Optional metadata (tool_call_id, model, etc.)"
-    )
+    metadata: dict[str, Any] | None = Field(None, description="Optional metadata (tool_call_id, model, etc.)")
 
     model_config = ConfigDict(
         json_schema_extra={

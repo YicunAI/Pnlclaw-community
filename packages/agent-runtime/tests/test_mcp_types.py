@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from pnlclaw_agent.mcp.types import (
     McpConfig,
     McpServerConfig,
@@ -13,7 +11,6 @@ from pnlclaw_agent.mcp.types import (
     McpTransport,
 )
 from pnlclaw_types.risk import RiskLevel
-
 
 # ---------------------------------------------------------------------------
 # McpTransport enum
@@ -108,9 +105,7 @@ class TestMcpServerConfig:
         assert "url" in errors[0].lower()
 
     def test_validate_sse_with_url_ok(self) -> None:
-        config = McpServerConfig(
-            transport=McpTransport.SSE, url="https://example.com/sse"
-        )
+        config = McpServerConfig(transport=McpTransport.SSE, url="https://example.com/sse")
         errors = config.validate_config()
         assert errors == []
 
@@ -141,9 +136,7 @@ class TestMcpConfig:
     def test_multiple_servers(self) -> None:
         config = McpConfig(
             servers={
-                "filesystem": McpServerConfig(
-                    command="npx", transport=McpTransport.STDIO
-                ),
+                "filesystem": McpServerConfig(command="npx", transport=McpTransport.STDIO),
                 "remote": McpServerConfig(
                     url="https://mcp.example.com/sse",
                     transport=McpTransport.SSE,
@@ -157,9 +150,7 @@ class TestMcpConfig:
         assert config.servers["remote"].enabled is False
 
     def test_serialization(self) -> None:
-        config = McpConfig(
-            servers={"test": McpServerConfig(command="echo")}
-        )
+        config = McpConfig(servers={"test": McpServerConfig(command="echo")})
         data = config.model_dump()
         assert "test" in data["servers"]
 
@@ -191,9 +182,7 @@ class TestMcpToolInfo:
         assert info.input_schema == {}
 
     def test_serialization(self) -> None:
-        info = McpToolInfo(
-            server_name="s", tool_name="t", description="d"
-        )
+        info = McpToolInfo(server_name="s", tool_name="t", description="d")
         data = info.model_dump()
         restored = McpToolInfo.model_validate(data)
         assert restored.server_name == "s"

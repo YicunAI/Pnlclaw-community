@@ -201,11 +201,13 @@ async def _verify_account_ownership(user_id: str, account_id: str) -> bool:
     if user_id == "local":
         return True
     from app.core.dependencies import get_db_manager
+
     db = get_db_manager()
     if db is None:
         return True
     try:
         from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
+
         repo = PaperAccountRepository(db)
         acct = await repo.get_account(account_id)
         if acct is None:
@@ -254,18 +256,22 @@ async def ws_paper(ws: WebSocket) -> None:
 
             if action == "subscribe" and account_id:
                 if ws_user_id is None:
-                    await ws.send_json({
-                        "type": "error",
-                        "message": "Authentication required: provide a valid token query parameter",
-                        "timestamp": int(time.time() * 1000),
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "message": "Authentication required: provide a valid token query parameter",
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
                     continue
                 if ws_user_id != "local" and not await _verify_account_ownership(ws_user_id, account_id):
-                    await ws.send_json({
-                        "type": "error",
-                        "message": "Access denied: account does not belong to current user",
-                        "timestamp": int(time.time() * 1000),
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "message": "Access denied: account does not belong to current user",
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
                     continue
                 _paper_manager.subscribe(ws, f"paper:{account_id}")
                 await ws.send_json(
@@ -340,11 +346,13 @@ async def ws_trading(ws: WebSocket) -> None:
 
             if action == "subscribe":
                 if ws_user_id is None:
-                    await ws.send_json({
-                        "type": "error",
-                        "message": "Authentication required",
-                        "timestamp": int(time.time() * 1000),
-                    })
+                    await ws.send_json(
+                        {
+                            "type": "error",
+                            "message": "Authentication required",
+                            "timestamp": int(time.time() * 1000),
+                        }
+                    )
                     continue
                 for ch in channels:
                     _trading_manager.subscribe(ws, f"trading:{ch}")
@@ -460,35 +468,43 @@ async def _handle_agent_chat_ws(ws: WebSocket, message: str, session_id: str | N
     ts = int(time.time() * 1000)
 
     if runtime is None:
-        await ws.send_json({
-            "type": "final_answer",
-            "data": {"text": "Agent runtime is not available."},
-            "timestamp": ts,
-        })
+        await ws.send_json(
+            {
+                "type": "final_answer",
+                "data": {"text": "Agent runtime is not available."},
+                "timestamp": ts,
+            }
+        )
         await ws.send_json({"type": "done", "data": {}, "timestamp": ts})
         return
 
-    await ws.send_json({
-        "type": "reasoning_start",
-        "data": {"session_id": session_id or ""},
-        "timestamp": ts,
-    })
+    await ws.send_json(
+        {
+            "type": "reasoning_start",
+            "data": {"session_id": session_id or ""},
+            "timestamp": ts,
+        }
+    )
 
     try:
         async for event in runtime.process_message(message):
             ws_type = _AGENT_EVENT_MAP.get(event.type.value, event.type.value)
-            await ws.send_json({
-                "type": ws_type,
-                "data": event.data,
-                "timestamp": event.timestamp,
-            })
+            await ws.send_json(
+                {
+                    "type": ws_type,
+                    "data": event.data,
+                    "timestamp": event.timestamp,
+                }
+            )
     except Exception as exc:
         logger.error("ws_agent_error", error=str(exc), exc_info=True)
-        await ws.send_json({
-            "type": "error",
-            "data": {"message": str(exc)},
-            "timestamp": int(time.time() * 1000),
-        })
+        await ws.send_json(
+            {
+                "type": "error",
+                "data": {"message": str(exc)},
+                "timestamp": int(time.time() * 1000),
+            }
+        )
         await ws.send_json({"type": "done", "data": {}, "timestamp": int(time.time() * 1000)})
 
 
@@ -509,7 +525,7 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     """Push a market event to all WebSocket subscribers of that symbol."""
     exchange = data.get("exchange", "binance")
     market_type = data.get("market_type", "spot")
-    
+
     # Broadcast to specific symbol channel (e.g. market:binance:spot:BTC/USDT)
     channel = f"market:{exchange}:{market_type}:{symbol}"
     payload = {
@@ -519,7 +535,7 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
         "timestamp": int(time.time() * 1000),
     }
     await _market_manager.broadcast(channel, payload)
-    
+
     # Also broadcast to global "ALL" channel for tactical/derivative events
     # This enables global whale detectors and liquidation monitors
     if symbol != "ALL" and event_type in (
@@ -636,8 +652,8 @@ async def _ensure_poly_ws():
                 )
             _poly_ws_client = None
 
-        from pnlclaw_exchange.exchanges.polymarket.ws_client import PolymarketWSClient
         from pnlclaw_exchange.exchanges.polymarket.client import detect_local_proxy
+        from pnlclaw_exchange.exchanges.polymarket.ws_client import PolymarketWSClient
 
         proxy = detect_local_proxy()
         if proxy:
@@ -677,6 +693,7 @@ _poll_task: asyncio.Task[None] | None = None
 _POLL_INTERVAL_S = 2.0  # poll every 2 seconds
 _poll_index = 0
 
+
 async def _poll_orderbooks() -> None:
     """Background task: poll REST orderbooks for subscribed tokens and broadcast."""
     from pnlclaw_exchange.exchanges.polymarket.client import PolymarketClient
@@ -703,12 +720,12 @@ async def _poll_orderbooks() -> None:
             # Fetch up to 15 concurrent tokens per cycle
             batch_size = min(15, num_tokens)
             end_index = _poll_index + batch_size
-            
+
             if end_index > num_tokens:
-                batch = tokens[_poll_index:num_tokens] + tokens[0:(end_index - num_tokens)]
+                batch = tokens[_poll_index:num_tokens] + tokens[0 : (end_index - num_tokens)]
             else:
                 batch = tokens[_poll_index:end_index]
-                
+
             _poll_index = end_index % num_tokens
 
             for tid in batch:
@@ -745,9 +762,7 @@ def _ensure_poll_fallback() -> None:
         return
     if _poll_task is not None and not _poll_task.done():
         return
-    _poll_task = asyncio.create_task(
-        _poll_orderbooks(), name="polymarket-rest-poll"
-    )
+    _poll_task = asyncio.create_task(_poll_orderbooks(), name="polymarket-rest-poll")
 
 
 @router.websocket("/api/v1/ws/polymarket")
@@ -801,20 +816,24 @@ async def ws_polymarket(ws: WebSocket) -> None:
                 else:
                     _ensure_poll_fallback()
 
-                await ws.send_json({
-                    "type": "subscribed",
-                    "token_ids": token_ids,
-                    "timestamp": int(time.time() * 1000),
-                })
+                await ws.send_json(
+                    {
+                        "type": "subscribed",
+                        "token_ids": token_ids,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             elif action == "unsubscribe" and token_ids:
                 for tid in token_ids:
                     _polymarket_manager.unsubscribe(ws, f"poly:{tid}")
                     _poll_subscribed_tokens.discard(tid)
-                await ws.send_json({
-                    "type": "unsubscribed",
-                    "token_ids": token_ids,
-                    "timestamp": int(time.time() * 1000),
-                })
+                await ws.send_json(
+                    {
+                        "type": "unsubscribed",
+                        "token_ids": token_ids,
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
             else:
                 await ws.send_json({"type": "error", "message": f"Unknown action: {action}"})
 

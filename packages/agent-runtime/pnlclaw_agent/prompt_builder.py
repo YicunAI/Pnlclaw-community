@@ -390,9 +390,7 @@ def build_system_prompt(context: AgentContext) -> str:
 
     # 1.5. ReAct Reasoning Protocol
     if context.react_enabled:
-        sections.append(
-            _REACT_PROTOCOL_TEMPLATE.format(max_rounds=context.max_tool_rounds)
-        )
+        sections.append(_REACT_PROTOCOL_TEMPLATE.format(max_rounds=context.max_tool_rounds))
 
     # 2. Available tools
     if context.available_tools:
@@ -434,9 +432,7 @@ def build_system_prompt(context: AgentContext) -> str:
         )
 
     if context.active_symbols:
-        sections.append(
-            f"## Active Symbols\nCurrently tracking: {', '.join(context.active_symbols)}"
-        )
+        sections.append(f"## Active Symbols\nCurrently tracking: {', '.join(context.active_symbols)}")
 
     # 4. User preferences
     if context.user_preferences:

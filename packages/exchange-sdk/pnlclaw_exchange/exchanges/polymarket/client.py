@@ -36,7 +36,8 @@ def detect_local_proxy() -> str | None:
     Returns a URL like ``http://127.0.0.1:1081`` or ``None``.
     Shared between HTTP and WebSocket clients.
     """
-    import os, sys
+    import os
+    import sys
 
     for var in ("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"):
         val = os.environ.get(var, "").strip()
@@ -63,6 +64,8 @@ def detect_local_proxy() -> str | None:
             pass
 
     return None
+
+
 DEFAULT_GAMMA_URL = "https://gamma-api.polymarket.com"
 
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
@@ -133,9 +136,7 @@ class PolymarketClient:
             )
         return self._http_direct
 
-    async def _try_get(
-        self, client: httpx.AsyncClient, url: str, params: dict[str, Any] | None
-    ) -> httpx.Response:
+    async def _try_get(self, client: httpx.AsyncClient, url: str, params: dict[str, Any] | None) -> httpx.Response:
         resp = await client.get(url, params=params)
         resp.raise_for_status()
         return resp
@@ -164,7 +165,10 @@ class PolymarketClient:
                     last_exc = exc
                     logger.debug(
                         "Polymarket %s %s failed (%s): %s",
-                        label, url.split("/")[-1], type(exc).__name__, exc,
+                        label,
+                        url.split("/")[-1],
+                        type(exc).__name__,
+                        exc,
                     )
                     continue
                 except httpx.ReadTimeout as exc:
@@ -177,11 +181,14 @@ class PolymarketClient:
                     raise
 
             if attempt < max_retries - 1:
-                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                delay = _RETRY_BASE_DELAY * (2**attempt)
                 logger.warning(
                     "Polymarket API retry %d/%d for %s: %s (delay %.1fs)",
-                    attempt + 1, max_retries, url.split("/")[-1],
-                    type(last_exc).__name__ if last_exc else "unknown", delay,
+                    attempt + 1,
+                    max_retries,
+                    url.split("/")[-1],
+                    type(last_exc).__name__ if last_exc else "unknown",
+                    delay,
                 )
                 await asyncio.sleep(delay)
 
@@ -191,9 +198,7 @@ class PolymarketClient:
     # Markets
     # ------------------------------------------------------------------
 
-    async def list_markets(
-        self, *, limit: int = 20, next_cursor: str = ""
-    ) -> list[PolymarketMarket]:
+    async def list_markets(self, *, limit: int = 20, next_cursor: str = "") -> list[PolymarketMarket]:
         """Fetch active prediction markets from the CLOB API."""
         params: dict[str, Any] = {"limit": limit, "active": "true"}
         if next_cursor:
@@ -214,20 +219,22 @@ class PolymarketClient:
                 )
                 for t in m.get("tokens", [])
             ]
-            result.append(PolymarketMarket(
-                condition_id=m.get("condition_id", ""),
-                question_id=m.get("question_id", ""),
-                question=m.get("question", ""),
-                description=m.get("description", ""),
-                market_slug=m.get("market_slug", ""),
-                end_date_iso=m.get("end_date_iso", ""),
-                active=m.get("active", True),
-                closed=m.get("closed", False),
-                tokens=tokens,
-                volume=float(m.get("volume", 0) or 0),
-                volume_24h=float(m.get("volume_num_24hr", 0) or 0),
-                liquidity=float(m.get("liquidity", 0) or 0),
-            ))
+            result.append(
+                PolymarketMarket(
+                    condition_id=m.get("condition_id", ""),
+                    question_id=m.get("question_id", ""),
+                    question=m.get("question", ""),
+                    description=m.get("description", ""),
+                    market_slug=m.get("market_slug", ""),
+                    end_date_iso=m.get("end_date_iso", ""),
+                    active=m.get("active", True),
+                    closed=m.get("closed", False),
+                    tokens=tokens,
+                    volume=float(m.get("volume", 0) or 0),
+                    volume_24h=float(m.get("volume_num_24hr", 0) or 0),
+                    liquidity=float(m.get("liquidity", 0) or 0),
+                )
+            )
         return result
 
     # ------------------------------------------------------------------
@@ -236,9 +243,7 @@ class PolymarketClient:
 
     async def get_orderbook(self, token_id: str) -> PolymarketOrderBook:
         """Fetch the order book for a specific token."""
-        resp = await self._get_with_retry(
-            f"{self._clob_url}/book", {"token_id": token_id}
-        )
+        resp = await self._get_with_retry(f"{self._clob_url}/book", {"token_id": token_id})
         data = resp.json()
         return PolymarketOrderBook(
             market=data.get("market", ""),
@@ -257,25 +262,19 @@ class PolymarketClient:
 
     async def get_midpoint(self, token_id: str) -> float:
         """Get the midpoint price for a token."""
-        resp = await self._get_with_retry(
-            f"{self._clob_url}/midpoint", {"token_id": token_id}
-        )
+        resp = await self._get_with_retry(f"{self._clob_url}/midpoint", {"token_id": token_id})
         data = resp.json()
         return float(data.get("mid", 0))
 
     async def get_price(self, token_id: str, side: str = "BUY") -> float:
         """Get the best market price for a token on the given side."""
-        resp = await self._get_with_retry(
-            f"{self._clob_url}/price", {"token_id": token_id, "side": side}
-        )
+        resp = await self._get_with_retry(f"{self._clob_url}/price", {"token_id": token_id, "side": side})
         data = resp.json()
         return float(data.get("price", 0))
 
     async def get_last_trade_price(self, token_id: str) -> PolymarketPrice:
         """Get the last trade price for a token."""
-        resp = await self._get_with_retry(
-            f"{self._clob_url}/last-trade-price", {"token_id": token_id}
-        )
+        resp = await self._get_with_retry(f"{self._clob_url}/last-trade-price", {"token_id": token_id})
         data = resp.json()
         return PolymarketPrice(
             token_id=token_id,
@@ -326,9 +325,7 @@ class PolymarketClient:
     async def get_event_by_slug(self, slug: str) -> dict[str, Any] | None:
         """Fetch a single event by slug. Returns None if not found."""
         try:
-            resp = await self._get_with_retry(
-                f"{self._gamma_url}/events/slug/{slug}"
-            )
+            resp = await self._get_with_retry(f"{self._gamma_url}/events/slug/{slug}")
             data = resp.json()
             if isinstance(data, dict) and data.get("id"):
                 return data

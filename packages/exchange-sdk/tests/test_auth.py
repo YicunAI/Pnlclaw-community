@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
-import base64
-import time
-from unittest.mock import patch
 
 import pytest
 from pydantic import SecretStr
@@ -17,7 +15,6 @@ from pnlclaw_exchange.base.auth import (
     OKXAuthenticator,
 )
 
-
 # ---------------------------------------------------------------------------
 # ExchangeCredentials
 # ---------------------------------------------------------------------------
@@ -25,17 +22,13 @@ from pnlclaw_exchange.base.auth import (
 
 class TestExchangeCredentials:
     def test_secrets_are_hidden(self) -> None:
-        creds = ExchangeCredentials(
-            api_key=SecretStr("my-key"), api_secret=SecretStr("my-secret")
-        )
+        creds = ExchangeCredentials(api_key=SecretStr("my-key"), api_secret=SecretStr("my-secret"))
         assert "my-key" not in str(creds)
         assert "my-secret" not in str(creds)
         assert creds.api_key.get_secret_value() == "my-key"
 
     def test_passphrase_optional(self) -> None:
-        creds = ExchangeCredentials(
-            api_key=SecretStr("k"), api_secret=SecretStr("s")
-        )
+        creds = ExchangeCredentials(api_key=SecretStr("k"), api_secret=SecretStr("s"))
         assert creds.passphrase is None
 
 
@@ -55,7 +48,8 @@ class TestBinanceAuth:
     def test_sign_request_returns_api_key_header(self) -> None:
         auth = self._make_auth()
         headers = auth.sign_request(
-            "POST", "/api/v3/order",
+            "POST",
+            "/api/v3/order",
             params={"symbol": "BTCUSDT", "side": "BUY"},
             timestamp=1000000,
         )
@@ -107,7 +101,9 @@ class TestOKXAuth:
     def test_sign_request_returns_all_headers(self) -> None:
         auth = self._make_auth()
         headers = auth.sign_request(
-            "POST", "/api/v5/trade/order", body='{"instId":"BTC-USDT"}',
+            "POST",
+            "/api/v5/trade/order",
+            body='{"instId":"BTC-USDT"}',
             timestamp="2020-12-08T09:08:57.000Z",
         )
         assert headers["OK-ACCESS-KEY"] == "okx-key"
@@ -124,24 +120,24 @@ class TestOKXAuth:
         headers = auth.sign_request("POST", path, body=body, timestamp=ts)
 
         prehash = ts + "POST" + path + body
-        expected = base64.b64encode(
-            hmac.new(b"okx-secret", prehash.encode("utf-8"), hashlib.sha256).digest()
-        ).decode("utf-8")
+        expected = base64.b64encode(hmac.new(b"okx-secret", prehash.encode("utf-8"), hashlib.sha256).digest()).decode(
+            "utf-8"
+        )
         assert headers["OK-ACCESS-SIGN"] == expected
 
     def test_get_with_params_includes_query_in_signature(self) -> None:
         auth = self._make_auth()
         params = {"ccy": "BTC"}
         headers = auth.sign_request(
-            "GET", "/api/v5/account/balance", params=params,
+            "GET",
+            "/api/v5/account/balance",
+            params=params,
             timestamp="2020-12-08T09:08:57.000Z",
         )
         assert "OK-ACCESS-SIGN" in headers
 
     def test_missing_passphrase_raises(self) -> None:
-        creds = ExchangeCredentials(
-            api_key=SecretStr("k"), api_secret=SecretStr("s")
-        )
+        creds = ExchangeCredentials(api_key=SecretStr("k"), api_secret=SecretStr("s"))
         auth = OKXAuthenticator(creds)
         with pytest.raises(ValueError, match="passphrase"):
             auth.sign_request("GET", "/test")

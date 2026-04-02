@@ -73,9 +73,7 @@ async def test_version_ordering(conn: aiosqlite.Connection):
 @pytest.mark.asyncio
 async def test_register_after_init(conn: aiosqlite.Connection):
     runner = MigrationRunner()
-    runner.register(
-        Migration(id="v001", version=1, description="create demo", apply=_create_demo_table)
-    )
+    runner.register(Migration(id="v001", version=1, description="create demo", apply=_create_demo_table))
     executed = await runner.run_pending(conn)
     assert executed == ["create demo"]
 
@@ -128,9 +126,7 @@ async def test_failed_migration_rolls_back(conn: aiosqlite.Connection):
     with pytest.raises(RuntimeError, match="boom"):
         await runner.run_pending(conn)
 
-    cursor = await conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='tx_fail'"
-    )
+    cursor = await conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tx_fail'")
     assert (await cursor.fetchone()) is None
 
     cursor = await conn.execute("SELECT id FROM _migrations WHERE id='v001'")

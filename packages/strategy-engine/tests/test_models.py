@@ -91,9 +91,7 @@ class TestConditionRule:
     """Test ConditionRule model."""
 
     def test_with_numeric_comparator(self) -> None:
-        rule = ConditionRule(
-            indicator="rsi", params={"period": 14}, operator="less_than", comparator=30.0
-        )
+        rule = ConditionRule(indicator="rsi", params={"period": 14}, operator="less_than", comparator=30.0)
         assert rule.comparator == 30.0
 
     def test_with_indicator_comparator(self) -> None:

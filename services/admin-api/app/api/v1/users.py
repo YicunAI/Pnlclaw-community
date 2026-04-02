@@ -7,7 +7,7 @@ import io
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -411,10 +411,13 @@ async def ban_user(
             message="Cannot ban admin or operator users",
         )
 
-    updated = await user_repo.update(_safe_uuid(user_id), **{
-        "status": "banned",
-        "ban_reason": body.reason,
-    })
+    updated = await user_repo.update(
+        _safe_uuid(user_id),
+        **{
+            "status": "banned",
+            "ban_reason": body.reason,
+        },
+    )
 
     if session_mgr is not None:
         await session_mgr.revoke_all_user_sessions(user_id)
@@ -470,7 +473,9 @@ async def suspend_user(
         await session_mgr.revoke_all_user_sessions(user_id)
 
     await _audit_log(
-        admin, "suspend_user", target_user_id=user_id,
+        admin,
+        "suspend_user",
+        target_user_id=user_id,
         details={"reason": body.reason, "until": body.until},
     )
 
@@ -496,10 +501,13 @@ async def activate_user(
             message=f"User '{user_id}' not found",
         )
 
-    updated = await user_repo.update(_safe_uuid(user_id), **{
-        "status": "active",
-        "ban_reason": None,
-    })
+    updated = await user_repo.update(
+        _safe_uuid(user_id),
+        **{
+            "status": "active",
+            "ban_reason": None,
+        },
+    )
 
     await _audit_log(admin, "activate_user", target_user_id=user_id)
 
@@ -692,7 +700,9 @@ async def assign_tag(
         assigned_by=uuid.UUID(admin.id),
     )
     await _audit_log(
-        admin, "assign_tag", target_user_id=user_id,
+        admin,
+        "assign_tag",
+        target_user_id=user_id,
         details={"tag_id": body.tag_id},
     )
 
@@ -723,7 +733,9 @@ async def remove_tag(
         tag_id=_safe_uuid(tag_id, "tag_id"),
     )
     await _audit_log(
-        admin, "remove_tag", target_user_id=user_id,
+        admin,
+        "remove_tag",
+        target_user_id=user_id,
         details={"tag_id": tag_id},
     )
 
@@ -878,10 +890,13 @@ async def bulk_action(
                 continue
 
             if body.action == "ban":
-                await user_repo.update(uid_uuid, **{
-                    "status": "banned",
-                    "ban_reason": body.reason,
-                })
+                await user_repo.update(
+                    uid_uuid,
+                    **{
+                        "status": "banned",
+                        "ban_reason": body.reason,
+                    },
+                )
                 if session_mgr is not None:
                     await session_mgr.revoke_all_user_sessions(uid)
 
@@ -905,7 +920,8 @@ async def bulk_action(
             errors.append({"user_id": uid, "error": str(exc)})
 
     await _audit_log(
-        admin, f"bulk_{body.action}",
+        admin,
+        f"bulk_{body.action}",
         details={
             "user_ids": body.user_ids,
             "reason": body.reason,

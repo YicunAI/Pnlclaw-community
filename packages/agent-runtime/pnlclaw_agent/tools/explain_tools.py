@@ -222,14 +222,8 @@ class ExplainMarketTool(BaseTool):
         }
         regime_text = regime_desc.get(state.regime.value, state.regime.value)
 
-        trend_label = (
-            "weak"
-            if state.trend_strength < 0.3
-            else ("moderate" if state.trend_strength < 0.7 else "strong")
-        )
-        vol_label = (
-            "low" if state.volatility < 0.3 else ("moderate" if state.volatility < 0.7 else "high")
-        )
+        trend_label = "weak" if state.trend_strength < 0.3 else ("moderate" if state.trend_strength < 0.7 else "strong")
+        vol_label = "low" if state.volatility < 0.3 else ("moderate" if state.volatility < 0.7 else "high")
 
         lines = [
             f"Market State Analysis — {symbol}",

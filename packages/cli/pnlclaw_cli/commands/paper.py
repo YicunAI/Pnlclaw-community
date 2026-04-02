@@ -21,8 +21,10 @@ def _load_managers() -> tuple[AccountManager, PaperOrderManager, PositionManager
 
 
 def _save(
-    am: AccountManager, om: PaperOrderManager,
-    pm: PositionManager, state: PaperState,
+    am: AccountManager,
+    om: PaperOrderManager,
+    pm: PositionManager,
+    state: PaperState,
 ) -> None:
     state.save_state(am, om, pm)
 

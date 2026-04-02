@@ -91,8 +91,6 @@ async def test_get_nonexistent(repos):
     assert await bt_repo.get("nonexistent") is None
 
 
-
-
 @pytest.mark.asyncio
 async def test_list_all(repos):
     _, bt_repo = repos

@@ -16,6 +16,12 @@ Public API:
 
 from __future__ import annotations
 
+# Lazy imports for classes that depend on the optional `mcp` SDK.
+# We re-export them here so callers can do:
+#     from pnlclaw_agent.mcp import McpClientSession, McpToolWrapper, McpRegistry
+from pnlclaw_agent.mcp.client import McpClientSession
+from pnlclaw_agent.mcp.registry import McpRegistry
+from pnlclaw_agent.mcp.tool_wrapper import McpToolWrapper
 from pnlclaw_agent.mcp.types import (
     McpConfig,
     McpServerConfig,
@@ -24,14 +30,6 @@ from pnlclaw_agent.mcp.types import (
     McpToolResult,
     McpTransport,
 )
-
-# Lazy imports for classes that depend on the optional `mcp` SDK.
-# We re-export them here so callers can do:
-#     from pnlclaw_agent.mcp import McpClientSession, McpToolWrapper, McpRegistry
-
-from pnlclaw_agent.mcp.client import McpClientSession
-from pnlclaw_agent.mcp.tool_wrapper import McpToolWrapper
-from pnlclaw_agent.mcp.registry import McpRegistry
 
 __all__ = [
     "McpConfig",

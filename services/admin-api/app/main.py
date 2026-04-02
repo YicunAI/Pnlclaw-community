@@ -22,7 +22,8 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.health import router as health_router
 from app.api.v1.invitations import router as invitations_router
 from app.api.v1.tags import router as tags_router
-from app.api.v1.users import router as users_router, sessions_router
+from app.api.v1.users import router as users_router
+from app.api.v1.users import sessions_router
 from app.core.config import AdminAPIConfig
 from app.core.dependencies import (
     set_activity_repo,
@@ -55,6 +56,7 @@ logger = logging.getLogger(__name__)
 # Adapters: bridge pro-storage SessionRepository → pro-auth Protocols
 # ---------------------------------------------------------------------------
 
+
 class _SessionRepoAdapter:
     """Wraps pro-storage SessionRepository to satisfy pro-auth's SessionRepository Protocol."""
 
@@ -62,13 +64,21 @@ class _SessionRepoAdapter:
         self._repo = repo
 
     async def create(
-        self, user_id: str, jti: str, ip_address: str | None,
-        user_agent: str | None, expires_at: Any,
+        self,
+        user_id: str,
+        jti: str,
+        ip_address: str | None,
+        user_agent: str | None,
+        expires_at: Any,
     ) -> Any:
         import uuid as _uuid
+
         session = await self._repo.create(
-            user_id=_uuid.UUID(user_id), jti=jti,
-            ip_address=ip_address, user_agent=user_agent, expires_at=expires_at,
+            user_id=_uuid.UUID(user_id),
+            jti=jti,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            expires_at=expires_at,
         )
         return session.id
 
@@ -77,9 +87,13 @@ class _SessionRepoAdapter:
         if session is None:
             return None
         return {
-            "id": session.id, "user_id": str(session.user_id), "jti": session.jti,
-            "ip_address": session.ip_address, "user_agent": session.user_agent,
-            "revoked_at": session.revoked_at, "expires_at": session.expires_at,
+            "id": session.id,
+            "user_id": str(session.user_id),
+            "jti": session.jti,
+            "ip_address": session.ip_address,
+            "user_agent": session.user_agent,
+            "revoked_at": session.revoked_at,
+            "expires_at": session.expires_at,
             "role": getattr(session, "role", "user"),
         }
 
@@ -93,6 +107,7 @@ class _SessionRepoAdapter:
 
     async def revoke_all_for_user(self, user_id: str) -> int:
         import uuid as _uuid
+
         return await self._repo.revoke_all_for_user(_uuid.UUID(user_id))
 
 
@@ -104,7 +119,9 @@ class _RefreshTokenRepoAdapter:
 
     async def create(self, session_id: Any, token_hash: str, expires_at: Any) -> None:
         await self._repo.create_refresh_token(
-            session_id=session_id, token_hash=token_hash, expires_at=expires_at,
+            session_id=session_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
         )
 
     async def get_by_hash(self, token_hash: str) -> dict | None:
@@ -112,8 +129,11 @@ class _RefreshTokenRepoAdapter:
         if rt is None:
             return None
         return {
-            "id": rt.id, "session_id": rt.session_id, "token_hash": rt.token_hash,
-            "used_at": rt.used_at, "revoked_at": getattr(rt, "revoked_at", None),
+            "id": rt.id,
+            "session_id": rt.session_id,
+            "token_hash": rt.token_hash,
+            "used_at": rt.used_at,
+            "revoked_at": getattr(rt, "revoked_at", None),
             "expires_at": rt.expires_at,
         }
 
@@ -136,7 +156,6 @@ def _build_oauth_providers(auth_config: Any) -> dict[str, Any]:
     )
 
     providers: dict[str, Any] = {}
-    redirect_base = auth_config.oauth_redirect_base_url
 
     if auth_config.google_client_id and auth_config.google_client_secret:
         providers["google"] = GoogleOAuthProvider(
@@ -165,11 +184,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from pnlclaw_pro_auth import AuthConfig, JWTManager, SessionManager, TOTPManager
     from pnlclaw_pro_auth.device_parser import DeviceParser
     from pnlclaw_pro_auth.geoip import GeoIPResolver
-    from pnlclaw_pro_auth.oauth import (
-        GitHubOAuthProvider,
-        GoogleOAuthProvider,
-        TwitterOAuthProvider,
-    )
     from pnlclaw_pro_storage.postgres import AsyncPostgresManager
     from pnlclaw_pro_storage.repositories import (
         ActivityLogRepository,

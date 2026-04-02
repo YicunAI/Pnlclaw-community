@@ -192,14 +192,8 @@ class BinanceNormalizer:
         last_update_id = int(data["u"])
         previous_update_id = int(data["pu"]) if "pu" in data else None
 
-        bids = [
-            PriceLevel(price=float(entry[0]), quantity=float(entry[1]))
-            for entry in data.get("b", [])
-        ]
-        asks = [
-            PriceLevel(price=float(entry[0]), quantity=float(entry[1]))
-            for entry in data.get("a", [])
-        ]
+        bids = [PriceLevel(price=float(entry[0]), quantity=float(entry[1])) for entry in data.get("b", [])]
+        asks = [PriceLevel(price=float(entry[0]), quantity=float(entry[1])) for entry in data.get("a", [])]
 
         delta = OrderBookL2Delta(
             exchange=EXCHANGE,

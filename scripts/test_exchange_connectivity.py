@@ -6,7 +6,6 @@ This validates that our SDK layer works end-to-end with live data.
 
 import asyncio
 import sys
-import time
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -30,7 +29,7 @@ async def test_binance() -> bool:
 
         if received:
             t = received[0]
-            print(f"  [OK] Binance BTC/USDT via SDK")
+            print("  [OK] Binance BTC/USDT via SDK")
             print(f"       last={t.last_price} bid={t.bid} ask={t.ask}")
             print(f"       vol24h={t.volume_24h} change={t.change_24h_pct}%")
             return True
@@ -62,7 +61,7 @@ async def test_binance_kline() -> bool:
 
         if received:
             k = received[0]
-            print(f"  [OK] Binance BTC/USDT kline via SDK")
+            print("  [OK] Binance BTC/USDT kline via SDK")
             print(f"       o={k.open} h={k.high} l={k.low} c={k.close}")
             print(f"       interval={k.interval} closed={k.closed}")
             return True
@@ -90,7 +89,7 @@ async def test_binance_l2() -> bool:
             data = resp.json()
             bids = data["bids"][:3]
             asks = data["asks"][:3]
-            print(f"  [OK] Binance L2 depth (REST)")
+            print("  [OK] Binance L2 depth (REST)")
             print(f"       Top bids: {bids}")
             print(f"       Top asks: {asks}")
             return True
@@ -117,7 +116,7 @@ async def test_okx() -> bool:
 
         if received:
             t = received[0]
-            print(f"  [OK] OKX BTC-USDT via SDK")
+            print("  [OK] OKX BTC-USDT via SDK")
             print(f"       last={t.last_price} bid={t.bid} ask={t.ask}")
             print(f"       vol24h={t.volume_24h} change={t.change_24h_pct}%")
             return True
@@ -147,15 +146,12 @@ async def test_polymarket() -> bool:
             return False
 
         # Filter for truly active markets (price between 0.01 and 0.99)
-        active_markets = [
-            m for m in markets
-            if m.tokens and any(0.01 < t.price < 0.99 for t in m.tokens)
-        ]
+        active_markets = [m for m in markets if m.tokens and any(0.01 < t.price < 0.99 for t in m.tokens)]
         print(f"  [OK] Total markets: {len(markets)}, active (live prices): {len(active_markets)}")
 
         display = active_markets[:2] if active_markets else markets[:2]
         for i, m in enumerate(display):
-            print(f"       {i+1}. {m.question[:65]}")
+            print(f"       {i + 1}. {m.question[:65]}")
             if m.tokens:
                 for t in m.tokens[:2]:
                     print(f"          {t.outcome}: price={t.price}")

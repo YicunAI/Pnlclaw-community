@@ -18,7 +18,13 @@ import pandas as pd
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import AuthenticatedUser, build_response_meta, get_db_manager, get_market_service, optional_user
+from app.core.dependencies import (
+    AuthenticatedUser,
+    build_response_meta,
+    get_db_manager,
+    get_market_service,
+    optional_user,
+)
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import BacktestResult
@@ -69,6 +75,7 @@ def _evict_oldest_tasks() -> None:
 def _get_results_store() -> dict[str, BacktestResult]:
     """Return the unified backtest results store (single source of truth)."""
     from pnlclaw_agent.tools.strategy_tools import get_results_store
+
     return get_results_store()
 
 
@@ -87,9 +94,7 @@ class RunBacktestRequest(BaseModel):
     initial_cash: float | None = Field(None, gt=0, description="Starting capital (alias)")
     commission_rate: float = Field(0.001, ge=0, description="Commission rate")
     data_path: str | None = Field(None, description="Optional parquet data path")
-    parameters: dict[str, Any] = Field(
-        default_factory=dict, description="Override strategy parameters"
-    )
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Override strategy parameters")
 
     model_config = {"populate_by_name": True}
 
@@ -128,6 +133,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
         # The AI strategy generator stores rules as strings like "EMA21 > EMA55"
         # but the compiler needs structured ConditionRule objects.
         from pnlclaw_strategy.rule_parser import parse_entry_rules, parse_exit_rules
+
         if not engine_config.parsed_entry_rules.long and not engine_config.parsed_entry_rules.short:
             if engine_config.entry_rules:
                 parsed_entry = parse_entry_rules(engine_config.entry_rules)
@@ -138,6 +144,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
                 engine_config = engine_config.model_copy(update={"parsed_exit_rules": parsed_exit})
         if engine_config.risk_params and engine_config.parsed_risk_params.stop_loss_pct is None:
             from pnlclaw_strategy.models import RiskParams
+
             try:
                 parsed_rp = RiskParams.model_validate(engine_config.risk_params)
                 engine_config = engine_config.model_copy(update={"parsed_risk_params": parsed_rp})
@@ -161,6 +168,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
         compiled = compile_strategy(engine_config)
         # FX06: Pass strategy direction to runtime
         from pnlclaw_types.strategy import StrategyDirection
+
         direction = getattr(config, "direction", StrategyDirection.LONG_ONLY)
         strategy = StrategyRuntime(compiled, direction=direction)
 
@@ -201,6 +209,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
 
         # Store in unified results cache
         from pnlclaw_agent.tools.strategy_tools import _evict_oldest_results
+
         _get_results_store()[result.id] = result
         _result_owners[result.id] = task.user_id
         _evict_oldest_results()
@@ -209,6 +218,7 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
         if db is not None:
             try:
                 from pnlclaw_storage.repositories.backtests import BacktestRepository
+
                 repo = BacktestRepository(db)
                 await repo.save(result, user_id=task.user_id)
             except Exception:
@@ -218,7 +228,9 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
 
         logger.info(
             "Backtest %s completed: trades=%d, return=%.4f",
-            task.task_id, result.trades_count, result.metrics.total_return,
+            task.task_id,
+            result.trades_count,
+            result.metrics.total_return,
         )
 
     except Exception as exc:
@@ -279,14 +291,14 @@ async def _load_kline_data(
             return pd.read_parquet(dp)
 
     raise FileNotFoundError(
-        f"No kline data available for {symbol}. "
-        "Provide data_path or ensure the exchange is reachable."
+        f"No kline data available for {symbol}. Provide data_path or ensure the exchange is reachable."
     )
 
 
 def _resolve_strategy_symbol_interval(strategy_id: str) -> tuple[str, str]:
     """Best-effort lookup of symbol/interval from strategy cache."""
     from app.api.v1.strategies import _strategies
+
     config = _strategies.get(strategy_id)
     if config is not None:
         symbol = config.symbols[0] if config.symbols else ""
@@ -297,8 +309,10 @@ def _resolve_strategy_symbol_interval(strategy_id: str) -> tuple[str, str]:
 async def _ensure_strategies_loaded(user_id: str = "local") -> None:
     """Pre-warm _strategies cache from DB for a specific user."""
     from app.api.v1.strategies import _strategies
+
     try:
         from app.core.dependencies import get_strategy_repo
+
         repo = get_strategy_repo()
         if repo is not None:
             uid = user_id if user_id != "local" else None
@@ -317,6 +331,7 @@ def _result_to_frontend_dict(result: BacktestResult) -> dict[str, Any]:
     drawdown_curve = result.drawdown_curve
     if not drawdown_curve and len(eq) >= 2:
         import numpy as np
+
         arr = np.asarray(eq, dtype=np.float64)
         peak = np.maximum.accumulate(arr)
         dd = ((arr - peak) / peak).tolist()
@@ -327,10 +342,7 @@ def _result_to_frontend_dict(result: BacktestResult) -> dict[str, Any]:
         start_val = eq[0]
         end_val = eq[-1]
         ratio = end_val / start_val if start_val else 1.0
-        buy_hold_curve = [
-            round(start_val * (1 + (ratio - 1) * (i / (len(eq) - 1))), 2)
-            for i in range(len(eq))
-        ]
+        buy_hold_curve = [round(start_val * (1 + (ratio - 1) * (i / (len(eq) - 1))), 2) for i in range(len(eq))]
 
     symbol = result.symbol
     interval = result.interval
@@ -464,6 +476,7 @@ async def get_backtest(
     if db is not None:
         try:
             from pnlclaw_storage.repositories.backtests import BacktestRepository
+
             repo = BacktestRepository(db)
             persisted = await repo.get(task_id, user_id=user.id)
             if persisted is not None:
@@ -517,6 +530,7 @@ async def list_backtests(
     if db is not None:
         try:
             from pnlclaw_storage.repositories.backtests import BacktestRepository
+
             repo = BacktestRepository(db)
             persisted = (
                 await repo.list_by_strategy(strategy_id, limit=1000, user_id=user.id)
@@ -572,6 +586,7 @@ async def delete_backtest(
     if db is not None:
         try:
             from pnlclaw_storage.repositories.backtests import BacktestRepository
+
             repo = BacktestRepository(db)
             await repo.delete(backtest_id, user_id=user.id)
         except Exception:

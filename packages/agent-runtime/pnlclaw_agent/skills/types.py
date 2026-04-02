@@ -38,16 +38,10 @@ class SkillFrontmatter(BaseModel):
     author: str = Field("", description="Skill author")
     tags: list[str] = Field(default_factory=list, description="Categorization tags")
     user_invocable: bool = Field(True, description="Whether users can trigger via /skill_name")
-    model_invocable: bool = Field(
-        True, description="Whether the LLM can auto-select this skill"
-    )
+    model_invocable: bool = Field(True, description="Whether the LLM can auto-select this skill")
     always_load: bool = Field(False, description="Always include in system prompt")
-    requires_tools: list[str] = Field(
-        default_factory=list, description="Tool dependencies"
-    )
-    requires_env: list[str] = Field(
-        default_factory=list, description="Required environment variables"
-    )
+    requires_tools: list[str] = Field(default_factory=list, description="Tool dependencies")
+    requires_env: list[str] = Field(default_factory=list, description="Required environment variables")
 
 
 class Skill(BaseModel):
@@ -102,12 +96,8 @@ class SkillsLimits(BaseModel):
     """
 
     max_skills_in_prompt: int = Field(50, description="Max skills included in prompt")
-    max_prompt_chars: int = Field(
-        30_000, description="Max characters for skills prompt block"
-    )
-    max_skill_file_bytes: int = Field(
-        256_000, description="Max SKILL.md file size in bytes"
-    )
+    max_prompt_chars: int = Field(30_000, description="Max characters for skills prompt block")
+    max_skill_file_bytes: int = Field(256_000, description="Max SKILL.md file size in bytes")
 
 
 class SkillsConfig(BaseModel):
@@ -119,12 +109,8 @@ class SkillsConfig(BaseModel):
         limits: Resource limits for skill loading.
     """
 
-    extra_dirs: list[str] = Field(
-        default_factory=list, description="Additional skill directories"
-    )
-    enabled: dict[str, bool] = Field(
-        default_factory=dict, description="Per-skill enable/disable overrides"
-    )
+    extra_dirs: list[str] = Field(default_factory=list, description="Additional skill directories")
+    enabled: dict[str, bool] = Field(default_factory=dict, description="Per-skill enable/disable overrides")
     limits: SkillsLimits = Field(default_factory=SkillsLimits)
 
 
@@ -138,7 +124,5 @@ class SkillSnapshot(BaseModel):
     """
 
     prompt: str = Field(..., description="Formatted prompt text for LLM injection")
-    skills: list[SkillSummary] = Field(
-        default_factory=list, description="Loaded skill summaries"
-    )
+    skills: list[SkillSummary] = Field(default_factory=list, description="Loaded skill summaries")
     version: int = Field(1, description="Snapshot format version")

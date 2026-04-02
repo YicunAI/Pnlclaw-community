@@ -2,24 +2,18 @@
 
 from __future__ import annotations
 
-import time
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
-
-from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 from pnlclaw_exchange.trading import (
     BalanceInfo,
     BinanceTradingAdapter,
     OKXTradingAdapter,
     OrderRequest,
-    OrderResponse,
     PolymarketTradingAdapter,
-    TradingClient,
 )
-
+from pnlclaw_types.trading import OrderSide, OrderStatus, OrderType
 
 # ---------------------------------------------------------------------------
 # OrderRequest model
@@ -140,18 +134,20 @@ class TestBinanceTradingAdapter:
 
     def test_parse_filled_order(self) -> None:
         adapter, _ = self._make_adapter()
-        result = adapter._parse_order_response({
-            "orderId": 99,
-            "symbol": "ETHUSDT",
-            "side": "SELL",
-            "type": "MARKET",
-            "status": "FILLED",
-            "origQty": "1.0",
-            "executedQty": "1.0",
-            "cummulativeQuoteQty": "3500.0",
-            "price": "0.00",
-            "transactTime": 1711000000000,
-        })
+        result = adapter._parse_order_response(
+            {
+                "orderId": 99,
+                "symbol": "ETHUSDT",
+                "side": "SELL",
+                "type": "MARKET",
+                "status": "FILLED",
+                "origQty": "1.0",
+                "executedQty": "1.0",
+                "cummulativeQuoteQty": "3500.0",
+                "price": "0.00",
+                "transactTime": 1711000000000,
+            }
+        )
         assert result.status == OrderStatus.FILLED
         assert result.filled_quantity == 1.0
         assert result.avg_fill_price == 3500.0
@@ -216,18 +212,20 @@ class TestOKXTradingAdapter:
 
     def test_parse_single_order(self) -> None:
         adapter, _ = self._make_adapter()
-        result = adapter._parse_single_order({
-            "ordId": "111",
-            "clOrdId": "c1",
-            "instId": "ETH-USDT",
-            "side": "sell",
-            "ordType": "limit",
-            "state": "filled",
-            "sz": "2.0",
-            "fillSz": "2.0",
-            "px": "3500",
-            "avgPx": "3498",
-        })
+        result = adapter._parse_single_order(
+            {
+                "ordId": "111",
+                "clOrdId": "c1",
+                "instId": "ETH-USDT",
+                "side": "sell",
+                "ordType": "limit",
+                "state": "filled",
+                "sz": "2.0",
+                "fillSz": "2.0",
+                "px": "3500",
+                "avgPx": "3498",
+            }
+        )
         assert result.status == OrderStatus.FILLED
         assert result.symbol == "ETH/USDT"
         assert result.avg_fill_price == 3498.0

@@ -1,8 +1,10 @@
-import requests
 import json
+
+import requests
 
 BASE_URL = "http://127.0.0.1:8080/api/v1/paper"
 ACCOUNT_ID = "paper-default"
+
 
 def test_equity_history():
     try:
@@ -18,6 +20,7 @@ def test_equity_history():
             print(f"Error: {resp.text}")
     except Exception as e:
         print(f"Connection failed: {e}")
+
 
 if __name__ == "__main__":
     test_equity_history()
