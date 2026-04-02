@@ -5,7 +5,9 @@ import { Flame } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useI18n } from "@/components/i18n/use-i18n"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080"
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8080" : "")
 
 interface LiquidationStats {
   window: string
@@ -71,7 +73,11 @@ export function LiquidationPanel() {
   }, [])
 
   useEffect(() => {
-    const wsBase = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8080"
+    const wsBase =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      (process.env.NODE_ENV === "development"
+        ? "ws://127.0.0.1:8080"
+        : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`)
     const ws = new WebSocket(`${wsBase}/api/v1/ws/markets`)
 
     ws.onopen = () => {

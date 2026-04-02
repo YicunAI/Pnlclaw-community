@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-const WS_BASE = process.env.NEXT_PUBLIC_WS_URL || "ws://127.0.0.1:8080"
+const WS_BASE =
+  process.env.NEXT_PUBLIC_WS_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "ws://127.0.0.1:8080"
+    : typeof window !== "undefined"
+      ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+      : "ws://localhost:8080")
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
 const STALE_AFTER_MS = 5000
