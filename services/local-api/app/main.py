@@ -314,19 +314,33 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         else:
             logger.info("Redis Pub/Sub disabled (single-worker mode)")
 
-        # Subscribe minimal default symbols to conserve CPU.
-        # Other symbols/exchanges are subscribed lazily via _ensure_subscribed.
-        _boot_subs: list[tuple[str, str, str]] = [
-            ("BTC/USDT", "binance", "spot"),
-            ("BTC/USDT", "okx", "futures"),
-        ]
-        for sym, ex, mt in _boot_subs:
-            try:
-                await market_svc.add_symbol(sym, exchange=ex, market_type=mt)
-                logger.info("Subscribed %s on %s/%s", sym, ex, mt)
-            except Exception:
-                logger.warning("Failed to subscribe %s on %s/%s", sym, ex, mt, exc_info=True)
-            await asyncio.sleep(0.3)
+        # Subscribe default symbols on ALL sources so large-trade and
+        # liquidation monitors see data from every exchange.
+        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
+        if default_symbols:
+            all_sources: list[tuple[str, str]] = [
+                ("binance", "spot"),
+                ("binance", "futures"),
+                ("okx", "spot"),
+                ("okx", "futures"),
+            ]
+            for sym in default_symbols.split(","):
+                sym = sym.strip()
+                if not sym:
+                    continue
+                for ex, mt in all_sources:
+                    try:
+                        await market_svc.add_symbol(sym, exchange=ex, market_type=mt)
+                        logger.info("Subscribed %s on %s/%s", sym, ex, mt)
+                    except Exception:
+                        logger.warning(
+                            "Failed to subscribe %s on %s/%s (may be unreachable)",
+                            sym,
+                            ex,
+                            mt,
+                            exc_info=True,
+                        )
+                    await asyncio.sleep(0.3)
 
         # --- K-line warmup: pre-fetch common symbols x intervals into Redis ---
         from app.core.redis import get_redis
@@ -1246,16 +1260,7 @@ def _bridge_market_events(market_svc: object) -> None:
         finally:
             _ob_flush_running = False
 
-    _ticker_last_ts: dict[str, float] = {}
-    _TICKER_THROTTLE = 0.5
-
     def _on_ticker(event: TickerEvent) -> None:
-        now = _time.monotonic()
-        key = f"{event.exchange}:{event.market_type}:{event.symbol}"
-        last = _ticker_last_ts.get(key, 0.0)
-        if now - last < _TICKER_THROTTLE:
-            return
-        _ticker_last_ts[key] = now
         if _market_manager.active_count == 0:
             return
         asyncio.ensure_future(
@@ -1303,16 +1308,7 @@ def _bridge_market_events(market_svc: object) -> None:
         buf_key = f"{event.exchange}:{event.market_type}:{event.symbol}:{event.interval}"
         _kline_buffer[buf_key] = event
 
-    _kline_last_ts: dict[str, float] = {}
-    _KLINE_THROTTLE = 2.0
-
     def _on_kline(event: KlineEvent) -> None:
-        now = _time.monotonic()
-        buf_key = f"{event.exchange}:{event.market_type}:{event.symbol}:{event.interval}"
-        last = _kline_last_ts.get(buf_key, 0.0)
-        if now - last < _KLINE_THROTTLE:
-            return
-        _kline_last_ts[buf_key] = now
         _buffer_kline_for_redis(event)
         if _market_manager.active_count > 0:
             asyncio.ensure_future(
@@ -1397,15 +1393,7 @@ def _bridge_price_to_paper(market_svc: object, paper_engine: object) -> None:
     svc: _MDS = market_svc  # type: ignore[assignment]
     engine: _PE = paper_engine  # type: ignore[assignment]
 
-    import time as _paper_time
-
-    _paper_ticker_last: dict[str, float] = {}
-
     def _on_ticker_for_paper(event: TickerEvent) -> None:
-        now = _paper_time.monotonic()
-        if now - _paper_ticker_last.get(event.symbol, 0.0) < 1.0:
-            return
-        _paper_ticker_last[event.symbol] = now
         asyncio.ensure_future(engine.on_price_tick(event.symbol, event.last_price))
 
     svc.on_ticker(_on_ticker_for_paper)
