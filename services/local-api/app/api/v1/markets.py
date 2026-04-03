@@ -203,9 +203,11 @@ async def get_kline(
         if not klines:
             klines = []
 
+    import json as _json
+
     kline_dicts = [k.model_dump() for k in klines]
-    body = APIResponse(
-        data={
+    content = {
+        "data": {
             "symbol": sym,
             "interval": interval,
             "exchange": ex,
@@ -213,13 +215,10 @@ async def get_kline(
             "klines": kline_dicts,
             "source": source,
         },
-        meta=build_response_meta(request),
-        error=None,
-    )
+        "meta": build_response_meta(request),
+        "error": None,
+    }
 
-    import json as _json
-
-    content = body.model_dump()
     raw = _json.dumps(content, ensure_ascii=False, separators=(",", ":"))
     etag = hashlib.md5(raw.encode()).hexdigest()  # noqa: S324
 
@@ -227,8 +226,11 @@ async def get_kline(
     if if_none_match and if_none_match.strip('"') == etag:
         return JSONResponse(status_code=304, content=None, headers={"ETag": f'"{etag}"'})
 
-    return JSONResponse(
-        content=content,
+    from starlette.responses import Response
+
+    return Response(
+        content=raw,
+        media_type="application/json",
         headers={
             "ETag": f'"{etag}"',
             "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
