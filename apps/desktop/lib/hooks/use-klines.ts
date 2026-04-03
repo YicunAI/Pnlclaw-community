@@ -8,6 +8,11 @@ import {
   type ExchangeProvider,
   type MarketType,
 } from "../api-client"
+import {
+  getCachedKlines,
+  putCachedKlines,
+  getLatestTimestamp,
+} from "../kline-cache"
 
 function dedupAndSort(klines: KlineData[]): KlineData[] {
   const map = new Map<number, KlineData>()
@@ -22,12 +27,20 @@ async function fetchKlineData(
   exchange?: ExchangeProvider,
   marketType?: MarketType,
   endTime?: number,
+  since?: number,
 ): Promise<KlineData[]> {
   const source =
     exchange || marketType
       ? { exchange: exchange as ExchangeProvider, market_type: marketType as MarketType }
       : undefined
-  const r = await getKlines(symbol, interval, limit, source, endTime)
+
+  const params = new URLSearchParams()
+  params.set("interval", interval)
+  params.set("limit", String(limit))
+  if (endTime !== undefined) params.set("end_time", String(endTime))
+  if (since !== undefined) params.set("since", String(since))
+
+  const r = await getKlines(symbol, interval, limit, source, endTime, since)
   if (r.error) throw new Error(r.error)
   if (!r.data) return []
   if (Array.isArray(r.data)) return r.data
@@ -36,11 +49,14 @@ async function fetchKlineData(
 }
 
 /**
- * SWR-backed K-line history hook.
+ * Cache-first K-line history hook.
  *
- * Key feature: data is cached per (symbol, interval, exchange, marketType).
- * Switching back to a previously loaded interval returns cached data instantly
- * instead of re-fetching from the API.
+ * Strategy:
+ * 1. Read IndexedDB cache instantly (< 50ms)
+ * 2. Determine `since` = latest cached timestamp
+ * 3. Fetch only incremental data from API (`?since=xxx`)
+ * 4. Merge + write back to IndexedDB
+ * 5. SWR handles deduplication and stale-while-revalidate
  */
 export function useKlineHistory(
   symbol: string,
@@ -53,12 +69,51 @@ export function useKlineHistory(
       ? ["api:klines", symbol, interval, exchange ?? "", marketType ?? ""]
       : null
 
+  const ex = exchange ?? "binance"
+  const mt = marketType ?? "spot"
+
   const { data, error, isLoading, mutate } = useSWR<KlineData[]>(
     cacheKey,
-    async () => dedupAndSort(await fetchKlineData(symbol, interval, 500, exchange, marketType)),
+    async () => {
+      // Step 1: Read IndexedDB cache
+      const cached = await getCachedKlines(ex, mt, symbol, interval)
+
+      // Step 2: Determine incremental fetch boundary
+      let since: number | undefined
+      if (cached.length > 0) {
+        since = cached[cached.length - 1].timestamp
+      }
+
+      // Step 3: Fetch from API (incremental if cache exists)
+      let fresh: KlineData[]
+      try {
+        fresh = await fetchKlineData(
+          symbol,
+          interval,
+          since ? 200 : 500,
+          exchange,
+          marketType,
+          undefined,
+          since,
+        )
+      } catch (e) {
+        // API failed but cache is available — return stale data
+        if (cached.length > 0) return cached
+        throw e
+      }
+
+      // Step 4: Merge and persist
+      const merged = dedupAndSort([...cached, ...fresh])
+      putCachedKlines(ex, mt, symbol, interval, merged).catch(() => {})
+
+      return merged
+    },
     {
       revalidateOnFocus: false,
       dedupingInterval: 30_000,
+      refreshInterval: (latestData: KlineData[] | undefined) =>
+        !latestData || latestData.length === 0 ? 3_000 : 0,
+      errorRetryCount: 3,
     },
   )
 
@@ -90,12 +145,14 @@ export function useKlineHistory(
       if (batch.length === 0) {
         setNoMoreData(true)
       } else {
-        await mutate(dedupAndSort([...batch, ...data]), { revalidate: false })
+        const merged = dedupAndSort([...batch, ...data])
+        putCachedKlines(ex, mt, symbol, interval, merged).catch(() => {})
+        await mutate(merged, { revalidate: false })
       }
     } finally {
       setIsLoadingMore(false)
     }
-  }, [isLoadingMore, noMoreData, data, symbol, interval, exchange, marketType, mutate])
+  }, [isLoadingMore, noMoreData, data, symbol, interval, exchange, marketType, mutate, ex, mt])
 
   return {
     klines: data ?? [],

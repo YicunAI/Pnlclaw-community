@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useMemo, useCallback } from "react"
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -21,6 +21,7 @@ import { LiquidationPanel } from "@/components/tactical/liquidation-panel"
 import { TickerPanel } from "@/components/trading/ticker-panel"
 import { OrderbookPanel } from "@/components/trading/orderbook-panel"
 import dynamic from "next/dynamic"
+import { perf } from "@/lib/perf"
 
 const CandlestickChart = dynamic(
   () => import("@/components/trading/candlestick-chart"),
@@ -83,6 +84,12 @@ function normalizeSymbolInput(input: string): string {
 
 
 export default function MarketsPage() {
+  const perfMarkedRef = useRef(false)
+  if (!perfMarkedRef.current) {
+    perf.mark("route_change")
+    perfMarkedRef.current = true
+  }
+
   const { locale, t } = useI18n()
   const { market: ws, marketSubscription, setMarketSubscription } = useDashboardRealtime()
   const [symbol, setSymbol] = useState(marketSubscription.symbol)
@@ -141,6 +148,23 @@ export default function MarketsPage() {
       .filter((k) => k && typeof k.timestamp === "number" && !isNaN(k.timestamp))
       .sort((a, b) => a.timestamp - b.timestamp)
   }, [historyKlines, ws.klines, interval])
+
+  // Performance: track first data arrival and WS connection
+  const firstDataMarkedRef = useRef(false)
+  useEffect(() => {
+    if (klines.length > 0 && !firstDataMarkedRef.current) {
+      firstDataMarkedRef.current = true
+      perf.mark("first_data")
+      perf.measure("time_to_data", "route_change", "first_data")
+    }
+  }, [klines.length])
+
+  useEffect(() => {
+    if (ws.connected) {
+      perf.mark("ws_ready")
+      perf.measure("time_to_ws", "route_change", "ws_ready")
+    }
+  }, [ws.connected])
 
   const quickSymbols = useMemo(() => {
     return [...new Set([...SYMBOLS.map((s) => s.value), ...recentSymbols])]
@@ -311,22 +335,26 @@ export default function MarketsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <Skeleton className="h-[650px] w-full" />
-                ) : klines.length > 0 ? (
-                  <div className="h-[650px] w-full">
-                    <CandlestickChart
-                      data={klines}
-                      interval={interval}
-                      onLoadMore={loadMoreKlines}
-                      isLoadingMore={isLoadingMore}
-                    />
-                  </div>
-                ) : (
-                  <div className="h-[650px] flex items-center justify-center text-sm text-muted-foreground">
-                    {t("markets.noKline")}
-                  </div>
-                )}
+                <div className="h-[650px] w-full relative">
+                  {/* Chart container always mounted — never destroy/recreate canvas */}
+                  <CandlestickChart
+                    data={klines}
+                    interval={interval}
+                    onLoadMore={loadMoreKlines}
+                    isLoadingMore={isLoadingMore}
+                  />
+                  {/* Overlay states — chart stays alive underneath */}
+                  {loading && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
+                      <Skeleton className="h-full w-full" />
+                    </div>
+                  )}
+                  {!loading && klines.length === 0 && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center text-sm text-muted-foreground bg-background/60">
+                      {t("markets.noKline")}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 

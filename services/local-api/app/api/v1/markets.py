@@ -9,10 +9,12 @@ selected via query parameters.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import JSONResponse
 
 from app.core.dependencies import (
     build_response_meta,
@@ -155,6 +157,7 @@ async def get_kline(
     interval: str = Query("1h", description="Kline interval, e.g. 1m, 5m, 15m, 30m, 1h, 4h, 1d"),
     limit: int = Query(200, ge=1, le=1500, description="Max number of klines"),
     end_time: int | None = Query(None, description="Fetch candles before this timestamp (ms) for pagination"),
+    since: int | None = Query(None, description="Return candles with timestamp >= since (ms) for incremental fetch"),
     exchange: str | None = Query(None, description="Exchange provider: binance or okx"),
     market_type: str | None = Query(None, description="Market type: spot or futures"),
     svc: Any = Depends(_require_market_service),
@@ -165,26 +168,71 @@ async def get_kline(
     Fetches from exchange REST API with the requested interval, ensuring
     multi-timeframe support regardless of the WS subscription interval.
 
-    Pass ``end_time`` (ms) to paginate backwards into history.
+    - ``end_time``: paginate backwards into history
+    - ``since``: incremental fetch — return only candles newer than this timestamp
     """
+    from app.core.redis import get_redis
+    from pnlclaw_market.kline_store import KlineStore
+
     sym = _normalize_symbol(symbol)
     ex, mt = _resolve_source(exchange, market_type, settings_service)
     await _ensure_subscribed(svc, sym, ex, mt)
 
-    klines = await svc.fetch_klines_rest(sym, ex, mt, interval=interval, limit=limit, end_time=end_time)
-    if not klines:
-        raise NotFoundError(f"No kline data for symbol '{sym}' on {ex}/{mt}")
+    redis_client = get_redis()
+    kline_store = KlineStore(redis_client) if redis_client else None
 
-    return APIResponse(
+    # Try Redis cache first (skip for historical pagination with end_time)
+    source = "exchange"
+    klines = None
+    if kline_store and end_time is None:
+        cached = await kline_store.get(ex, mt, sym, interval, since=since, limit=limit)
+        if cached and len(cached) >= min(limit, 10):
+            klines = cached
+            source = "cache"
+
+    if klines is None:
+        try:
+            klines = await svc.fetch_klines_rest(sym, ex, mt, interval=interval, limit=limit, end_time=end_time)
+        except Exception:
+            logger.warning("REST kline fetch failed for %s on %s/%s", sym, ex, mt, exc_info=True)
+            klines = []
+        if klines and kline_store and end_time is None:
+            await kline_store.put(ex, mt, sym, interval, klines)
+        if since is not None and klines:
+            klines = [k for k in klines if k.timestamp >= since]
+        if not klines:
+            klines = []
+
+    kline_dicts = [k.model_dump() for k in klines]
+    body = APIResponse(
         data={
             "symbol": sym,
             "interval": interval,
             "exchange": ex,
             "market_type": mt,
-            "klines": [k.model_dump() for k in klines],
+            "klines": kline_dicts,
+            "source": source,
         },
         meta=build_response_meta(request),
         error=None,
+    )
+
+    import json as _json
+
+    content = body.model_dump()
+    raw = _json.dumps(content, ensure_ascii=False, separators=(",", ":"))
+    etag = hashlib.md5(raw.encode()).hexdigest()  # noqa: S324
+
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match.strip('"') == etag:
+        return JSONResponse(status_code=304, content=None, headers={"ETag": f'"{etag}"'})
+
+    return JSONResponse(
+        content=content,
+        headers={
+            "ETag": f'"{etag}"',
+            "Cache-Control": "public, max-age=5, stale-while-revalidate=30",
+        },
     )
 
 

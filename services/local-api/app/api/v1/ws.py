@@ -43,8 +43,10 @@ _ALLOWED_ORIGINS: set[str] = {
     "http://127.0.0.1:3000",
 }
 
-_MAX_WS_CONNECTIONS_PER_IP = 20
-_MAX_WS_CONNECTIONS_GLOBAL = 200
+import os as _os
+
+_MAX_WS_CONNECTIONS_PER_IP = int(_os.environ.get("PNLCLAW_WS_MAX_PER_IP", "50"))
+_MAX_WS_CONNECTIONS_GLOBAL = int(_os.environ.get("PNLCLAW_WS_MAX_GLOBAL", "5000"))
 _ip_connection_counts: dict[str, int] = {}
 
 
@@ -107,12 +109,19 @@ class ConnectionManager:
         return self._connections.get(ws, set())
 
     async def broadcast(self, channel: str, data: dict[str, Any]) -> None:
-        """Send data to all connections subscribed to *channel*."""
+        """Send data to all connections subscribed to *channel*.
+
+        Pre-serializes JSON once and sends the same text to all clients,
+        avoiding redundant json.dumps() per connection (N clients = 1 serialize).
+        """
         dead: list[WebSocket] = []
+        text: str | None = None
         for ws, channels in list(self._connections.items()):
             if channel in channels:
+                if text is None:
+                    text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
                 try:
-                    await ws.send_json(data)
+                    await ws.send_text(text)
                 except Exception:
                     dead.append(ws)
         for ws in dead:
@@ -138,6 +147,38 @@ _ws_user_ids: dict[WebSocket, str] = {}
 # ---------------------------------------------------------------------------
 # /api/v1/ws/markets
 # ---------------------------------------------------------------------------
+
+
+async def _push_kline_snapshot(
+    ws: WebSocket,
+    symbols: list[str],
+    exchange: str,
+    market_type: str,
+) -> None:
+    """Send cached K-line data to a newly subscribed client for instant rendering."""
+    try:
+        from app.core.redis import get_redis
+        from pnlclaw_market.kline_store import KlineStore
+
+        redis_client = get_redis()
+        if redis_client is None:
+            return
+        store = KlineStore(redis_client)
+        for sym in symbols:
+            for ivl in ("1m", "5m", "15m", "30m", "1h", "4h", "1d"):
+                cached = await store.get(exchange, market_type, sym, ivl, limit=200)
+                if cached:
+                    await ws.send_json({
+                        "type": "kline_snapshot",
+                        "symbol": sym,
+                        "exchange": exchange,
+                        "market_type": market_type,
+                        "interval": ivl,
+                        "data": [c.model_dump() for c in cached],
+                        "timestamp": int(time.time() * 1000),
+                    })
+    except Exception:
+        logger.debug("kline_snapshot push failed", exc_info=True)
 
 
 @router.websocket("/api/v1/ws/markets")
@@ -198,6 +239,9 @@ async def ws_markets(ws: WebSocket) -> None:
                         "timestamp": int(time.time() * 1000),
                     }
                 )
+
+                # Push kline_snapshot from Redis cache for instant chart rendering
+                asyncio.ensure_future(_push_kline_snapshot(ws, symbols, ex, mt))
             elif action == "unsubscribe":
                 ex = msg.get("exchange", "binance")
                 mt = msg.get("market_type", "spot")
@@ -617,11 +661,13 @@ async def broadcast_agent_event(
 
 
 async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, Any]) -> None:
-    """Push a market event to all WebSocket subscribers of that symbol."""
+    """Push a market event to all WebSocket subscribers of that symbol.
+
+    Also publishes to Redis Pub/Sub so other workers receive the event.
+    """
     exchange = data.get("exchange", "binance")
     market_type = data.get("market_type", "spot")
 
-    # Broadcast to specific symbol channel (e.g. market:binance:spot:BTC/USDT)
     channel = f"market:{exchange}:{market_type}:{symbol}"
     payload = {
         "type": event_type,
@@ -631,8 +677,11 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     }
     await _market_manager.broadcast(channel, payload)
 
-    # Also broadcast to global "ALL" channel for tactical/derivative events
-    # This enables global whale detectors and liquidation monitors
+    # Cross-worker: publish to Redis Pub/Sub
+    from app.core.redis_pubsub import publish as redis_publish
+
+    await redis_publish(channel, payload)
+
     if symbol != "ALL" and event_type in (
         "large_trade",
         "large_order",
@@ -642,6 +691,7 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     ):
         all_channel = f"market:{exchange}:{market_type}:ALL"
         await _market_manager.broadcast(all_channel, payload)
+        await redis_publish(all_channel, payload)
 
 
 async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str, Any]) -> None:

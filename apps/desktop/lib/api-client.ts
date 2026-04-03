@@ -316,10 +316,12 @@ export async function getKlines(
   interval = "1h",
   limit = 500,
   options?: MarketSourceOptions,
-  endTime?: number
+  endTime?: number,
+  since?: number,
 ): Promise<ApiResponse<KlineData[]>> {
   let url = `/api/v1/markets/${marketPathSymbol(symbol)}/kline?interval=${interval}&limit=${limit}${toMarketSourceQuery(options)}`
   if (endTime != null) url += `&end_time=${endTime}`
+  if (since != null) url += `&since=${since}`
   return request(url)
 }
 

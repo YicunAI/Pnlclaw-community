@@ -159,6 +159,7 @@ export default function PaperPage() {
 
   const {
     klines: klineHistory,
+    isLoading: klineLoading,
     isLoadingMore,
     loadMore: handleLoadMoreKlines,
   } = useKlineHistory(tickerSymbol, chartInterval, "okx", "futures")
@@ -1450,7 +1451,7 @@ export default function PaperPage() {
                     </div>
                   </div>
                   <CardContent className="p-0 flex-1">
-                    <div className="h-full min-h-[420px]">
+                    <div className="h-full min-h-[420px] relative">
                       <CandlestickChart
                         data={chartData}
                         interval={chartInterval}
@@ -1458,6 +1459,11 @@ export default function PaperPage() {
                         onLoadMore={handleLoadMoreKlines}
                         isLoadingMore={isLoadingMore}
                       />
+                      {klineLoading && klineHistory.length === 0 && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80">
+                          <Skeleton className="h-full w-full" />
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

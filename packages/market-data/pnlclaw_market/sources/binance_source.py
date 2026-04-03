@@ -117,6 +117,12 @@ class BinanceSource:
         self._SNAPSHOT_THROTTLE_S = 0.25  # max 4 snapshots/s per symbol
         self._last_snapshot_time: dict[str, float] = {}
 
+        self._http_client = httpx.AsyncClient(
+            proxy=self._proxy_url if self._proxy_url else None,
+            timeout=15.0,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+
     # -- ExchangeSource protocol --
 
     @property
@@ -131,12 +137,8 @@ class BinanceSource:
         if self._running:
             return
 
-        l2_http = httpx.AsyncClient(
-            proxy=self._proxy_url if self._proxy_url else None,
-            timeout=15.0,
-        )
         self._l2_manager = BinanceL2Manager(
-            http_client=l2_http,
+            http_client=self._http_client,
             symbol_normalizer=self._symbol_normalizer,
             rest_url=self._rest_url,
         )
@@ -203,6 +205,9 @@ class BinanceSource:
 
         if self._l2_manager:
             await self._l2_manager.close()
+
+        if self._http_client:
+            await self._http_client.aclose()
 
         self._cache.clear()
         self._snapshot_store.clear()
@@ -320,11 +325,9 @@ class BinanceSource:
         binance_sym = symbol.replace("/", "").upper()
         params = {"symbol": binance_sym, "interval": ivl, "limit": 200}
         try:
-            proxy = self._proxy_url if self._proxy_url else None
-            async with httpx.AsyncClient(proxy=proxy, timeout=15.0) as client:
-                resp = await client.get(self._kline_rest_url, params=params)
-                resp.raise_for_status()
-                raw = resp.json()
+            resp = await self._http_client.get(self._kline_rest_url, params=params)
+            resp.raise_for_status()
+            raw = resp.json()
 
             buf: deque[KlineEvent] = deque(maxlen=_MAX_KLINE_BUFFER)
             for row in raw:
@@ -379,11 +382,9 @@ class BinanceSource:
         if end_time is not None:
             params["endTime"] = end_time
         try:
-            proxy = self._proxy_url if self._proxy_url else None
-            async with httpx.AsyncClient(proxy=proxy, timeout=15.0) as client:
-                resp = await client.get(self._kline_rest_url, params=params)
-                resp.raise_for_status()
-                raw = resp.json()
+            resp = await self._http_client.get(self._kline_rest_url, params=params)
+            resp.raise_for_status()
+            raw = resp.json()
             result: list[KlineEvent] = []
             now_ms = int(_time.time() * 1000)
             for row in raw:

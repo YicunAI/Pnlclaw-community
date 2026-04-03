@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, CrosshairMode, createSeriesMarkers } from "lightweight-charts"
 import type { KlineData } from "@/lib/api-client"
 import { cn } from "@/lib/utils"
+import { perf } from "@/lib/perf"
 
 export interface TradeMarker {
   time: number
@@ -42,6 +43,7 @@ export default function CandlestickChart({
   const loadingMoreRef = useRef(false)
   const dataLenRef = useRef(0)
   const prevDataLenRef = useRef(0)
+  const prevDataHashRef = useRef("")
 
   const [hoverData, setHoverData] = useState<HoverData | null>(null)
 
@@ -71,6 +73,7 @@ export default function CandlestickChart({
     onLoadMoreRef.current = onLoadMore
   }, [onLoadMore])
 
+  // Create chart ONCE — never destroy on data/interval/symbol change
   useEffect(() => {
     if (!chartContainerRef.current) return
 
@@ -116,7 +119,19 @@ export default function CandlestickChart({
         secondsVisible: false,
       },
     })
+
+    // Enable Data Conflation for large dataset performance (lightweight-charts v5.1+)
+    try {
+      chart.applyOptions({
+        ...({ enableConflation: true, precomputeConflationOnInit: true } as any),
+      })
+    } catch {
+      // Graceful fallback if conflation not supported in current version
+    }
+
     chartRef.current = chart
+    perf.mark("chart_visible")
+    perf.measure("time_to_chart", "route_change", "chart_visible")
 
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: "#10b981",
@@ -173,12 +188,51 @@ export default function CandlestickChart({
       window.removeEventListener("resize", handleResize)
       markersApiRef.current = null
       chart.remove()
+      chartRef.current = null
+      seriesRef.current = null
+      volumeRef.current = null
     }
   }, [])
 
+  // Imperative data update — detect incremental vs full replace
   useEffect(() => {
     if (!seriesRef.current || !volumeRef.current || !chartRef.current) return
+    if (data.length === 0) return
 
+    const lastTs = data.length > 0 ? data[data.length - 1].timestamp : 0
+    const dataHash = `${data.length}:${data[0]?.timestamp}:${lastTs}`
+    const prevHash = prevDataHashRef.current
+    const oldLen = prevDataLenRef.current
+    const newLen = data.length
+
+    prevDataHashRef.current = dataHash
+    prevDataLenRef.current = newLen
+
+    // Incremental update: same base data, only last candle changed (WS real-time update)
+    const isIncrementalUpdate =
+      oldLen > 0 &&
+      (newLen === oldLen || newLen === oldLen + 1) &&
+      prevHash.split(":")[1] === dataHash.split(":")[1]
+
+    if (isIncrementalUpdate && newLen > 0) {
+      const last = data[newLen - 1]
+      const t = Math.floor(last.timestamp / 1000) as any
+      seriesRef.current.update({
+        time: t,
+        open: last.open,
+        high: last.high,
+        low: last.low,
+        close: last.close,
+      })
+      volumeRef.current.update({
+        time: t,
+        value: last.volume,
+        color: last.close >= last.open ? "rgba(16, 185, 129, 0.4)" : "rgba(239, 68, 68, 0.4)",
+      })
+      return
+    }
+
+    // Full data replace (symbol/interval change, history load, etc.)
     const candleData = data.map((d) => ({
       time: Math.floor(d.timestamp / 1000) as any,
       open: d.open,
@@ -195,10 +249,6 @@ export default function CandlestickChart({
 
     seriesRef.current.setData(candleData)
     volumeRef.current.setData(volData)
-
-    const oldLen = prevDataLenRef.current
-    const newLen = data.length
-    prevDataLenRef.current = newLen
 
     if (oldLen < 30 && newLen >= 30) {
       const barsToShow = Math.min(newLen, 120)

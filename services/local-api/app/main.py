@@ -125,9 +125,13 @@ async def _seed_template_strategies(
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown hooks."""
     from app.core.crypto import KeyPairManager
+    from app.core.redis import close_redis, init_redis
     from app.core.settings_service import SettingsService
     from pnlclaw_market import BinanceSource, MarketDataService, OKXSource
     from pnlclaw_security.secrets import SecretManager
+
+    # --- Redis (shared K-line cache + WS pub/sub) ---
+    await init_redis()
 
     # --- JWT (Pro mode: verify tokens from admin-api) ---
     jwt_secret = os.environ.get("PNLCLAW_AUTH_JWT_SECRET", "")
@@ -295,6 +299,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # are pushed to connected WebSocket clients in real time.
         _bridge_market_events(market_svc)
 
+        # Start Redis Pub/Sub subscriber for cross-worker WS broadcasting
+        from app.core.redis_pubsub import start_subscriber as _start_pubsub
+
+        async def _pubsub_forward(channel: str, data: dict) -> None:
+            from app.api.v1.ws import _market_manager
+            await _market_manager.broadcast(channel, data)
+
+        await _start_pubsub(_pubsub_forward)
+
         # Subscribe default symbols on ALL sources so large-trade and
         # liquidation monitors see data from every exchange.
         default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
@@ -322,6 +335,41 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                             exc_info=True,
                         )
                     await asyncio.sleep(0.3)
+
+        # --- K-line warmup: pre-fetch common symbols x intervals into Redis ---
+        from app.core.redis import get_redis
+
+        _warmup_redis = get_redis()
+        if _warmup_redis is not None:
+            from pnlclaw_market.kline_store import KlineStore
+
+            _warmup_store = KlineStore(_warmup_redis)
+            _warmup_intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
+            _warmup_symbols_str = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
+            _warmup_symbols = [s.strip() for s in _warmup_symbols_str.split(",") if s.strip()]
+
+            async def _warmup_task() -> None:
+                """Background task: pre-fetch K-lines for default symbols."""
+                await asyncio.sleep(5)  # let exchange WS connections stabilize
+                for sym in _warmup_symbols:
+                    for ivl in _warmup_intervals:
+                        for ex, mt in [("binance", "spot"), ("binance", "futures"), ("okx", "spot"), ("okx", "futures")]:
+                            try:
+                                existing = await _warmup_store.count(ex, mt, sym, ivl)
+                                if existing >= 100:
+                                    continue
+                                klines = await market_svc.fetch_klines_rest(sym, ex, mt, interval=ivl, limit=500)
+                                if klines:
+                                    await _warmup_store.put(ex, mt, sym, ivl, klines)
+                                    logger.info("Warmup: cached %d klines %s/%s %s %s", len(klines), ex, mt, sym, ivl)
+                                await asyncio.sleep(0.2)
+                            except Exception:
+                                logger.debug("Warmup skip %s/%s %s %s", ex, mt, sym, ivl, exc_info=True)
+                logger.info("K-line warmup completed")
+
+            asyncio.create_task(_warmup_task(), name="kline-warmup")
+        else:
+            logger.info("Redis not available, skipping K-line warmup")
 
         # Register market health check
         async def _market_health() -> HealthCheckResult:
@@ -690,6 +738,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.warning("Error closing database", exc_info=True)
         set_db_manager(None)
 
+        from app.core.redis_pubsub import stop_subscriber as _stop_pubsub
+
+        await _stop_pubsub()
+        await close_redis()
         logger.info("PnLClaw Local API shutdown complete")
 
 
@@ -1206,16 +1258,34 @@ def _bridge_market_events(market_svc: object) -> None:
             )
         )
 
+    async def _kline_broadcast_and_cache(event: KlineEvent) -> None:
+        """Broadcast kline to WS clients and write-through to Redis cache."""
+        await broadcast_market_event(event.symbol, "kline", event.model_dump())
+        await _kline_cache_only(event)
+
+    async def _kline_cache_only(event: KlineEvent) -> None:
+        """Write kline to Redis cache without broadcasting (no WS clients)."""
+        redis_client = _get_redis_lazy()
+        if redis_client is not None:
+            from pnlclaw_market.kline_store import KlineStore
+
+            store = KlineStore(redis_client)
+            await store.append(
+                event.exchange, event.market_type, event.symbol, event.interval, event
+            )
+
+    def _get_redis_lazy():  # noqa: ANN202
+        from app.core.redis import get_redis
+
+        return get_redis()
+
     def _on_kline(event: KlineEvent) -> None:
         if _market_manager.active_count == 0:
+            redis_client = _get_redis_lazy()
+            if redis_client is not None:
+                asyncio.ensure_future(_kline_cache_only(event))
             return
-        asyncio.ensure_future(
-            broadcast_market_event(
-                event.symbol,
-                "kline",
-                event.model_dump(),
-            )
-        )
+        asyncio.ensure_future(_kline_broadcast_and_cache(event))
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
         nonlocal _ob_flush_running
@@ -1492,6 +1562,11 @@ def create_app() -> FastAPI:
         expose_headers=["X-Session-ID", "X-Request-ID"],
         max_age=3600,
     )
+
+    # GZip — compress JSON responses (500 klines ~150KB -> ~20KB)
+    from fastapi.middleware.gzip import GZipMiddleware
+
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Error handlers (must be installed before routers for catch-all to work)
     install_error_handlers(app)

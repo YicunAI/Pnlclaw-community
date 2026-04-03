@@ -25,6 +25,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
+    "idb": "^8.0.3",
     "js-yaml": "^4.1.1",
     "lightweight-charts": "^5.1.0",
     "lucide-react": "^0.577.0",

@@ -30,6 +30,7 @@ jobs:
             echo "=== Installing Python dependencies ==="
             source /opt/pnlclaw/venv/bin/activate
             pip install -e ".[dev]" -q
+            pip install "redis[hiredis]>=5.0.0" -q
             for pkg in packages/*/; do
               if [ -f "$pkg/pyproject.toml" ]; then
                 pip install -e "$pkg" -q
@@ -41,6 +42,15 @@ jobs:
             npm ci --prefer-offline
             npm run build
             cd /opt/pnlclaw
+
+            echo "=== Ensuring Redis is installed and running ==="
+            if ! command -v redis-server &>/dev/null; then
+              echo "Installing Redis..."
+              apt-get update -qq && apt-get install -y -qq redis-server
+            fi
+            systemctl enable redis-server 2>/dev/null || true
+            systemctl start redis-server 2>/dev/null || true
+            redis-cli ping || echo "WARNING: Redis not responding, K-line cache will be disabled"
 
             echo "=== Restarting services ==="
             systemctl restart pnlclaw-api

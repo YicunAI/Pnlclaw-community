@@ -14,6 +14,7 @@ const WS_BASE =
 const RECONNECT_BASE_MS = 1000
 const RECONNECT_MAX_MS = 30000
 const STALE_AFTER_MS = 5000
+const UNSUB_DELAY_MS = 5000
 
 type StreamState = "live" | "degraded" | "recovering"
 
@@ -54,6 +55,15 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
   const subRef = useRef({ symbol, exchange, marketType })
   const lastSeqRef = useRef<number | null>(null)
 
+  // --- RAF throttle buffers for high-frequency data ---
+  const pendingTickerRef = useRef<TickerData | null>(null)
+  const pendingOrderbookRef = useRef<OrderbookData | null>(null)
+  const pendingKlineRef = useRef<WSKlineData | null>(null)
+  const rafIdRef = useRef<number | null>(null)
+
+  // --- Delayed unsubscribe ---
+  const pendingUnsubRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const [state, setState] = useState<MarketWSState>({
     connected: false,
     ticker: null,
@@ -77,18 +87,42 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
     }))
   }, [])
 
-  const patchLive = useCallback((updater: (s: MarketWSState) => MarketWSState) => {
+  // Flush all pending RAF updates in a single setState call
+  const flushRAF = useCallback(() => {
+    rafIdRef.current = null
+    const ticker = pendingTickerRef.current
+    const orderbook = pendingOrderbookRef.current
+    const kline = pendingKlineRef.current
+    pendingTickerRef.current = null
+    pendingOrderbookRef.current = null
+    pendingKlineRef.current = null
+
+    if (!ticker && !orderbook && !kline) return
+
     const now = Date.now()
     setState((prev) => {
-      const next = updater(prev)
-      return {
-        ...next,
-        lastMessageAt: now,
-        stale: false,
-        streamState: "live",
+      let next = { ...prev, lastMessageAt: now, stale: false, streamState: "live" as StreamState }
+      if (ticker) next.ticker = ticker
+      if (orderbook) next.orderbook = orderbook
+      if (kline) {
+        const arr = [...next.klines]
+        if (arr.length > 0 && arr[arr.length - 1].timestamp === kline.timestamp) {
+          arr[arr.length - 1] = kline
+        } else {
+          arr.push(kline)
+          if (arr.length > 500) arr.shift()
+        }
+        next.klines = arr
       }
+      return next
     })
   }, [])
+
+  const scheduleRAF = useCallback(() => {
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(flushRAF)
+    }
+  }, [flushRAF])
 
   const sendSubscribe = useCallback((ws: WebSocket, sym: string, ex: string, mt: string) => {
     if (ws.readyState !== WebSocket.OPEN) return
@@ -159,23 +193,21 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
 
         if (msg.type === "ticker") {
           const d = msg.data
-          patchLive((s) => ({
-            ...s,
-            ticker: {
-              symbol: d.symbol,
-              last_price: d.last_price,
-              change_24h_pct: d.change_24h_pct ?? 0,
-              volume_24h: d.volume_24h ?? 0,
-              quote_volume_24h: d.quote_volume_24h,
-              high_24h: d.high_24h,
-              low_24h: d.low_24h,
-              bid: d.bid,
-              ask: d.ask,
-            },
-          }))
+          pendingTickerRef.current = {
+            symbol: d.symbol,
+            last_price: d.last_price,
+            change_24h_pct: d.change_24h_pct ?? 0,
+            volume_24h: d.volume_24h ?? 0,
+            quote_volume_24h: d.quote_volume_24h,
+            high_24h: d.high_24h,
+            low_24h: d.low_24h,
+            bid: d.bid,
+            ask: d.ask,
+          }
+          scheduleRAF()
         } else if (msg.type === "kline") {
           const d = msg.data
-          const point: WSKlineData = {
+          pendingKlineRef.current = {
             timestamp: d.timestamp,
             open: d.open,
             high: d.high,
@@ -184,25 +216,35 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
             volume: d.volume,
             wsInterval: d.interval,
           }
-          patchLive((s) => {
-            const arr = [...s.klines]
-            if (arr.length > 0 && arr[arr.length - 1].timestamp === point.timestamp) {
-              arr[arr.length - 1] = point
-            } else {
-              arr.push(point)
-              if (arr.length > 500) arr.shift()
-            }
-            return { ...s, klines: arr }
-          })
+          scheduleRAF()
+        } else if (msg.type === "kline_snapshot") {
+          // Backend pushes cached K-lines on subscribe — bulk replace for instant rendering
+          const snapshotData: WSKlineData[] = (msg.data || []).map((d: any) => ({
+            timestamp: d.timestamp,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+            volume: d.volume,
+            wsInterval: d.interval || msg.interval,
+          }))
+          if (snapshotData.length > 0) {
+            const now = Date.now()
+            setState((prev) => ({
+              ...prev,
+              klines: snapshotData,
+              lastMessageAt: now,
+              stale: false,
+              streamState: "live",
+            }))
+          }
         } else if (msg.type === "depth") {
           const d = msg.data
-          patchLive((s) => ({
-            ...s,
-            orderbook: {
-              bids: d.bids ?? [],
-              asks: d.asks ?? [],
-            },
-          }))
+          pendingOrderbookRef.current = {
+            bids: d.bids ?? [],
+            asks: d.asks ?? [],
+          }
+          scheduleRAF()
         }
       } catch {
         // ignore parse errors
@@ -221,7 +263,7 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
     ws.onerror = () => {
       ws.close()
     }
-  }, [patchLive, sendSubscribe])
+  }, [scheduleRAF, sendSubscribe])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -241,13 +283,17 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
     return () => {
       intentionalCloseRef.current = true
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+      if (pendingUnsubRef.current) clearTimeout(pendingUnsubRef.current)
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current)
       wsRef.current?.close()
       wsRef.current = null
       lastSeqRef.current = null
     }
   }, [connect])
 
-  // When symbol/exchange/marketType changes, switch subscription
+  // Delayed unsubscribe: when symbol/exchange/marketType changes,
+  // subscribe new immediately but delay old unsubscribe by 5s.
+  // If user switches back within 5s, the old sub stays alive (zero cold-start).
   useEffect(() => {
     const prev = subRef.current
     const changed =
@@ -256,8 +302,25 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
     if (changed) {
       const ws = wsRef.current
       if (ws && ws.readyState === WebSocket.OPEN) {
-        sendUnsubscribe(ws, prev.symbol, prev.exchange, prev.marketType)
         sendSubscribe(ws, symbol, exchange, marketType)
+
+        // Cancel any pending unsub for the NEW target (user switched back)
+        if (pendingUnsubRef.current) {
+          clearTimeout(pendingUnsubRef.current)
+          pendingUnsubRef.current = null
+        }
+
+        // Schedule delayed unsub for the OLD target
+        const oldSym = prev.symbol
+        const oldEx = prev.exchange
+        const oldMt = prev.marketType
+        pendingUnsubRef.current = setTimeout(() => {
+          const currentWs = wsRef.current
+          if (currentWs && currentWs.readyState === WebSocket.OPEN) {
+            sendUnsubscribe(currentWs, oldSym, oldEx, oldMt)
+          }
+          pendingUnsubRef.current = null
+        }, UNSUB_DELAY_MS)
       }
       subRef.current = { symbol, exchange, marketType }
       lastSeqRef.current = null

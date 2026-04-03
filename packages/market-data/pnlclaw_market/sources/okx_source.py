@@ -95,6 +95,12 @@ class OKXSource:
         self._SNAPSHOT_THROTTLE_S = 0.25
         self._last_snapshot_time: dict[str, float] = {}
 
+        self._http_client = httpx.AsyncClient(
+            proxy=self._proxy_url if self._proxy_url else None,
+            timeout=15.0,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+
     # -- helpers --
 
     def _to_inst_id(self, symbol: str) -> str:
@@ -172,6 +178,9 @@ class OKXSource:
             except asyncio.CancelledError:
                 pass
         self._reconnect_task = None
+
+        if self._http_client:
+            await self._http_client.aclose()
 
         self._cache.clear()
         self._snapshot_store.clear()
@@ -282,11 +291,9 @@ class OKXSource:
         inst_id = self._to_inst_id(symbol)
         params = {"instId": inst_id, "bar": okx_bar, "limit": "200"}
         try:
-            proxy = self._proxy_url if self._proxy_url else None
-            async with httpx.AsyncClient(proxy=proxy, timeout=15.0) as client:
-                resp = await client.get(_OKX_CANDLE_REST_URL, params=params)
-                resp.raise_for_status()
-                body = resp.json()
+            resp = await self._http_client.get(_OKX_CANDLE_REST_URL, params=params)
+            resp.raise_for_status()
+            body = resp.json()
 
             raw_candles = body.get("data", [])
             buf: deque[KlineEvent] = deque(maxlen=_MAX_KLINE_BUFFER)
@@ -344,7 +351,6 @@ class OKXSource:
         """
         inst_id = self._to_inst_id(symbol)
         okx_bar = _OKX_KLINE_INTERVAL_MAP.get(interval, "1H")
-        proxy = self._proxy_url if self._proxy_url else None
 
         try:
             raw_candles: list = []
@@ -356,10 +362,9 @@ class OKXSource:
                     "limit": str(min(limit, 100)),
                     "after": str(end_time),
                 }
-                async with httpx.AsyncClient(proxy=proxy, timeout=15.0) as client:
-                    resp = await client.get(_OKX_HISTORY_CANDLE_REST_URL, params=hist_params)
-                    resp.raise_for_status()
-                    body = resp.json()
+                resp = await self._http_client.get(_OKX_HISTORY_CANDLE_REST_URL, params=hist_params)
+                resp.raise_for_status()
+                body = resp.json()
                 if body.get("code") == "0":
                     raw_candles = body.get("data", [])
 
@@ -371,10 +376,9 @@ class OKXSource:
                 }
                 if end_time is not None:
                     params["after"] = str(end_time)
-                async with httpx.AsyncClient(proxy=proxy, timeout=15.0) as client:
-                    resp = await client.get(_OKX_CANDLE_REST_URL, params=params)
-                    resp.raise_for_status()
-                    body = resp.json()
+                resp = await self._http_client.get(_OKX_CANDLE_REST_URL, params=params)
+                resp.raise_for_status()
+                body = resp.json()
                 if body.get("code") == "0":
                     raw_candles = body.get("data", [])
 
