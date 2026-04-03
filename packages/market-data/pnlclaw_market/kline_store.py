@@ -74,8 +74,11 @@ class KlineStore:
             mapping: dict[str, float] = {}
             for c in candles:
                 mapping[c.model_dump_json()] = float(c.timestamp)
-            added = await self._r.zadd(key, mapping)  # type: ignore[arg-type]
-            await self._r.expire(key, self._ttl)
+            async with self._r.pipeline(transaction=False) as pipe:
+                pipe.zadd(key, mapping)  # type: ignore[arg-type]
+                pipe.expire(key, self._ttl)
+                results = await pipe.execute()
+            added = results[0] if results else 0
             await self._trim(key)
             return added or 0
         except Exception:
@@ -92,17 +95,17 @@ class KlineStore:
     ) -> None:
         """Append or update a single candle (real-time WS update).
 
-        For an in-progress candle the timestamp stays the same but OHLCV changes,
-        so we remove the old entry at that score before inserting the new one.
+        Uses pipeline to batch Redis operations into a single round-trip,
+        preventing connection pool exhaustion under high-frequency WS events.
         """
         key = _cache_key(exchange, market_type, symbol, interval)
         try:
             ts = float(candle.timestamp)
-            old = await self._r.zrangebyscore(key, min=ts, max=ts)
-            if old:
-                await self._r.zrem(key, *old)
-            await self._r.zadd(key, {candle.model_dump_json(): ts})  # type: ignore[arg-type]
-            await self._r.expire(key, self._ttl)
+            async with self._r.pipeline(transaction=False) as pipe:
+                pipe.zremrangebyscore(key, ts, ts)
+                pipe.zadd(key, {candle.model_dump_json(): ts})  # type: ignore[arg-type]
+                pipe.expire(key, self._ttl)
+                await pipe.execute()
         except Exception:
             logger.warning("KlineStore.append failed for %s", key, exc_info=True)
 

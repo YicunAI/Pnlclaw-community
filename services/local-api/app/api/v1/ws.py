@@ -677,10 +677,10 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     }
     await _market_manager.broadcast(channel, payload)
 
-    # Cross-worker: publish to Redis Pub/Sub
-    from app.core.redis_pubsub import publish as redis_publish
-
-    await redis_publish(channel, payload)
+    # Cross-worker Pub/Sub only when multi-worker is enabled
+    if _os.environ.get("PNLCLAW_WS_PUBSUB_ENABLED", "").lower() in ("1", "true"):
+        from app.core.redis_pubsub import publish as redis_publish
+        await redis_publish(channel, payload)
 
     if symbol != "ALL" and event_type in (
         "large_trade",
@@ -691,7 +691,6 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     ):
         all_channel = f"market:{exchange}:{market_type}:ALL"
         await _market_manager.broadcast(all_channel, payload)
-        await redis_publish(all_channel, payload)
 
 
 async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str, Any]) -> None:

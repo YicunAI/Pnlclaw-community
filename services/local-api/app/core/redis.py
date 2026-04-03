@@ -32,9 +32,9 @@ async def init_redis() -> aioredis.Redis | None:
         client = aioredis.from_url(
             url,
             decode_responses=True,
-            max_connections=50,
-            socket_connect_timeout=3,
-            socket_timeout=3,
+            max_connections=200,
+            socket_connect_timeout=5,
+            socket_timeout=5,
             retry_on_timeout=True,
         )
         await client.ping()

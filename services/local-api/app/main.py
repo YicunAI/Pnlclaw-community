@@ -58,6 +58,8 @@ from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
+_kline_flush_task: asyncio.Task | None = None
+
 
 async def _seed_template_strategies(
     strategies: dict,
@@ -299,14 +301,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # are pushed to connected WebSocket clients in real time.
         _bridge_market_events(market_svc)
 
-        # Start Redis Pub/Sub subscriber for cross-worker WS broadcasting
-        from app.core.redis_pubsub import start_subscriber as _start_pubsub
+        # Start Redis Pub/Sub subscriber only in multi-worker mode
+        if os.environ.get("PNLCLAW_WS_PUBSUB_ENABLED", "").lower() in ("1", "true"):
+            from app.core.redis_pubsub import start_subscriber as _start_pubsub
 
-        async def _pubsub_forward(channel: str, data: dict) -> None:
-            from app.api.v1.ws import _market_manager
-            await _market_manager.broadcast(channel, data)
+            async def _pubsub_forward(channel: str, data: dict) -> None:
+                from app.api.v1.ws import _market_manager
+                await _market_manager.broadcast(channel, data)
 
-        await _start_pubsub(_pubsub_forward)
+            await _start_pubsub(_pubsub_forward)
+            logger.info("Redis Pub/Sub enabled for multi-worker broadcasting")
+        else:
+            logger.info("Redis Pub/Sub disabled (single-worker mode)")
 
         # Subscribe default symbols on ALL sources so large-trade and
         # liquidation monitors see data from every exchange.
@@ -349,11 +355,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             _warmup_symbols = [s.strip() for s in _warmup_symbols_str.split(",") if s.strip()]
 
             async def _warmup_task() -> None:
-                """Background task: pre-fetch K-lines for default symbols."""
-                await asyncio.sleep(5)  # let exchange WS connections stabilize
+                """Background task: pre-fetch K-lines for default symbols.
+
+                Only warms the most used intervals to avoid blocking the event loop.
+                Lower-priority data is cached on first user request.
+                """
+                await asyncio.sleep(10)
+                _fast_intervals = ["1h", "4h"]
                 for sym in _warmup_symbols:
-                    for ivl in _warmup_intervals:
-                        for ex, mt in [("binance", "spot"), ("binance", "futures"), ("okx", "spot"), ("okx", "futures")]:
+                    for ivl in _fast_intervals:
+                        for ex, mt in [("binance", "spot"), ("okx", "futures")]:
                             try:
                                 existing = await _warmup_store.count(ex, mt, sym, ivl)
                                 if existing >= 100:
@@ -362,7 +373,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                                 if klines:
                                     await _warmup_store.put(ex, mt, sym, ivl, klines)
                                     logger.info("Warmup: cached %d klines %s/%s %s %s", len(klines), ex, mt, sym, ivl)
-                                await asyncio.sleep(0.2)
+                                await asyncio.sleep(1.5)
                             except Exception:
                                 logger.debug("Warmup skip %s/%s %s %s", ex, mt, sym, ivl, exc_info=True)
                 logger.info("K-line warmup completed")
@@ -741,6 +752,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         from app.core.redis_pubsub import stop_subscriber as _stop_pubsub
 
         await _stop_pubsub()
+        if _kline_flush_task is not None:
+            _kline_flush_task.cancel()
         await close_redis()
         logger.info("PnLClaw Local API shutdown complete")
 
@@ -1258,34 +1271,49 @@ def _bridge_market_events(market_svc: object) -> None:
             )
         )
 
-    async def _kline_broadcast_and_cache(event: KlineEvent) -> None:
-        """Broadcast kline to WS clients and write-through to Redis cache."""
-        await broadcast_market_event(event.symbol, "kline", event.model_dump())
-        await _kline_cache_only(event)
+    global _kline_flush_task
+    _kline_buffer: dict[str, KlineEvent] = {}
+    _KLINE_FLUSH_INTERVAL = 2.0
 
-    async def _kline_cache_only(event: KlineEvent) -> None:
-        """Write kline to Redis cache without broadcasting (no WS clients)."""
-        redis_client = _get_redis_lazy()
-        if redis_client is not None:
+    async def _flush_kline_buffer() -> None:
+        """Periodically flush buffered kline events to Redis (every 2s)."""
+        while True:
+            await asyncio.sleep(_KLINE_FLUSH_INTERVAL)
+            if not _kline_buffer:
+                continue
+            redis_client = _get_redis_lazy()
+            if redis_client is None:
+                _kline_buffer.clear()
+                continue
             from pnlclaw_market.kline_store import KlineStore
-
             store = KlineStore(redis_client)
-            await store.append(
-                event.exchange, event.market_type, event.symbol, event.interval, event
-            )
+            batch = dict(_kline_buffer)
+            _kline_buffer.clear()
+            for _buf_key, event in batch.items():
+                try:
+                    await store.append(
+                        event.exchange, event.market_type, event.symbol, event.interval, event
+                    )
+                except Exception:
+                    logger.debug("Flush kline to Redis failed: %s", _buf_key, exc_info=True)
+
+    _kline_flush_task = asyncio.create_task(_flush_kline_buffer(), name="kline-redis-flush")
 
     def _get_redis_lazy():  # noqa: ANN202
         from app.core.redis import get_redis
-
         return get_redis()
 
+    def _buffer_kline_for_redis(event: KlineEvent) -> None:
+        """Buffer kline event for batched Redis write (deduplicates by key)."""
+        buf_key = f"{event.exchange}:{event.market_type}:{event.symbol}:{event.interval}"
+        _kline_buffer[buf_key] = event
+
     def _on_kline(event: KlineEvent) -> None:
-        if _market_manager.active_count == 0:
-            redis_client = _get_redis_lazy()
-            if redis_client is not None:
-                asyncio.ensure_future(_kline_cache_only(event))
-            return
-        asyncio.ensure_future(_kline_broadcast_and_cache(event))
+        _buffer_kline_for_redis(event)
+        if _market_manager.active_count > 0:
+            asyncio.ensure_future(
+                broadcast_market_event(event.symbol, "kline", event.model_dump())
+            )
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
         nonlocal _ob_flush_running
