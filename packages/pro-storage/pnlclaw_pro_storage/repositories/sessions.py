@@ -135,9 +135,17 @@ class SessionRepository:
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
 
-    async def use_refresh_token(self, token_hash: str) -> None:
-        """Mark a refresh token as used (single-use rotation)."""
+    async def use_refresh_token(self, token_hash: str) -> bool:
+        """Atomically mark a refresh token as used. Returns True if consumed, False if already used."""
         now = datetime.now(UTC)
         async with self._db.session() as session:
-            stmt = update(RefreshToken).where(RefreshToken.token_hash == token_hash).values(used_at=now)
-            await session.execute(stmt)
+            stmt = (
+                update(RefreshToken)
+                .where(
+                    RefreshToken.token_hash == token_hash,
+                    RefreshToken.used_at.is_(None),
+                )
+                .values(used_at=now)
+            )
+            result = await session.execute(stmt)
+            return result.rowcount > 0  # type: ignore[return-value]

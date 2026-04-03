@@ -72,8 +72,8 @@ class RefreshTokenRepository(Protocol):
         """Return refresh token record by hash, or None."""
         ...
 
-    async def mark_used(self, token_hash: str) -> None:
-        """Mark a refresh token as used (consumed)."""
+    async def mark_used(self, token_hash: str) -> bool:
+        """Atomically mark a refresh token as used. Returns True if consumed, False if already used."""
         ...
 
     async def revoke_all_for_session(self, session_id: UUID) -> None:
@@ -221,8 +221,16 @@ class SessionManager:
                 await self._sessions.revoke(session["jti"])
             raise AuthenticationError("Refresh token has already been used")
 
-        # Mark old token as consumed
-        await self._refresh.mark_used(token_hash)
+        # Atomic mark-used: UPDATE ... WHERE used_at IS NULL
+        # Returns False if another concurrent request already consumed it
+        marked = await self._refresh.mark_used(token_hash)
+        if not marked:
+            logger.warning(
+                "Refresh token concurrent use detected for session=%s",
+                session_id_str,
+            )
+            await self._refresh.revoke_all_for_session(session_uuid)
+            raise AuthenticationError("Refresh token consumed by concurrent request")
 
         # Look up the session to get authoritative user info (H1)
         session = await self._sessions.get_by_id(session_uuid)

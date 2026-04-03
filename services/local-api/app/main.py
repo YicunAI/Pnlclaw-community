@@ -51,6 +51,7 @@ from app.core.dependencies import (
     set_tool_catalog,
 )
 from app.middleware.error_handler import install_error_handlers
+from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
 
@@ -140,6 +141,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except ImportError:
             logger.info("pnlclaw_pro_auth not available, JWT auth disabled")
     else:
+        bind_host = os.environ.get("UVICORN_HOST", os.environ.get("HOST", "127.0.0.1"))
+        if bind_host in ("0.0.0.0", "::"):
+            logger.critical(
+                "FATAL: Community (no-auth) mode on public interface %s is unsafe! "
+                "Set PNLCLAW_AUTH_JWT_SECRET or bind to 127.0.0.1.",
+                bind_host,
+            )
+            raise RuntimeError(
+                "Refusing to start in Community (no-auth) mode on a public interface. "
+                "Either set PNLCLAW_AUTH_JWT_SECRET for Pro mode, or bind to 127.0.0.1."
+            )
         logger.info("PNLCLAW_AUTH_JWT_SECRET not set, running in Community (no-auth) mode")
 
     # --- Health ---
@@ -183,6 +195,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         chat_session_repo = ChatSessionRepository(db_manager)
         set_chat_session_repo(chat_session_repo)
+
+        from app.core.audit import set_audit_repo
+        from pnlclaw_storage.repositories.audit_logs import AuditLogRepository
+
+        audit_repo = AuditLogRepository(db_manager)
+        set_audit_repo(audit_repo)
 
         # Pre-load persisted strategies into in-memory store used by routes
         from app.api.v1.strategies import _strategies
@@ -513,7 +531,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # FX09: Create a single ToolCatalog shared by MCP and Agent
         from pnlclaw_agent import ToolCatalog as _TC
 
-        tool_catalog = _TC()
+        try:
+            from pnlclaw_security.tool_policy import ToolPolicyEngine
+
+            _policy_engine = ToolPolicyEngine()
+            logger.info("ToolPolicyEngine loaded — tool gating active")
+        except Exception:
+            _policy_engine = None
+            logger.warning("ToolPolicyEngine not available — all tools allowed")
+
+        tool_catalog = _TC(policy_engine=_policy_engine)
 
         # --- MCP Registry (uses the shared tool_catalog) ---
         try:
@@ -681,7 +708,7 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
     )
     from app.core.dependencies import get_strategy_runner
 
-    config = await _get_strategy(strategy_id)
+    config = await _get_strategy(strategy_id, user_id="local")
     if config is None:
         return f"Strategy '{strategy_id}' not found"
 
@@ -731,7 +758,7 @@ async def _deploy_strategy_callback(strategy_id: str, account_id: str) -> str:
         await _save_deployment(dep)
         updated = config.model_copy(update={"lifecycle_state": "running"})
         _strategies[strategy_id] = updated
-        await _persist_save(updated)
+        await _persist_save(updated, user_id="local")
     except Exception:
         pass
 
@@ -1428,15 +1455,21 @@ async def _paper_snapshot_after_fill(engine: object, fill: object, account_id: s
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    import os
+    is_production = os.environ.get("PNLCLAW_ENV") == "production"
     app = FastAPI(
         title="PnLClaw Local API",
         description="Local-first crypto quantitative trading platform API",
         version="0.1.0",
         lifespan=lifespan,
+        docs_url=None if is_production else "/api/v1/docs",
+        redoc_url=None if is_production else "/api/v1/redoc",
+        openapi_url=None if is_production else "/api/v1/openapi.json",
     )
 
-    # Middleware (outermost first)
+    # Middleware (outermost first — order matters: request-id → rate-limit → ...)
     app.add_middleware(RequestIDMiddleware)
+    app.add_middleware(RateLimitMiddleware)
 
     # Security headers
     @app.middleware("http")

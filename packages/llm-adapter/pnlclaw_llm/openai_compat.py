@@ -134,6 +134,31 @@ def _should_retry_llm(exc: Exception) -> bool:
     return False
 
 
+_BLOCKED_HOSTS = frozenset([
+    "169.254.169.254", "metadata.google.internal",
+    "100.100.100.200",
+])
+_BLOCKED_PREFIXES = ("10.", "172.16.", "172.17.", "172.18.", "172.19.",
+                     "172.20.", "172.21.", "172.22.", "172.23.", "172.24.",
+                     "172.25.", "172.26.", "172.27.", "172.28.", "172.29.",
+                     "172.30.", "172.31.", "192.168.", "127.", "0.", "[::1]",
+                     "[fc", "[fd", "[fe80")
+
+
+def _validate_url_not_internal(url: str) -> None:
+    """Block SSRF attempts to internal/metadata addresses."""
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if host in _BLOCKED_HOSTS:
+        raise ValueError(f"URL targets a blocked address: {host}")
+    for prefix in _BLOCKED_PREFIXES:
+        if host.startswith(prefix):
+            raise ValueError(f"URL targets an internal network address: {host}")
+    if host == "localhost":
+        raise ValueError(f"URL targets localhost")
+
+
 def _normalize_base_url(url: str) -> str:
     """Ensure base URL points to an OpenAI-compatible API root.
 
@@ -147,6 +172,7 @@ def _normalize_base_url(url: str) -> str:
         https://generativelanguage.googleapis.com/v1beta → kept as-is
     """
     url = url.strip().rstrip("/")
+    _validate_url_not_internal(url)
 
     # User accidentally pasted a full endpoint path — trim back to API root
     for suffix in ("/chat/completions", "/completions", "/models", "/embeddings"):

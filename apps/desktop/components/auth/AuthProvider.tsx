@@ -105,17 +105,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const interval = setInterval(() => {
-      if (isTokenExpired()) {
+      const payload = getTokenPayload();
+      const exp = (payload?.exp as number) ?? 0;
+      const nowSec = Math.floor(Date.now() / 1000);
+      const needsRefresh = isTokenExpired() || (exp > 0 && exp - nowSec < 300);
+
+      if (needsRefresh) {
         refreshToken().then((ok) => {
           if (ok) {
             updateFromToken();
-          } else {
+          } else if (isTokenExpired()) {
             clearAccessToken();
             setIsAuthenticated(false);
           }
         });
       }
-    }, 60 * 1000);
+    }, 30 * 1000);
 
     return () => clearInterval(interval);
   }, [updateFromToken]);

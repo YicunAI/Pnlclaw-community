@@ -92,6 +92,27 @@ def _skill_to_dict(s: Any, enabled_map: dict[str, bool] | None = None) -> dict[s
     }
 
 
+_ALLOWED_SKILL_ROOTS = [
+    Path.home() / ".pnlclaw",
+    Path("/opt/pnlclaw"),
+]
+
+
+def _sanitize_extra_dirs(raw_dirs: list[str]) -> list[str]:
+    """Filter extra_dirs to only allow paths under safe root directories."""
+    safe: list[str] = []
+    for d in raw_dirs:
+        try:
+            resolved = Path(d).expanduser().resolve()
+            if any(resolved == root or root in resolved.parents for root in _ALLOWED_SKILL_ROOTS):
+                safe.append(str(resolved))
+            else:
+                logger.warning("Rejected unsafe skill directory: %s", d)
+        except Exception:
+            logger.warning("Invalid skill directory path: %s", d)
+    return safe
+
+
 def _rebuild_registry(registry: Any, settings_svc: Any) -> None:
     if registry is None or settings_svc is None:
         return
@@ -100,7 +121,7 @@ def _rebuild_registry(registry: Any, settings_svc: Any) -> None:
 
         cfg = settings_svc.get_skills_config()
         new_config = SkillsConfig(
-            extra_dirs=cfg.get("extra_dirs", []),
+            extra_dirs=_sanitize_extra_dirs(cfg.get("extra_dirs", [])),
             enabled=cfg.get("enabled", {}),
         )
         registry._config = new_config
@@ -284,6 +305,8 @@ async def update_skill(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Update a user-created skill's content or metadata."""
+    if not _SAFE_NAME_RE.match(name):
+        raise HTTPException(400, "Invalid skill name")
     if registry is None:
         raise HTTPException(503, "Skill registry not initialized")
 
@@ -328,6 +351,8 @@ async def delete_skill(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Delete a user-created skill."""
+    if not _SAFE_NAME_RE.match(name):
+        raise HTTPException(400, "Invalid skill name")
     if registry is None:
         raise HTTPException(503, "Skill registry not initialized")
 
@@ -356,6 +381,8 @@ async def toggle_skill(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
     """Enable or disable a skill, persisted to settings."""
+    if not _SAFE_NAME_RE.match(name):
+        raise HTTPException(400, "Invalid skill name")
     if registry is None:
         raise HTTPException(503, "Skill registry not initialized")
 

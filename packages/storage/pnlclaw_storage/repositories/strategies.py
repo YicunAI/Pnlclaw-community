@@ -2,14 +2,39 @@
 
 Persists ``StrategyConfig`` models to the ``strategies`` table,
 storing the full config as JSON in the ``config_json`` column.
+Strategy configs are encrypted at rest when PNLCLAW_ENCRYPTION_KEY is set.
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
 from pnlclaw_types.strategy import StrategyConfig
+
+logger = logging.getLogger(__name__)
+
+
+def _encrypt(value: str) -> str:
+    try:
+        from pnlclaw_security.encryption import encrypt_value
+
+        return encrypt_value(value)
+    except Exception:
+        return value
+
+
+def _decrypt(value: str) -> str:
+    try:
+        from pnlclaw_security.encryption import decrypt_value
+
+        return decrypt_value(value)
+    except ValueError:
+        logger.warning("Failed to decrypt strategy config — returning raw value")
+        return value
+    except Exception:
+        return value
 
 
 class StrategyRepository:
@@ -33,7 +58,7 @@ class StrategyRepository:
             The strategy ID.
         """
         now = datetime.now(UTC).isoformat()
-        config_json = strategy.model_dump_json()
+        config_json = _encrypt(strategy.model_dump_json())
 
         await self._db.execute(
             """
@@ -71,7 +96,7 @@ class StrategyRepository:
             )
         if not rows:
             return None
-        return StrategyConfig.model_validate_json(rows[0]["config_json"])
+        return StrategyConfig.model_validate_json(_decrypt(rows[0]["config_json"]))
 
     async def list(
         self,
@@ -98,7 +123,7 @@ class StrategyRepository:
                 "SELECT config_json FROM strategies ORDER BY updated_at DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             )
-        strategies = [StrategyConfig.model_validate_json(r["config_json"]) for r in rows]
+        strategies = [StrategyConfig.model_validate_json(_decrypt(r["config_json"])) for r in rows]
 
         if strategy_type is not None:
             strategies = [s for s in strategies if s.type.value == strategy_type]

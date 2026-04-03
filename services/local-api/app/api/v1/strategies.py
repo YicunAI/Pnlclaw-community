@@ -13,7 +13,7 @@ import time
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.core.dependencies import (
@@ -22,6 +22,8 @@ from app.core.dependencies import (
     get_strategy_repo,
     optional_user,
 )
+
+MAX_STRATEGIES_PER_USER = 200
 from pnlclaw_types.common import APIResponse, Pagination
 from pnlclaw_types.errors import NotFoundError
 from pnlclaw_types.strategy import (
@@ -41,8 +43,10 @@ router = APIRouter(prefix="/strategies", tags=["strategies"])
 # ---------------------------------------------------------------------------
 
 _strategies: dict[str, StrategyConfig] = {}
+_strategy_owners: dict[str, str] = {}
 _strategy_versions: dict[str, list[StrategyVersionSnapshot]] = {}
 _strategy_deployments: list[StrategyDeployment] = []
+_deploy_lock = asyncio.Lock()
 
 
 async def _persist_save(config: StrategyConfig, *, user_id: str = "local") -> None:
@@ -122,17 +126,28 @@ class ValidateStrategyRequest(BaseModel):
 
 
 async def _get_strategy(strategy_id: str, *, user_id: str = "local") -> StrategyConfig | None:
-    """Load a strategy, preferring the repository when available."""
+    """Load a strategy, preferring the repository when available.
+
+    Non-local users are denied access to strategies they don't own.
+    """
     repo = get_strategy_repo()
     if repo is not None:
         try:
             config = await repo.get(strategy_id, user_id=user_id)
             if config is not None:
                 _strategies[strategy_id] = config
+                _strategy_owners.setdefault(strategy_id, user_id)
                 return config
         except Exception:
             logger.debug("Failed to read strategy %s from repository", strategy_id, exc_info=True)
-    return _strategies.get(strategy_id)
+    cached = _strategies.get(strategy_id)
+    if cached is None:
+        return None
+    if user_id != "local":
+        owner = _strategy_owners.get(strategy_id)
+        if owner is not None and owner != user_id and owner != "local":
+            return None
+    return cached
 
 
 async def _list_strategies(
@@ -150,11 +165,17 @@ async def _list_strategies(
             configs = await repo.list(limit=limit, offset=offset, tags=tag_list, user_id=user_id)
             for config in configs:
                 _strategies[config.id] = config
+                _strategy_owners.setdefault(config.id, user_id)
             return configs
         except Exception:
             logger.debug("Failed to list strategies from repository", exc_info=True)
 
     configs = list(_strategies.values())
+    if user_id != "local":
+        configs = [
+            s for s in configs
+            if _strategy_owners.get(s.id) in (user_id, "local", None)
+        ]
     if tags:
         tag_set = {t.strip().lower() for t in tags.split(",") if t.strip()}
         configs = [s for s in configs if tag_set & {t.lower() for t in getattr(s, "tags", [])}]
@@ -251,6 +272,10 @@ async def create_strategy(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Create a new strategy and store it."""
+    user_strategy_count = sum(1 for owner in _strategy_owners.values() if owner == user.id)
+    if user_strategy_count >= MAX_STRATEGIES_PER_USER:
+        raise HTTPException(429, f"Strategy limit reached ({MAX_STRATEGIES_PER_USER})")
+
     strategy_id = f"strat-{uuid.uuid4().hex[:8]}"
     config = StrategyConfig(
         id=strategy_id,
@@ -267,6 +292,7 @@ async def create_strategy(
         source=body.source,
     )
     _strategies[strategy_id] = config
+    _strategy_owners[strategy_id] = user.id
     asyncio.create_task(_persist_save(config, user_id=user.id))
     await _save_version_snapshot(config, "initial create")
     return APIResponse(
@@ -392,7 +418,10 @@ async def list_strategy_deployments(
             except Exception:
                 pass
         if not user_strategy_ids:
-            user_strategy_ids = {sid for sid, cfg in _strategies.items()}
+            user_strategy_ids = {
+                sid for sid in _strategies
+                if _strategy_owners.get(sid) in (user.id, "local", None)
+            }
         deployments = [d for d in deployments if d.strategy_id in user_strategy_ids]
     return APIResponse(
         data=[deployment.model_dump(mode="json") for deployment in deployments],
@@ -402,7 +431,10 @@ async def list_strategy_deployments(
 
 
 @router.get("/runner/status")
-async def get_runner_status(request: Request) -> APIResponse[dict[str, Any]]:
+async def get_runner_status(
+    request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
+) -> APIResponse[dict[str, Any]]:
     """Get the status of the strategy runner and all active deployments."""
     from app.core.dependencies import get_strategy_runner
 
@@ -435,6 +467,7 @@ async def get_runner_status(request: Request) -> APIResponse[dict[str, Any]]:
 async def get_deployment_signals(
     deployment_id: str,
     request: Request,
+    user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Get signal history for a specific deployment."""
     from app.core.dependencies import get_strategy_runner
@@ -611,6 +644,16 @@ async def deploy_strategy_to_paper(
     deployment. The StrategyRunner handles account creation, rule validation,
     duplicate prevention, and historical kline warmup internally.
     """
+    async with _deploy_lock:
+        return await _deploy_strategy_inner(strategy_id, body, request, user)
+
+
+async def _deploy_strategy_inner(
+    strategy_id: str,
+    body: DeployStrategyRequest,
+    request: Request,
+    user: AuthenticatedUser,
+) -> APIResponse[dict[str, Any]]:
     config = await _get_strategy(strategy_id, user_id=user.id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
@@ -779,9 +822,15 @@ async def delete_strategy(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Delete a strategy by ID."""
-    config = _strategies.pop(strategy_id, None)
+    config = _strategies.get(strategy_id)
     if config is None:
         raise NotFoundError(f"Strategy '{strategy_id}' not found")
+    if user.id != "local":
+        owner = _strategy_owners.get(strategy_id)
+        if owner is not None and owner != user.id and owner != "local":
+            raise NotFoundError(f"Strategy '{strategy_id}' not found")
+    _strategies.pop(strategy_id, None)
+    _strategy_owners.pop(strategy_id, None)
     asyncio.create_task(_persist_delete(strategy_id, user_id=user.id))
     return APIResponse(
         data={"deleted": strategy_id},

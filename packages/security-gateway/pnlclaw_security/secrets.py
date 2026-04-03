@@ -158,6 +158,25 @@ class SecretManager:
         except ImportError:
             return False
 
+    def keyring_backend_info(self) -> dict[str, object]:
+        """Return diagnostics about the active keyring backend and encryption."""
+        from pnlclaw_security.encryption import is_encryption_available
+
+        info: dict[str, object] = {"available": self.keyring_available(), "encryption_active": is_encryption_available()}
+        if self.keyring_available():
+            try:
+                import keyring  # type: ignore[import-untyped]
+
+                backend = keyring.get_keyring()
+                name = type(backend).__name__
+                info["backend"] = name
+                plaintext_backends = {"PlaintextKeyring", "NullKeyring", "ChainerBackend"}
+                info["is_secure_backend"] = name not in plaintext_backends
+            except Exception:
+                info["backend"] = "unknown"
+                info["is_secure_backend"] = False
+        return info
+
     async def exists(self, ref: SecretRef) -> bool:
         """Return True if the secret exists in the referenced source."""
         try:
@@ -244,6 +263,7 @@ class SecretManager:
 
         The ``keyring`` library is an optional dependency. If not installed,
         raises :class:`SecretResolutionError` with a helpful message.
+        Transparently decrypts Fernet-encrypted values.
         """
         keyring = self._import_keyring()
 
@@ -251,12 +271,20 @@ class SecretManager:
         value = keyring.get_password(service, ref.id)
         if value is None:
             raise SecretResolutionError(f"No keyring entry found for service={service!r}, key={ref.id!r}")
-        return value
+
+        from pnlclaw_security.encryption import decrypt_value
+
+        try:
+            return decrypt_value(value)
+        except ValueError:
+            return value
 
     async def _store_keyring(self, ref: SecretRef, value: str) -> None:
         keyring = self._import_keyring()
         service = ref.provider or "pnlclaw"
-        keyring.set_password(service, ref.id, value)
+        from pnlclaw_security.encryption import encrypt_value
+
+        keyring.set_password(service, ref.id, encrypt_value(value))
 
     async def _delete_keyring(self, ref: SecretRef) -> None:
         keyring = self._import_keyring()

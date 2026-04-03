@@ -12,9 +12,11 @@ class AdminAPIConfig(ProDatabaseConfig):
     and adds HTTP-specific configuration.
     """
 
-    host: str = "0.0.0.0"
+    host: str = "127.0.0.1"
     port: int = 8001
     cors_origins: list[str] = [
+        "https://pnlclaw.com",
+        "https://www.pnlclaw.com",
         "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",

@@ -52,7 +52,7 @@ export async function login(provider: string): Promise<void> {
   if (!AUTH_API) return;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const qs = origin ? `?redirect_to=${encodeURIComponent(origin)}` : "";
-  const res = await fetch(`${AUTH_API}/auth/login/${encodeURIComponent(provider)}${qs}`);
+  const res = await fetch(`${AUTH_API}/login/${encodeURIComponent(provider)}${qs}`);
   const json = await res.json();
   const url = json?.data?.redirect_url ?? json?.redirect_url;
   if (url) {
@@ -73,7 +73,7 @@ export async function handleCallback(
   if (!AUTH_API) return { status: "error" };
   try {
     const res = await fetch(
-      `${AUTH_API}/auth/callback/${encodeURIComponent(provider)}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state ?? "")}`,
+      `${AUTH_API}/callback/${encodeURIComponent(provider)}?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state ?? "")}`,
       { credentials: "include" },
     );
     const json = await res.json();
@@ -94,7 +94,7 @@ export async function handleCallback(
 export async function refreshToken(): Promise<boolean> {
   if (!AUTH_API) return false;
   try {
-    const res = await fetch(`${AUTH_API}/auth/refresh`, {
+    const res = await fetch(`${AUTH_API}/refresh`, {
       method: "POST",
       credentials: "include",
     });
@@ -116,4 +116,36 @@ export function logout(): void {
   if (typeof window !== "undefined") {
     window.location.href = "/";
   }
+}
+
+let _refreshPromise: Promise<boolean> | null = null;
+
+/**
+ * Wrapper around fetch that auto-refreshes the access token on 401.
+ * Use this instead of raw fetch() for authenticated API calls.
+ */
+export async function authFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<Response> {
+  const doFetch = () => {
+    const token = getAccessToken();
+    const headers = new Headers(init?.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(input, { ...init, headers });
+  };
+
+  let res = await doFetch();
+  if (res.status === 401 && isAuthEnabled()) {
+    if (!_refreshPromise) {
+      _refreshPromise = refreshToken().finally(() => {
+        _refreshPromise = null;
+      });
+    }
+    const ok = await _refreshPromise;
+    if (ok) {
+      res = await doFetch();
+    }
+  }
+  return res;
 }

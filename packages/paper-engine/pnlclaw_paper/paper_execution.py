@@ -9,9 +9,11 @@ Implements the ExecutionEngine protocol for paper (simulated) trading:
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import time
+from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
@@ -61,6 +63,7 @@ class PaperExecutionEngine:
         self._initial_balance = initial_balance
 
         self._last_prices: dict[str, float] = {}
+        self._account_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 
         self._on_order_update_cbs: list[Callable[[Order], Any]] = []
         self._on_fill_cbs: list[Callable[[Fill], Any]] = []
@@ -151,7 +154,33 @@ class PaperExecutionEngine:
         the symbol.  This guarantees immediate fill for market orders.
 
         Margin check: required margin = quantity / leverage (skipped for reduce_only).
+        Per-account lock prevents TOCTOU balance race conditions.
         """
+        async with self._account_locks[account_id]:
+            return await self._place_order_inner(
+                account_id=account_id, symbol=symbol, side=side, order_type=order_type,
+                quantity=quantity, price=price, stop_price=stop_price, leverage=leverage,
+                margin_mode=margin_mode, pos_side=pos_side, reduce_only=reduce_only,
+                mark_price=mark_price, signal_timestamp_ms=signal_timestamp_ms,
+            )
+
+    async def _place_order_inner(
+        self,
+        *,
+        account_id: str,
+        symbol: str,
+        side: OrderSide,
+        order_type: OrderType,
+        quantity: float,
+        price: float | None = None,
+        stop_price: float | None = None,
+        leverage: int = 1,
+        margin_mode: MarginMode = MarginMode.CROSS,
+        pos_side: PositionSide = PositionSide.NET,
+        reduce_only: bool = False,
+        mark_price: float | None = None,
+        signal_timestamp_ms: int | None = None,
+    ) -> Order:
         if not reduce_only:
             required_margin = quantity / leverage
             acct = self._account_mgr.get_account(account_id)

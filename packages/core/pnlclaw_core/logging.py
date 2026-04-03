@@ -19,6 +19,13 @@ _REDACT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"(password[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
     re.compile(r"(Bearer\s+[A-Za-z0-9._\-]{5})[A-Za-z0-9._\-]+"),
     re.compile(r"(eyJ[A-Za-z0-9_\-]{5})[A-Za-z0-9._\-]+"),  # JWT-like
+    re.compile(r"(api_key[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
+    re.compile(r"(api_secret[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
+    re.compile(r"(passphrase[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9]{3})[A-Za-z0-9]+", re.IGNORECASE),
+    re.compile(r"(fernet:[A-Za-z0-9_/+]{5})[A-Za-z0-9_/+=]+"),  # Fernet tokens
+    re.compile(r"(ghp_[A-Za-z0-9]{3})[A-Za-z0-9]+"),  # GitHub PAT
+    re.compile(r"(gho_[A-Za-z0-9]{3})[A-Za-z0-9]+"),  # GitHub OAuth
+    re.compile(r"(://[^:]+:)[^@]+(@)", re.IGNORECASE),  # URL credentials
 ]
 
 

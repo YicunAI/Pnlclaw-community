@@ -67,6 +67,25 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
+async def _count_admins(user_repo: Any) -> int:
+    """Count the number of users with admin role in the database."""
+    try:
+        from sqlalchemy import func, select
+        from pnlclaw_pro_storage.models import User
+
+        async with user_repo._db.session() as session:
+            result = await session.execute(
+                select(func.count()).where(
+                    User.role == "admin",
+                    User.deleted_at.is_(None),
+                )
+            )
+            return result.scalar_one()
+    except Exception:
+        logger.warning("Failed to count admin users, assuming 0", exc_info=True)
+        return 0
+
+
 async def _record_login(
     request: Request,
     user_id: str,
@@ -126,25 +145,29 @@ async def _record_login(
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     """Set refresh token as an HttpOnly secure cookie."""
+    import os
+    is_production = os.environ.get("PNLCLAW_ENV") == "production"
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
+        secure=is_production,
         samesite="lax",
         max_age=30 * 24 * 60 * 60,
-        path="/api/v1/auth",
+        path="/",
     )
 
 
 def _clear_refresh_cookie(response: Response) -> None:
     """Clear the refresh token cookie."""
+    import os
+    is_production = os.environ.get("PNLCLAW_ENV") == "production"
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        secure=False,
+        secure=is_production,
         samesite="lax",
-        path="/api/v1/auth",
+        path="/",
     )
 
 
@@ -341,8 +364,10 @@ async def oauth_callback(
             message="Provider did not return a valid user ID",
         )
 
-    # 4. Find or create user
+    # 4. Find or create user — with registration gate + admin bootstrap
     oauth_account = await oauth_repo.get_by_provider(provider, provider_user_id)
+
+    is_new_user = False
 
     if oauth_account is not None:
         user = await user_repo.get_by_id(oauth_account.user_id)
@@ -357,11 +382,44 @@ async def oauth_callback(
     else:
         user = await user_repo.get_by_email(email) if email else None
         if user is None:
+            # --- REGISTRATION GATE ---
+            open_reg = getattr(auth_config, "open_registration", False)
+            if not open_reg:
+                initial_email = getattr(auth_config, "initial_admin_email", "")
+                if not initial_email or (email.lower() != initial_email.lower()):
+                    logger.warning(
+                        "Registration rejected (closed): provider=%s email=%s",
+                        provider,
+                        email[:3] + "***" if email else "N/A",
+                    )
+                    raise PnLClawError(
+                        code=ErrorCode.PERMISSION_DENIED,
+                        message="Registration is currently closed. Please contact the administrator for an invitation.",
+                    )
+
+            # --- ADMIN BOOTSTRAP ---
+            initial_email = getattr(auth_config, "initial_admin_email", "")
+            assign_role = "user"
+            if initial_email and email and email.lower() == initial_email.lower():
+                admin_count = await _count_admins(user_repo)
+                max_admins = getattr(auth_config, "max_admin_count", 1)
+                if admin_count < max_admins:
+                    assign_role = "admin"
+                    logger.info("Bootstrapping initial admin: email=%s", email[:3] + "***")
+                else:
+                    logger.warning(
+                        "Admin cap reached (%d/%d), creating as regular user: email=%s",
+                        admin_count, max_admins, email[:3] + "***",
+                    )
+
             user = await user_repo.create(
                 email=email,
                 display_name=display_name,
                 avatar_url=avatar_url,
+                role=assign_role,
             )
+            is_new_user = True
+
         await oauth_repo.create(
             user_id=user.id,
             provider=provider,
@@ -376,6 +434,12 @@ async def oauth_callback(
         raise PnLClawError(
             code=ErrorCode.INTERNAL_ERROR,
             message="Failed to find or create user account",
+        )
+
+    if is_new_user:
+        logger.info(
+            "New user registered via OAuth: id=%s role=%s provider=%s",
+            str(user.id)[:8] + "...", user.role, provider,
         )
 
     # 5. Check user status
@@ -738,12 +802,18 @@ async def link_provider(
         )
 
     try:
-        jwt_mgr.decode_state_token(state)
+        state_payload = jwt_mgr.decode_state_token(state)
     except Exception as exc:
         raise PnLClawError(
             code=ErrorCode.AUTHENTICATION_ERROR,
             message="Invalid or expired state token",
         ) from exc
+
+    if state_payload.get("provider") != provider:
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message="State token provider mismatch",
+        )
 
     redirect_uri = _get_redirect_uri(auth_config, provider)
     oauth_provider = providers[provider]

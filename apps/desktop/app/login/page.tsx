@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { handleCallback, isAuthEnabled, login } from "@/lib/auth";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -26,10 +26,11 @@ function LoginContent() {
   const [providers, setProviders] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [processing, setProcessing] = useState(false);
+  const callbackAttempted = useRef(false);
 
   useEffect(() => {
     if (!AUTH_API) return;
-    fetch(`${AUTH_API}/auth/providers`)
+    fetch(`${AUTH_API}/providers`)
       .then((r) => r.json())
       .then((json) => {
         const list = json?.data?.providers ?? json?.providers ?? [];
@@ -49,7 +50,8 @@ function LoginContent() {
     const callback = params.get("callback");
     const code = params.get("code");
     const state = params.get("state");
-    if (callback && code && !processing) {
+    if (callback && code && !callbackAttempted.current) {
+      callbackAttempted.current = true;
       setProcessing(true);
       handleCallback(callback, code, state ?? undefined).then((result) => {
         if (result.status === "ok") {
@@ -62,7 +64,7 @@ function LoginContent() {
         }
       });
     }
-  }, [params, processing, router, syncAuth]);
+  }, [params, router, syncAuth]);
 
   if (!isAuthEnabled()) {
     return (

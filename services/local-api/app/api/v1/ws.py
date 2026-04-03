@@ -36,18 +36,64 @@ _poly_ws_lock = asyncio.Lock()
 # ---------------------------------------------------------------------------
 
 
+_ALLOWED_ORIGINS: set[str] = {
+    "https://pnlclaw.com",
+    "https://www.pnlclaw.com",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+}
+
+_MAX_WS_CONNECTIONS_PER_IP = 20
+_MAX_WS_CONNECTIONS_GLOBAL = 200
+_ip_connection_counts: dict[str, int] = {}
+
+
+def _check_origin(ws: WebSocket) -> bool:
+    """Validate Origin header against the allow-list (CSWSH protection)."""
+    origin = ws.headers.get("origin", "")
+    if not origin:
+        return True
+    return origin in _ALLOWED_ORIGINS
+
+
+def _get_client_ip(ws: WebSocket) -> str:
+    forwarded = ws.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return ws.client.host if ws.client else "unknown"
+
+
 class ConnectionManager:
     """Track active WebSocket connections and their subscriptions."""
 
     def __init__(self) -> None:
         self._connections: dict[WebSocket, set[str]] = {}
 
-    async def connect(self, ws: WebSocket) -> None:
+    async def connect(self, ws: WebSocket) -> bool:
+        """Accept connection if within limits. Returns False if rejected."""
+        if not _check_origin(ws):
+            await ws.close(code=4003, reason="Origin not allowed")
+            return False
+        ip = _get_client_ip(ws)
+        ip_count = _ip_connection_counts.get(ip, 0)
+        total = sum(m.active_count for m in _ALL_MANAGERS)
+        if ip_count >= _MAX_WS_CONNECTIONS_PER_IP or total >= _MAX_WS_CONNECTIONS_GLOBAL:
+            await ws.close(code=4029, reason="Too many connections")
+            return False
         await ws.accept()
         self._connections[ws] = set()
+        _ip_connection_counts[ip] = ip_count + 1
+        return True
 
     def disconnect(self, ws: WebSocket) -> None:
-        self._connections.pop(ws, None)
+        if ws in self._connections:
+            del self._connections[ws]
+            ip = _get_client_ip(ws)
+            cnt = _ip_connection_counts.get(ip, 1) - 1
+            if cnt <= 0:
+                _ip_connection_counts.pop(ip, None)
+            else:
+                _ip_connection_counts[ip] = cnt
 
     def subscribe(self, ws: WebSocket, channel: str) -> None:
         if ws in self._connections:
@@ -83,6 +129,10 @@ _paper_manager = ConnectionManager()
 _trading_manager = ConnectionManager()
 _polymarket_manager = ConnectionManager()
 _agent_manager = ConnectionManager()
+_ALL_MANAGERS = [_market_manager, _paper_manager, _trading_manager, _polymarket_manager, _agent_manager]
+
+# Per-WS user_id tracking (for user-scoped channels)
+_ws_user_ids: dict[WebSocket, str] = {}
 
 
 # ---------------------------------------------------------------------------
@@ -103,7 +153,8 @@ async def ws_markets(ws: WebSocket) -> None:
         ``{"type": "kline", "symbol": "BTC/USDT", "data": {...}}``
         ``{"type": "depth", "symbol": "BTC/USDT", "data": {...}}``
     """
-    await _market_manager.connect(ws)
+    if not await _market_manager.connect(ws):
+        return
     logger.info("ws_market_connected", connections=_market_manager.active_count)
     try:
         while True:
@@ -174,8 +225,12 @@ async def ws_markets(ws: WebSocket) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_ws_user(ws: WebSocket) -> str | None:
-    """Extract user_id from the first query param ``token`` on a WS connection.
+async def _resolve_ws_user(ws: WebSocket, *, token: str | None = None) -> str | None:
+    """Extract user_id from a JWT token.
+
+    Accepts token from:
+    1. Explicit ``token`` parameter (first-message auth, preferred)
+    2. Query param ``?token=`` (legacy, still supported)
 
     Returns the user_id string if auth is enabled and the token is valid,
     ``"local"`` when auth is disabled (Community mode), or ``None`` on failure.
@@ -186,7 +241,8 @@ async def _resolve_ws_user(ws: WebSocket) -> str | None:
     if jwt_mgr is None:
         return "local"
 
-    token = ws.query_params.get("token", "")
+    if not token:
+        token = ws.query_params.get("token", "")
     if not token:
         return None
     try:
@@ -197,14 +253,17 @@ async def _resolve_ws_user(ws: WebSocket) -> str | None:
 
 
 async def _verify_account_ownership(user_id: str, account_id: str) -> bool:
-    """Check if the given user owns the paper account (or auth is disabled)."""
+    """Check if the given user owns the paper account (or auth is disabled).
+
+    Fail-close: exceptions deny access rather than granting it.
+    """
     if user_id == "local":
         return True
     from app.core.dependencies import get_db_manager
 
     db = get_db_manager()
     if db is None:
-        return True
+        return False
     try:
         from pnlclaw_storage.repositories.paper_accounts import PaperAccountRepository
 
@@ -215,7 +274,8 @@ async def _verify_account_ownership(user_id: str, account_id: str) -> bool:
         acct_user = acct.get("user_id", "local")
         return acct_user == user_id or acct_user == "local"
     except Exception:
-        return True
+        logger.warning("account_ownership_check_failed", account_id=account_id, exc_info=True)
+        return False
 
 
 @router.websocket("/api/v1/ws/paper")
@@ -231,7 +291,8 @@ async def ws_paper(ws: WebSocket) -> None:
         ``{"type": "position_update", "account_id": "pa-xxx", "data": {...}}``
         ``{"type": "pnl_update", "account_id": "pa-xxx", "data": {...}}``
     """
-    await _paper_manager.connect(ws)
+    if not await _paper_manager.connect(ws):
+        return
     ws_user_id = await _resolve_ws_user(ws)
     logger.info("ws_paper_connected", connections=_paper_manager.active_count, user=ws_user_id)
     try:
@@ -321,8 +382,11 @@ async def ws_trading(ws: WebSocket) -> None:
         ``{"type": "position_update", "data": {...}}``
         ``{"type": "balance_update", "data": [...]}``
     """
-    await _trading_manager.connect(ws)
+    if not await _trading_manager.connect(ws):
+        return
     ws_user_id = await _resolve_ws_user(ws)
+    if ws_user_id:
+        _ws_user_ids[ws] = ws_user_id
     logger.info("ws_trading_connected", connections=_trading_manager.active_count, user=ws_user_id)
     try:
         while True:
@@ -344,6 +408,18 @@ async def ws_trading(ws: WebSocket) -> None:
             action = msg.get("action")
             channels = msg.get("channels", [])
 
+            # First-message auth support
+            if action == "auth":
+                token = msg.get("token", "")
+                resolved = await _resolve_ws_user(ws, token=token)
+                if resolved:
+                    ws_user_id = resolved
+                    _ws_user_ids[ws] = ws_user_id
+                    await ws.send_json({"type": "authenticated", "timestamp": int(time.time() * 1000)})
+                else:
+                    await ws.send_json({"type": "error", "message": "Invalid token"})
+                continue
+
             if action == "subscribe":
                 if ws_user_id is None:
                     await ws.send_json(
@@ -355,7 +431,7 @@ async def ws_trading(ws: WebSocket) -> None:
                     )
                     continue
                 for ch in channels:
-                    _trading_manager.subscribe(ws, f"trading:{ch}")
+                    _trading_manager.subscribe(ws, f"trading:{ws_user_id}:{ch}")
                 await ws.send_json(
                     {
                         "type": "subscribed",
@@ -365,7 +441,7 @@ async def ws_trading(ws: WebSocket) -> None:
                 )
             elif action == "unsubscribe":
                 for ch in channels:
-                    _trading_manager.unsubscribe(ws, f"trading:{ch}")
+                    _trading_manager.unsubscribe(ws, f"trading:{ws_user_id or 'local'}:{ch}")
                 await ws.send_json(
                     {
                         "type": "unsubscribed",
@@ -379,6 +455,7 @@ async def ws_trading(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        _ws_user_ids.pop(ws, None)
         _trading_manager.disconnect(ws)
         logger.info("ws_trading_disconnected", connections=_trading_manager.active_count)
 
@@ -416,14 +493,16 @@ async def ws_agent(ws: WebSocket) -> None:
         ``{"type": "final_answer", "data": {"text": "..."}}``
         ``{"type": "done", "data": {}}``
     """
-    await _agent_manager.connect(ws)
+    if not await _agent_manager.connect(ws):
+        return
     ws_user_id = await _resolve_ws_user(ws)
     if ws_user_id is None:
         await ws.send_json({"type": "error", "message": "Authentication required"})
         _agent_manager.disconnect(ws)
         await ws.close(code=4001, reason="Authentication required")
         return
-    _agent_manager.subscribe(ws, "agent:reasoning")
+    _ws_user_ids[ws] = ws_user_id
+    _agent_manager.subscribe(ws, f"agent:{ws_user_id}:reasoning")
     logger.info("ws_agent_connected", connections=_agent_manager.active_count, user=ws_user_id)
     try:
         while True:
@@ -456,15 +535,26 @@ async def ws_agent(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        _ws_user_ids.pop(ws, None)
         _agent_manager.disconnect(ws)
         logger.info("ws_agent_disconnected", connections=_agent_manager.active_count)
 
 
 async def _handle_agent_chat_ws(ws: WebSocket, message: str, session_id: str | None) -> None:
     """Process a chat message through AgentRuntime and push events over WS."""
-    from app.core.dependencies import get_agent_runtime
+    from app.core.dependencies import get_agent_runtime, get_settings_service
 
-    runtime = get_agent_runtime()
+    user_id = _ws_user_ids.get(ws, "local")
+    uid = user_id if user_id != "local" else None
+    runtime = None
+    try:
+        from app.api.v1.agent import _get_user_runtime
+        settings_service = get_settings_service()
+        runtime = await _get_user_runtime(settings_service, user_id=uid)
+    except Exception:
+        pass
+    if runtime is None:
+        runtime = get_agent_runtime()
     ts = int(time.time() * 1000)
 
     if runtime is None:
@@ -508,10 +598,15 @@ async def _handle_agent_chat_ws(ws: WebSocket, message: str, session_id: str | N
         await ws.send_json({"type": "done", "data": {}, "timestamp": int(time.time() * 1000)})
 
 
-async def broadcast_agent_event(event_type: str, data: dict[str, Any]) -> None:
-    """Push an agent reasoning event to all subscribed WS clients."""
+async def broadcast_agent_event(
+    event_type: str,
+    data: dict[str, Any],
+    *,
+    user_id: str = "local",
+) -> None:
+    """Push an agent reasoning event to the user's subscribed WS clients."""
     await _agent_manager.broadcast(
-        "agent:reasoning",
+        f"agent:{user_id}:reasoning",
         {"type": event_type, "data": data, "timestamp": int(time.time() * 1000)},
     )
 
@@ -562,16 +657,23 @@ async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str
     )
 
 
-async def broadcast_trading_event(channel: str, event_type: str, data: dict[str, Any]) -> None:
+async def broadcast_trading_event(
+    channel: str,
+    event_type: str,
+    data: dict[str, Any],
+    *,
+    user_id: str = "local",
+) -> None:
     """Push a trading event (order/fill/position/balance) to WS subscribers.
 
     Args:
         channel: One of 'orders', 'positions', 'balances'.
         event_type: Event type string, e.g. 'order_update', 'fill', 'balance_update'.
         data: Serialized event data.
+        user_id: Scope broadcast to this user's channel only.
     """
     await _trading_manager.broadcast(
-        f"trading:{channel}",
+        f"trading:{user_id}:{channel}",
         {"type": event_type, "data": data, "timestamp": int(time.time() * 1000)},
     )
 
@@ -778,7 +880,8 @@ async def ws_polymarket(ws: WebSocket) -> None:
         ``{"type": "price_change", "data": {...}}``
         ``{"type": "last_trade", "data": {...}}``
     """
-    await _polymarket_manager.connect(ws)
+    if not await _polymarket_manager.connect(ws):
+        return
     logger.info("ws_polymarket_connected", connections=_polymarket_manager.active_count)
 
     poly_ws = await _ensure_poly_ws()

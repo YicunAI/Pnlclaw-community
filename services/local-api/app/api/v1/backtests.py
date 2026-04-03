@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.core.dependencies import (
@@ -60,6 +60,7 @@ class BacktestTask(BaseModel):
 
 
 _MAX_TASKS = 1000
+_MAX_CONCURRENT_PER_USER = 10
 _tasks: dict[str, BacktestTask] = {}
 
 _result_owners: dict[str, str] = {}
@@ -112,14 +113,14 @@ async def _run_backtest(task: BacktestTask, body: RunBacktestRequest) -> None:
     """Execute backtest in background using the real BacktestEngine."""
     task.status = BacktestTaskStatus.RUNNING
     try:
-        from app.api.v1.strategies import _strategies
+        from app.api.v1.strategies import _get_strategy
         from pnlclaw_backtest.commissions import PercentageCommission
         from pnlclaw_backtest.engine import BacktestConfig, BacktestEngine
         from pnlclaw_strategy.compiler import compile as compile_strategy
         from pnlclaw_strategy.models import EngineStrategyConfig
         from pnlclaw_strategy.runtime import StrategyRuntime
 
-        config = _strategies.get(body.strategy_id)
+        config = await _get_strategy(body.strategy_id, user_id=task.user_id)
         if config is None:
             raise ValueError(f"Strategy '{body.strategy_id}' not found")
 
@@ -248,6 +249,17 @@ async def _load_kline_data(
         path = Path(body.data_path)
         if not path.is_absolute():
             path = Path.cwd() / path
+        safe_root = Path.home() / ".pnlclaw" / "data"
+        demo_root = Path.cwd() / "demo" / "data"
+        try:
+            resolved = path.resolve()
+            if not (
+                str(resolved).startswith(str(safe_root.resolve()))
+                or str(resolved).startswith(str(demo_root.resolve()))
+            ):
+                raise PermissionError(f"data_path must be under {safe_root} or {demo_root}")
+        except (OSError, ValueError) as exc:
+            raise PermissionError(f"Invalid data_path: {exc}") from exc
         if path.exists() and path.suffix == ".parquet":
             return pd.read_parquet(path)
         raise FileNotFoundError(f"Data file not found: {body.data_path}")
@@ -428,6 +440,13 @@ async def start_backtest(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[dict[str, Any]]:
     """Start a backtest (async).  Returns 202 with a task_id."""
+    active_count = sum(
+        1 for t in _tasks.values()
+        if t.user_id == user.id and t.status in (BacktestTaskStatus.PENDING, BacktestTaskStatus.RUNNING)
+    )
+    if active_count >= _MAX_CONCURRENT_PER_USER:
+        raise HTTPException(429, f"Too many active backtests ({_MAX_CONCURRENT_PER_USER} max)")
+
     task_id = f"bt-{uuid.uuid4().hex[:8]}"
     task = BacktestTask(task_id=task_id, strategy_id=body.strategy_id, user_id=user.id)
     _tasks[task_id] = task
@@ -464,7 +483,7 @@ async def get_backtest(
     cached = _get_results_store().get(task_id)
     if cached is not None:
         owner = _result_owners.get(task_id)
-        if user.id != "local" and owner is not None and owner != user.id:
+        if user.id != "local" and (owner is None or owner != user.id):
             raise NotFoundError(f"Backtest task '{task_id}' not found")
         return APIResponse(
             data=_result_to_frontend_dict(cached),
@@ -520,7 +539,7 @@ async def list_backtests(
         if result.id in seen_ids:
             continue
         owner = _result_owners.get(result.id)
-        if user.id != "local" and owner is not None and owner != user.id:
+        if user.id != "local" and (owner is None or owner != user.id):
             continue
         payload = _result_to_frontend_dict(result)
         items.append(payload)

@@ -8,6 +8,7 @@ instances can be overridden via ``app.dependency_overrides``.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from fastapi import Depends, Request
@@ -28,6 +29,9 @@ _jwt_manager: Any | None = None
 _auth_enabled: bool = False
 
 _bearer_scheme = HTTPBearer(auto_error=False)
+
+
+_UUID_RE = re.compile(r"^[0-9a-fA-F-]{1,40}$")
 
 
 class AuthenticatedUser(BaseModel):
@@ -77,6 +81,11 @@ async def require_user(
             code=ErrorCode.AUTHENTICATION_ERROR,
             message="Token missing user identity",
         )
+    if not _UUID_RE.match(user_id):
+        raise PnLClawError(
+            code=ErrorCode.AUTHENTICATION_ERROR,
+            message="Invalid user ID format",
+        )
 
     return AuthenticatedUser(id=user_id, role=payload.get("role", "user"))
 
@@ -106,6 +115,11 @@ async def optional_user(
             raise PnLClawError(
                 code=ErrorCode.AUTHENTICATION_ERROR,
                 message="Token missing user identity",
+            )
+        if not _UUID_RE.match(user_id):
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message="Invalid user ID format",
             )
         return AuthenticatedUser(
             id=user_id,

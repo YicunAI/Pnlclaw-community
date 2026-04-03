@@ -142,10 +142,16 @@ async def create_invitation(
             message=f"Invalid role: {body.role}. Must be one of {_VALID_ROLES}",
         )
 
-    if effective_role in ("admin", "operator") and admin.role != "admin":
+    if effective_role == "admin":
         raise PnLClawError(
             code=ErrorCode.PERMISSION_DENIED,
-            message="Only admins can create invitations for privileged roles",
+            message="Admin role can only be assigned during initial bootstrap via INITIAL_ADMIN_EMAIL. "
+            "Cannot create admin invitations.",
+        )
+    if effective_role == "operator" and admin.role != "admin":
+        raise PnLClawError(
+            code=ErrorCode.PERMISSION_DENIED,
+            message="Only admins can create invitations for operator roles",
         )
 
     code = secrets.token_urlsafe(12)[:16]

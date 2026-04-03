@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 _AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 _TOKEN_URL = "https://github.com/login/oauth/access_token"
 _USER_URL = "https://api.github.com/user"
+_EMAILS_URL = "https://api.github.com/user/emails"
 _SCOPE = "read:user user:email"
 
 
@@ -73,19 +74,39 @@ class GitHubOAuthProvider:
         )
 
     async def get_user_info(self, access_token: str) -> OAuthUserInfo:
-        """Fetch the authenticated user's profile from GitHub."""
+        """Fetch the authenticated user's profile from GitHub.
+
+        If the /user endpoint does not include an email (private email),
+        falls back to /user/emails to find the primary verified address.
+        """
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.github+json",
+        }
         client = self._make_client()
         client.token = {"access_token": access_token, "token_type": "Bearer"}
         try:
-            resp = await client.get(
-                _USER_URL,
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/vnd.github+json",
-                },
-            )
+            resp = await client.get(_USER_URL, headers=headers)
             resp.raise_for_status()
             data = resp.json()
+
+            email = data.get("email") or ""
+
+            if not email:
+                try:
+                    emails_resp = await client.get(_EMAILS_URL, headers=headers)
+                    emails_resp.raise_for_status()
+                    for entry in emails_resp.json():
+                        if entry.get("primary") and entry.get("verified"):
+                            email = entry["email"]
+                            break
+                    if not email:
+                        for entry in emails_resp.json():
+                            if entry.get("verified"):
+                                email = entry["email"]
+                                break
+                except Exception:
+                    logger.warning("Failed to fetch /user/emails, proceeding without email")
         except Exception as exc:
             raise OAuthError(f"GitHub user info request failed: {exc}") from exc
         finally:
@@ -98,7 +119,7 @@ class GitHubOAuthProvider:
         return OAuthUserInfo(
             provider="github",
             provider_user_id=provider_user_id,
-            email=data.get("email"),
+            email=email or None,
             name=data.get("name") or data.get("login"),
             avatar_url=data.get("avatar_url"),
         )

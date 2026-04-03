@@ -20,6 +20,7 @@ from app.core.dependencies import (
     optional_user,
     set_execution_mode,
 )
+from pnlclaw_types.errors import PnLClawError, ErrorCode
 from pnlclaw_types.trading import (
     BalanceUpdate,
     ExecutionMode,
@@ -38,6 +39,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/trading", tags=["trading"])
 
 DEFAULT_ACCOUNT = "paper-default"
+
+
+def _verify_trading_ownership(account_id: str, user: AuthenticatedUser) -> None:
+    """Verify the user owns the account. Delegates to paper module's registry."""
+    if user.id == "local":
+        return
+    try:
+        from app.api.v1.paper import _owner_of
+        owner = _owner_of(account_id)
+        if owner is not None and owner != user.id and owner != "local":
+            raise PnLClawError(ErrorCode.PERMISSION_DENIED, "You do not have access to this account")
+    except ImportError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +129,7 @@ async def place_order(
 
     Applies risk engine pre-check before delegating to the execution engine.
     """
+    _verify_trading_ownership(req.account_id, user)
     if engine is None:
         raise HTTPException(status_code=503, detail="Live execution engine not configured. Please add API keys.")
 
@@ -204,6 +219,7 @@ async def get_orders(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Order]:
     """Get orders, optionally filtered by status."""
+    _verify_trading_ownership(account_id, user)
     if engine is None:
         raise HTTPException(status_code=503, detail="Live execution engine not configured. Please add API keys.")
 
@@ -222,6 +238,7 @@ async def get_positions(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Position]:
     """Get all open positions."""
+    _verify_trading_ownership(account_id, user)
     if engine is None:
         raise HTTPException(status_code=503, detail="Live execution engine not configured. Please add API keys.")
 
@@ -240,6 +257,7 @@ async def get_balances(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[BalanceUpdate]:
     """Get account balances."""
+    _verify_trading_ownership(account_id, user)
     if engine is None:
         raise HTTPException(status_code=503, detail="Live execution engine not configured. Please add API keys.")
 
@@ -258,6 +276,7 @@ async def get_trade_history(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[Fill]:
     """Get trade execution history (fills)."""
+    _verify_trading_ownership(account_id, user)
     if engine is None:
         raise HTTPException(status_code=503, detail="Live execution engine not configured. Please add API keys.")
 

@@ -137,8 +137,8 @@ class _RefreshTokenRepoAdapter:
             "expires_at": rt.expires_at,
         }
 
-    async def mark_used(self, token_hash: str) -> None:
-        await self._repo.use_refresh_token(token_hash)
+    async def mark_used(self, token_hash: str) -> bool:
+        return await self._repo.use_refresh_token(token_hash)
 
     async def revoke_all_for_session(self, session_id: Any) -> None:
         pass  # pro-storage doesn't expose this; handled by session revocation

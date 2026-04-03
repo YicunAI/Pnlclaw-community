@@ -95,6 +95,7 @@ class TurnState:
     """Tracks a single agent turn (one user message → response cycle)."""
 
     session_id: str
+    user_id: str
     user_message: str
     status: str = "running"  # running | completed | failed
     started_at: float = dc_field(default_factory=time.monotonic)
@@ -106,22 +107,23 @@ class TurnState:
     active_tool: str = ""
 
 
-_active_turns: dict[str, TurnState] = {}
+# Key is (user_id, session_id) to prevent cross-user turn hijacking
+_active_turns: dict[tuple[str, str], TurnState] = {}
 
 
 def _cleanup_stale_turns() -> None:
     """Remove turns that have been completed/failed for > TTL."""
     now = time.monotonic()
     stale = [
-        sid
-        for sid, ts in _active_turns.items()
+        key
+        for key, ts in _active_turns.items()
         if ts.status != "running" and (now - ts.last_checkpoint_at) > _TURN_TTL_SECONDS
     ]
-    for sid in stale:
-        t = _active_turns.pop(sid, None)
+    for key in stale:
+        t = _active_turns.pop(key, None)
         if t and t.producer_task and not t.producer_task.done():
             t.producer_task.cancel()
-        _logger.debug("Cleaned up stale turn for session %s", sid)
+        _logger.debug("Cleaned up stale turn for %s", key)
 
 
 # ---------------------------------------------------------------------------
@@ -465,9 +467,10 @@ async def _guarded_agent_stream(
     settings_service: Any = None,
     *,
     resume: bool = False,
+    user_id: str = "local",
 ) -> AsyncIterator[str]:
     """Wrapper that applies output filtering on the real agent stream."""
-    async for chunk in _agent_stream(runtime, message, session_id, settings_service, resume=resume):
+    async for chunk in _agent_stream(runtime, message, session_id, settings_service, resume=resume, user_id=user_id):
         if _SECURITY_AVAILABLE and _content_guard is not None:
             # Filter text_delta events for information leaks
             if '"text_delta"' in chunk and '"text"' in chunk:
@@ -491,7 +494,7 @@ async def _guarded_agent_stream(
 _HEARTBEAT_INTERVAL = 5.0
 
 
-def _resolve_model_override(message: str, settings_service: Any) -> str | None:
+def _resolve_model_override(message: str, settings_service: Any, *, user_id: str | None = None) -> str | None:
     """Pick a smart-model override based on message keywords, if enabled."""
     if not settings_service:
         return None
@@ -499,7 +502,7 @@ def _resolve_model_override(message: str, settings_service: Any) -> str | None:
         from app.core.settings_service import SettingsService
 
         svc: SettingsService = settings_service  # type: ignore[assignment]
-        settings = svc._load_non_sensitive()
+        settings = svc._load_non_sensitive(user_id=user_id) if user_id else svc._load_non_sensitive()
         llm_section = settings.get("llm", {})
 
         raw_smart = llm_section.get("smart_mode", False)
@@ -532,7 +535,8 @@ def _start_producer(
     appends each one to ``turn.collected_events`` so reconnecting
     clients can replay what they missed.
     """
-    model_override = _resolve_model_override(message, settings_service)
+    uid = turn.user_id if turn.user_id != "local" else None
+    model_override = _resolve_model_override(message, settings_service, user_id=uid)
 
     async def _produce_events() -> None:
         original_model = None
@@ -651,6 +655,7 @@ async def _agent_stream(
     settings_service: Any = None,
     *,
     resume: bool = False,
+    user_id: str = "local",
 ) -> AsyncIterator[str]:
     """Stream events from the real AgentRuntime with heartbeat keepalive.
 
@@ -663,19 +668,18 @@ async def _agent_stream(
     """
     _cleanup_stale_turns()
 
-    existing = _active_turns.get(session_id)
+    turn_key = (user_id, session_id)
+    existing = _active_turns.get(turn_key)
 
     if resume and existing and existing.status == "running":
         replay_from = existing.consumer_cursor
         _logger.info(
-            "Resuming turn for session %s (buffered %d events, cursor %d)",
+            "Resuming turn for session %s user %s (buffered %d events, cursor %d)",
             session_id,
+            user_id,
             len(existing.collected_events),
             replay_from,
         )
-        # The consumer disconnected but the producer kept running.
-        # Drain any leftover items from the old queue into collected_events,
-        # then create a fresh queue for the new consumer.
         new_queue: asyncio.Queue[str | None] = asyncio.Queue()
         old_queue = existing.queue
         existing.queue = new_queue
@@ -703,16 +707,16 @@ async def _agent_stream(
         return
 
     # --- Start a new turn ---
-    # Cancel any leftover previous turn for this session
-    old_turn = _active_turns.pop(session_id, None)
+    old_turn = _active_turns.pop(turn_key, None)
     if old_turn and old_turn.producer_task and not old_turn.producer_task.done():
         old_turn.producer_task.cancel()
 
     turn = TurnState(
         session_id=session_id,
+        user_id=user_id,
         user_message=message,
     )
-    _active_turns[session_id] = turn
+    _active_turns[turn_key] = turn
 
     _start_producer(runtime, message, session_id, turn, settings_service)
 
@@ -751,14 +755,16 @@ async def agent_chat(
     session_id = body.session_id or f"sess-{uuid.uuid4().hex[:8]}"
 
     # --- Resume fast path: skip enrichment/security for reconnects ---
-    if body.resume and session_id in _active_turns:
-        _logger.info("Resume request for session %s", session_id)
+    turn_key = (user.id, session_id)
+    if body.resume and turn_key in _active_turns:
+        _logger.info("Resume request for session %s user %s", session_id, user.id)
         generator = _guarded_agent_stream(
             runtime,
             body.message,
             session_id,
             settings_service,
             resume=True,
+            user_id=user.id,
         )
         return StreamingResponse(
             generator,
@@ -840,7 +846,7 @@ async def agent_chat(
         runtime = await _try_lazy_init_runtime(settings_service, user_id=uid)
 
     if runtime is not None:
-        generator = _guarded_agent_stream(runtime, effective_message, session_id, settings_service)
+        generator = _guarded_agent_stream(runtime, effective_message, session_id, settings_service, user_id=user.id)
     else:
         generator = _mock_stream(body.message, session_id)
 

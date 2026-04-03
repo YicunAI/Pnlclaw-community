@@ -96,12 +96,21 @@ class SettingsService:
         except Exception:
             settings["network"].setdefault("proxy_url", "")
 
+        keyring_info = self._secret_manager.keyring_backend_info()
+        from pnlclaw_security.encryption import encryption_status
+
+        enc_status = encryption_status()
         settings["security"] = {
             "secret_backend": "keyring",
             "keyring_available": self._secret_manager.keyring_available(),
-            "persistence_guarantee": "best-effort-os-keychain",
+            "keyring_backend": keyring_info.get("backend", "unknown"),
+            "is_secure_backend": keyring_info.get("is_secure_backend", False),
+            "field_encryption_active": enc_status["field_encryption_active"],
+            "persistence_guarantee": "fernet-encrypted" if enc_status["field_encryption_active"] else "best-effort-os-keychain",
             "security_note": (
-                "Secrets are stored via OS keychain when available. No software can guarantee absolute unbreakability."
+                "Secrets are encrypted with Fernet (AES-128-CBC + HMAC-SHA256) before storage."
+                if enc_status["field_encryption_active"]
+                else "WARNING: PNLCLAW_ENCRYPTION_KEY not set — secrets stored without application-layer encryption."
             ),
         }
 
@@ -224,8 +233,8 @@ class SettingsService:
                 try:
                     plaintext = decrypt_if_encrypted(self._key_pair_manager, candidate)
                 except ValueError:
-                    logger.warning("Failed to decrypt secret for %s — storing as-is", ref.id)
-                    plaintext = candidate
+                    logger.error("Failed to decrypt secret for %s — rejecting storage to prevent plaintext leak", ref.id)
+                    return
                 await self._secret_manager.store(ref, plaintext)
 
     @staticmethod

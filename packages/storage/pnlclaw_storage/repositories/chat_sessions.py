@@ -1,13 +1,41 @@
-"""Repository for chat session and message persistence."""
+"""Repository for chat session and message persistence.
+
+Chat message content and extra data are encrypted at rest when
+PNLCLAW_ENCRYPTION_KEY is configured.
+"""
 
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
 from pnlclaw_storage.sqlite import AsyncSQLiteManager
+
+logger = logging.getLogger(__name__)
+
+
+def _enc(value: str) -> str:
+    try:
+        from pnlclaw_security.encryption import encrypt_value
+
+        return encrypt_value(value)
+    except Exception:
+        return value
+
+
+def _dec(value: str) -> str:
+    try:
+        from pnlclaw_security.encryption import decrypt_value
+
+        return decrypt_value(value)
+    except ValueError:
+        logger.warning("Failed to decrypt chat content — returning raw")
+        return value
+    except Exception:
+        return value
 
 
 def _now_iso() -> str:
@@ -104,7 +132,7 @@ class ChatSessionRepository:
         await self._db.execute(
             "INSERT INTO chat_messages (id, session_id, role, content, extra_json, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
-            (mid, session_id, role, content, extra_json, now),
+            (mid, session_id, role, _enc(content), _enc(extra_json), now),
         )
         await self.touch_session(session_id)
         return {
@@ -129,8 +157,9 @@ class ChatSessionRepository:
         result = []
         for r in rows:
             d = dict(r)
+            d["content"] = _dec(d.get("content", ""))
             try:
-                d["extra"] = json.loads(d.pop("extra_json", "{}"))
+                d["extra"] = json.loads(_dec(d.pop("extra_json", "{}")))
             except (json.JSONDecodeError, KeyError):
                 d["extra"] = {}
             result.append(d)
@@ -150,7 +179,7 @@ class ChatSessionRepository:
             content = msg.get("content", "")
             extra = msg.get("extra") or msg.get("reasoningSteps") or {}
             extra_json = json.dumps(extra, ensure_ascii=False) if isinstance(extra, (dict, list)) else "{}"
-            params.append((mid, session_id, role, content, extra_json, now))
+            params.append((mid, session_id, role, _enc(content), _enc(extra_json), now))
         if not params:
             return
         async with self._db.connection() as conn:

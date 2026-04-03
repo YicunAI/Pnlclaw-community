@@ -89,6 +89,17 @@ async def update_settings(
     if "llm" in payload:
         await _refresh_agent_runtime(service, user_id=uid)
 
+    from app.core.audit import audit_event
+
+    changed_sections = [k for k in payload if k not in ("_",)]
+    await audit_event(
+        event_type="settings.update",
+        actor=user.id,
+        action="update_settings",
+        resource=",".join(changed_sections),
+        details={"sections": changed_sections},
+    )
+
     return APIResponse(data=data, meta=build_response_meta(request), error=None)
 
 

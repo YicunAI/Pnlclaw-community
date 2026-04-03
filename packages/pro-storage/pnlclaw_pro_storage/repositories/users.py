@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -11,6 +12,35 @@ from sqlalchemy.orm import selectinload
 
 from pnlclaw_pro_storage.models import User, UserTag, UserTagAssignment
 from pnlclaw_pro_storage.postgres import AsyncPostgresManager
+
+logger = logging.getLogger(__name__)
+
+_TOTP_SENSITIVE_FIELDS = {"totp_secret", "totp_pending_secret"}
+
+
+def _encrypt_field(value: str | None) -> str | None:
+    if not value:
+        return value
+    try:
+        from pnlclaw_security.encryption import encrypt_value
+
+        return encrypt_value(value)
+    except Exception:
+        return value
+
+
+def _decrypt_field(value: str | None) -> str | None:
+    if not value:
+        return value
+    try:
+        from pnlclaw_security.encryption import decrypt_value
+
+        return decrypt_value(value)
+    except ValueError:
+        logger.warning("Failed to decrypt TOTP secret — returning raw value")
+        return value
+    except Exception:
+        return value
 
 _ALLOWED_SORT_COLUMNS = {
     "created_at",
@@ -81,7 +111,7 @@ class UserRepository:
                 )
             )
             result = await session.execute(stmt)
-            return result.scalar_one_or_none()
+            return self._decrypt_user_secrets(result.scalar_one_or_none())
 
     async def get_by_email(self, email: str) -> User | None:
         """Return the first non-deleted user matching *email*."""
@@ -95,7 +125,7 @@ class UserRepository:
                 )
             )
             result = await session.execute(stmt)
-            return result.scalar_one_or_none()
+            return self._decrypt_user_secrets(result.scalar_one_or_none())
 
     async def list_users(
         self,
@@ -195,11 +225,23 @@ class UserRepository:
     # Update
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _decrypt_user_secrets(user: User | None) -> User | None:
+        """Transparently decrypt TOTP secret on a loaded User."""
+        if user is None:
+            return None
+        user.totp_secret = _decrypt_field(user.totp_secret)
+        return user
+
     async def update(self, user_id: uuid.UUID, **fields: Any) -> User:
         """Update arbitrary columns on a user and return the refreshed row.
 
         Raises ``ValueError`` if the user does not exist.
         """
+        for key in _TOTP_SENSITIVE_FIELDS:
+            if key in fields and isinstance(fields[key], str):
+                fields[key] = _encrypt_field(fields[key])
+
         async with self._db.session() as session:
             user = await session.get(User, user_id)
             if user is None:
@@ -209,7 +251,7 @@ class UserRepository:
                     setattr(user, key, value)
             await session.flush()
             await session.refresh(user)
-            return user
+            return self._decrypt_user_secrets(user)  # type: ignore[return-value]
 
     # ------------------------------------------------------------------
     # Status transitions

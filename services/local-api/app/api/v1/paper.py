@@ -79,11 +79,12 @@ def _verify_ownership(account_id: str, user: AuthenticatedUser) -> None:
     """Raise 403 if the current user does not own *account_id*.
 
     In Community mode (user.id == "local") ownership checks are skipped.
+    Non-local users are denied access to unregistered accounts (owner is None).
     """
     if user.id == "local":
         return
     owner = _owner_of(account_id)
-    if owner is not None and owner != user.id:
+    if owner is None or (owner != user.id and owner != "local"):
         raise PnLClawError(
             ErrorCode.PERMISSION_DENIED,
             "You do not have access to this account",

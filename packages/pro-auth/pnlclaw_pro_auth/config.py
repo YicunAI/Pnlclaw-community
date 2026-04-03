@@ -15,7 +15,7 @@ class AuthConfig(BaseSettings):
 
     model_config = {"env_prefix": "PNLCLAW_AUTH_"}
 
-    jwt_secret: str = Field(..., description="JWT signing secret (required, no default)")
+    jwt_secret: str = Field(..., min_length=32, description="JWT signing secret (min 32 chars)")
     jwt_algorithm: str = Field("HS256", description="JWT signing algorithm")
 
     @field_validator("jwt_algorithm")
@@ -44,8 +44,16 @@ class AuthConfig(BaseSettings):
 
     # Redirect
     oauth_redirect_base_url: str = Field(
-        "http://localhost:3001", description="Base URL for OAuth redirect callbacks (frontend origin)"
+        "https://pnlclaw.com", description="Base URL for OAuth redirect callbacks (frontend origin)"
+    )
+
+    # Registration policy
+    open_registration: bool = Field(
+        False,
+        description="If False, only pre-existing or invited users can log in. "
+        "New accounts are rejected at OAuth callback.",
     )
 
     # Bootstrap
     initial_admin_email: str = Field("", description="Email address of the first admin user")
+    max_admin_count: int = Field(1, ge=1, le=3, description="Maximum number of admin accounts allowed")

@@ -359,18 +359,17 @@ async def update_user(
             message="No fields to update",
         )
 
-    # Prevent privilege escalation: only admins can change roles,
-    # and no one can set role to admin via this endpoint
     if "role" in updates:
         if admin.role != "admin":
             raise PnLClawError(
                 code=ErrorCode.PERMISSION_DENIED,
                 message="Only admins can change user roles",
             )
-        if updates["role"] == "admin" and user_id != admin.id:
+        if updates["role"] == "admin":
             raise PnLClawError(
                 code=ErrorCode.PERMISSION_DENIED,
-                message="Cannot promote users to admin via this endpoint",
+                message="Admin role can only be assigned during initial bootstrap via INITIAL_ADMIN_EMAIL. "
+                "Cannot promote users to admin via API.",
             )
 
     updated = await user_repo.update(_safe_uuid(user_id), **updates)

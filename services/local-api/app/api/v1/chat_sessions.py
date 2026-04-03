@@ -16,6 +16,8 @@ from app.core.dependencies import AuthenticatedUser, get_chat_session_repo, opti
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
+MAX_SESSIONS_PER_USER = 500
+
 
 class CreateSessionBody(BaseModel):
     strategy_id: str | None = None
@@ -42,6 +44,9 @@ async def create_session(
     repo: Any = Depends(_require_repo),
     user: AuthenticatedUser = Depends(optional_user),
 ) -> dict[str, Any]:
+    existing = await repo.list_sessions(user_id=user.id, limit=1, offset=MAX_SESSIONS_PER_USER)
+    if existing:
+        raise HTTPException(429, f"Session limit reached ({MAX_SESSIONS_PER_USER})")
     return await repo.create_session(
         strategy_id=body.strategy_id,
         title=body.title,
@@ -74,8 +79,12 @@ async def get_session(
     row = await repo.get_session(session_id)
     if row is None:
         raise HTTPException(404, "Session not found")
-    if row.get("user_id") and row["user_id"] != user.id and user.id != "local":
-        raise HTTPException(403, "Access denied")
+    session_owner = row.get("user_id")
+    if user.id != "local":
+        if session_owner and session_owner != user.id and session_owner != "local":
+            raise HTTPException(403, "Access denied")
+        if not session_owner:
+            raise HTTPException(403, "Access denied")
     return row
 
 
@@ -89,8 +98,10 @@ async def update_session(
     existing = await repo.get_session(session_id)
     if existing is None:
         raise HTTPException(404, "Session not found")
-    if existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
-        raise HTTPException(403, "Access denied")
+    owner = existing.get("user_id")
+    if user.id != "local":
+        if (owner and owner != user.id and owner != "local") or not owner:
+            raise HTTPException(403, "Access denied")
     await repo.update_session_title(session_id, body.title)
     return {"status": "ok"}
 
@@ -104,8 +115,10 @@ async def delete_session(
     existing = await repo.get_session(session_id)
     if existing is None:
         raise HTTPException(404, "Session not found")
-    if existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
-        raise HTTPException(403, "Access denied")
+    owner = existing.get("user_id")
+    if user.id != "local":
+        if (owner and owner != user.id and owner != "local") or not owner:
+            raise HTTPException(403, "Access denied")
     await repo.delete_session(session_id)
     return {"status": "ok"}
 
@@ -119,8 +132,10 @@ async def get_messages(
     user: AuthenticatedUser = Depends(optional_user),
 ) -> list[dict[str, Any]]:
     session = await repo.get_session(session_id)
-    if session and session.get("user_id") and session["user_id"] != user.id and user.id != "local":
-        raise HTTPException(403, "Access denied")
+    if session and user.id != "local":
+        owner = session.get("user_id")
+        if (owner and owner != user.id and owner != "local") or not owner:
+            raise HTTPException(403, "Access denied")
     return await repo.get_messages(session_id, limit=limit, offset=offset)
 
 
@@ -135,7 +150,9 @@ async def save_messages(
     existing = await repo.get_session(session_id)
     if existing is None:
         await repo.create_session(session_id=session_id, user_id=user.id)
-    elif existing.get("user_id") and existing["user_id"] != user.id and user.id != "local":
-        raise HTTPException(403, "Access denied")
+    elif user.id != "local":
+        owner = existing.get("user_id")
+        if (owner and owner != user.id and owner != "local") or not owner:
+            raise HTTPException(403, "Access denied")
     await repo.save_messages_bulk(session_id, body.messages)
     return {"status": "ok"}
