@@ -39,6 +39,10 @@ jobs:
 
             echo "=== Building frontend ==="
             cd apps/desktop
+            # Ensure auth env var persists across deploys
+            if [ ! -f .env.production ]; then
+              echo 'NEXT_PUBLIC_AUTH_API_URL=https://pnlclaw.com/auth' > .env.production
+            fi
             npm ci --prefer-offline
             npm run build
             cd /opt/pnlclaw
@@ -53,11 +57,13 @@ jobs:
             redis-cli ping || echo "WARNING: Redis not responding, K-line cache will be disabled"
 
             echo "=== Restarting services ==="
+            systemctl restart pnlclaw-admin
             systemctl restart pnlclaw-api
             systemctl restart pnlclaw-web
 
             echo "=== Verifying services ==="
             sleep 3
+            systemctl is-active pnlclaw-admin
             systemctl is-active pnlclaw-api
             systemctl is-active pnlclaw-web
 

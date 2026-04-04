@@ -225,10 +225,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # --- Market Data Service (multi-source) ---
     # Multi-interval: PNLCLAW_KLINE_INTERVALS takes priority over PNLCLAW_DEFAULT_INTERVAL
-    _intervals_raw = os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "30m,1h"
+    _intervals_raw = os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "1m,5m,15m,30m,1h,4h,1d"
     kline_intervals = [i.strip() for i in _intervals_raw.split(",") if i.strip()]
     if not kline_intervals:
-        kline_intervals = ["30m", "1h"]
+        kline_intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
     default_interval = kline_intervals[0]
     logger.info("Kline intervals: %s (primary: %s)", kline_intervals, default_interval)
 
@@ -247,32 +247,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     market_svc = MarketDataService()
 
-    # Binance Spot
-    market_svc.register_source(
-        BinanceSource(
-            market_type="spot",
-            ws_url=os.environ.get("PNLCLAW_BINANCE_WS_URL", None),
-            rest_url=os.environ.get("PNLCLAW_BINANCE_REST_URL", None),
-            proxy_url=proxy_url,
-            kline_intervals=kline_intervals,
-        )
-    )
-
     # Binance USDT-M Futures
     market_svc.register_source(
         BinanceSource(
             market_type="futures",
             ws_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_WS_URL", None),
             rest_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_REST_URL", None),
-            proxy_url=proxy_url,
-            kline_intervals=kline_intervals,
-        )
-    )
-
-    # OKX Spot
-    market_svc.register_source(
-        OKXSource(
-            market_type="spot",
             proxy_url=proxy_url,
             kline_intervals=kline_intervals,
         )
@@ -316,12 +296,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
         # Subscribe default symbols on ALL sources so large-trade and
         # liquidation monitors see data from every exchange.
-        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
+        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT"
         if default_symbols:
             all_sources: list[tuple[str, str]] = [
-                ("binance", "spot"),
                 ("binance", "futures"),
-                ("okx", "spot"),
                 ("okx", "futures"),
             ]
             for sym in default_symbols.split(","):
@@ -351,20 +329,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
             _warmup_store = KlineStore(_warmup_redis)
             _warmup_intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
-            _warmup_symbols_str = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
+            _warmup_symbols_str = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT"
             _warmup_symbols = [s.strip() for s in _warmup_symbols_str.split(",") if s.strip()]
 
             async def _warmup_task() -> None:
                 """Background task: pre-fetch K-lines for default symbols.
 
-                Only warms the most used intervals to avoid blocking the event loop.
-                Lower-priority data is cached on first user request.
+                Fetches high-priority intervals first (1h, 30m, 15m, 4h)
+                then fills remaining. Short delays between requests to avoid
+                hammering exchanges while still completing quickly.
                 """
-                await asyncio.sleep(10)
-                _fast_intervals = ["1h", "4h"]
+                await asyncio.sleep(3)
+                _priority_intervals = ["1h", "30m", "15m", "4h", "1m", "5m", "1d"]
                 for sym in _warmup_symbols:
-                    for ivl in _fast_intervals:
-                        for ex, mt in [("binance", "spot"), ("okx", "futures")]:
+                    for ivl in _priority_intervals:
+                        for ex, mt in [("binance", "futures"), ("okx", "futures")]:
                             try:
                                 existing = await _warmup_store.count(ex, mt, sym, ivl)
                                 if existing >= 100:
@@ -373,7 +352,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                                 if klines:
                                     await _warmup_store.put(ex, mt, sym, ivl, klines)
                                     logger.info("Warmup: cached %d klines %s/%s %s %s", len(klines), ex, mt, sym, ivl)
-                                await asyncio.sleep(1.5)
+                                await asyncio.sleep(0.3)
                             except Exception:
                                 logger.debug("Warmup skip %s/%s %s %s", ex, mt, sym, ivl, exc_info=True)
                 logger.info("K-line warmup completed")
@@ -1216,7 +1195,7 @@ def _bridge_market_events(market_svc: object) -> None:
     import asyncio
     import time as _time
 
-    from app.api.v1.ws import _market_manager, broadcast_market_event
+    from app.api.v1.ws import _market_manager, broadcast_market_event, broadcast_market_event_fast
     from pnlclaw_types.derivatives import (
         FundingRateEvent,
         LargeOrderEvent,
@@ -1263,11 +1242,16 @@ def _bridge_market_events(market_svc: object) -> None:
     def _on_ticker(event: TickerEvent) -> None:
         if _market_manager.active_count == 0:
             return
+        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
+        if not _market_manager.has_subscribers(channel):
+            return
         asyncio.ensure_future(
-            broadcast_market_event(
+            broadcast_market_event_fast(
                 event.symbol,
                 "ticker",
-                event.model_dump(),
+                event.model_dump_json(),
+                exchange=event.exchange,
+                market_type=event.market_type,
             )
         )
 
@@ -1310,14 +1294,27 @@ def _bridge_market_events(market_svc: object) -> None:
 
     def _on_kline(event: KlineEvent) -> None:
         _buffer_kline_for_redis(event)
-        if _market_manager.active_count > 0:
-            asyncio.ensure_future(
-                broadcast_market_event(event.symbol, "kline", event.model_dump())
+        if _market_manager.active_count == 0:
+            return
+        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
+        if not _market_manager.has_subscribers(channel):
+            return
+        asyncio.ensure_future(
+            broadcast_market_event_fast(
+                event.symbol,
+                "kline",
+                event.model_dump_json(),
+                exchange=event.exchange,
+                market_type=event.market_type,
             )
+        )
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
         nonlocal _ob_flush_running
         if _market_manager.active_count == 0:
+            return
+        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
+        if not _market_manager.has_subscribers(channel):
             return
         key = f"{event.exchange}:{event.market_type}:{event.symbol}"
         _pending_ob[key] = event

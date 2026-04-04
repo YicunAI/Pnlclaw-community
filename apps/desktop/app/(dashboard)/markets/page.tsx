@@ -34,7 +34,6 @@ const CandlestickChart = dynamic(
 const SYMBOLS = [
   { value: "BTC/USDT", label: "BTC/USDT" },
   { value: "ETH/USDT", label: "ETH/USDT" },
-  { value: "SOL/USDT", label: "SOL/USDT" },
 ]
 
 const INTERVALS = [
@@ -112,7 +111,7 @@ export default function MarketsPage() {
   })
   const [interval, setKlineInterval] = useState("1h")
   const [exchange, setExchange] = useState<ExchangeProvider>(marketSubscription.exchange)
-  const [marketType, setMarketType] = useState<MarketType>(marketSubscription.marketType)
+  const [marketType, setMarketType] = useState<MarketType>("futures")
   const {
     klines: historyKlines,
     error: klineError,
@@ -213,7 +212,7 @@ export default function MarketsPage() {
     const provider = appSettings.exchange?.provider
     const type = appSettings.exchange?.market_type
     if (provider === "binance" || provider === "okx") setExchange(provider)
-    if (type === "spot" || type === "futures") setMarketType(type)
+    if (type === "futures") setMarketType(type)
   }, [appSettings])
 
 
@@ -248,15 +247,9 @@ export default function MarketsPage() {
               <option value="binance">Binance</option>
               <option value="okx">OKX</option>
             </select>
-            <select
-              value={marketType}
-              onChange={(e) => setMarketType(e.target.value as MarketType)}
-              className="h-9 min-w-[100px] rounded-lg border border-input bg-background px-3 text-sm"
-              aria-label={t("markets.marketType")}
-            >
-              <option value="spot">{t("markets.spot")}</option>
-              <option value="futures">{t("markets.futures")}</option>
-            </select>
+            <span className="h-9 flex items-center min-w-[80px] rounded-lg border border-input bg-background px-3 text-sm text-muted-foreground">
+              {t("markets.futures")}
+            </span>
           </div>
           {quickSymbols.map((value) => (
             <button

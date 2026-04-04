@@ -127,6 +127,25 @@ class ConnectionManager:
         for ws in dead:
             self.disconnect(ws)
 
+    async def broadcast_raw(self, channel: str, text: str) -> None:
+        """Send a pre-serialized JSON string to all subscribers (zero-copy)."""
+        dead: list[WebSocket] = []
+        for ws, channels in list(self._connections.items()):
+            if channel in channels:
+                try:
+                    await ws.send_text(text)
+                except Exception:
+                    dead.append(ws)
+        for ws in dead:
+            self.disconnect(ws)
+
+    def has_subscribers(self, channel: str) -> bool:
+        """Check if any connection is subscribed to the given channel."""
+        for channels in self._connections.values():
+            if channel in channels:
+                return True
+        return False
+
     @property
     def active_count(self) -> int:
         return len(self._connections)
@@ -164,19 +183,18 @@ async def _push_kline_snapshot(
         if redis_client is None:
             return
         store = KlineStore(redis_client)
+        ts = int(time.time() * 1000)
         for sym in symbols:
             for ivl in ("1m", "5m", "15m", "30m", "1h", "4h", "1d"):
                 cached = await store.get(exchange, market_type, sym, ivl, limit=200)
                 if cached:
-                    await ws.send_json({
-                        "type": "kline_snapshot",
-                        "symbol": sym,
-                        "exchange": exchange,
-                        "market_type": market_type,
-                        "interval": ivl,
-                        "data": [c.model_dump() for c in cached],
-                        "timestamp": int(time.time() * 1000),
-                    })
+                    data_json = "[" + ",".join(c.model_dump_json() for c in cached) + "]"
+                    text = (
+                        f'{{"type":"kline_snapshot","symbol":"{sym}",'
+                        f'"exchange":"{exchange}","market_type":"{market_type}",'
+                        f'"interval":"{ivl}","data":{data_json},"timestamp":{ts}}}'
+                    )
+                    await ws.send_text(text)
     except Exception:
         logger.debug("kline_snapshot push failed", exc_info=True)
 
@@ -220,7 +238,7 @@ async def ws_markets(ws: WebSocket) -> None:
 
             if action == "subscribe":
                 ex = msg.get("exchange", "binance")
-                mt = msg.get("market_type", "spot")
+                mt = msg.get("market_type", "futures")
                 for sym in symbols:
                     _market_manager.subscribe(ws, f"market:{ex}:{mt}:{sym}")
                 svc = get_market_service()
@@ -244,7 +262,7 @@ async def ws_markets(ws: WebSocket) -> None:
                 asyncio.ensure_future(_push_kline_snapshot(ws, symbols, ex, mt))
             elif action == "unsubscribe":
                 ex = msg.get("exchange", "binance")
-                mt = msg.get("market_type", "spot")
+                mt = msg.get("market_type", "futures")
                 for sym in symbols:
                     _market_manager.unsubscribe(ws, f"market:{ex}:{mt}:{sym}")
                 await ws.send_json(
@@ -666,7 +684,7 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     Also publishes to Redis Pub/Sub so other workers receive the event.
     """
     exchange = data.get("exchange", "binance")
-    market_type = data.get("market_type", "spot")
+    market_type = data.get("market_type", "futures")
 
     channel = f"market:{exchange}:{market_type}:{symbol}"
     payload = {
@@ -691,6 +709,35 @@ async def broadcast_market_event(symbol: str, event_type: str, data: dict[str, A
     ):
         all_channel = f"market:{exchange}:{market_type}:ALL"
         await _market_manager.broadcast(all_channel, payload)
+
+
+async def broadcast_market_event_fast(
+    symbol: str,
+    event_type: str,
+    data_json: str,
+    *,
+    exchange: str = "binance",
+    market_type: str = "futures",
+) -> None:
+    """Zero-copy fast path: accept pre-serialized JSON from model_dump_json().
+
+    Skips model_dump() → dict → json.dumps() double serialization.
+    Used for high-frequency ticker/kline events.
+    """
+    channel = f"market:{exchange}:{market_type}:{symbol}"
+    ts = int(time.time() * 1000)
+    text = f'{{"type":"{event_type}","symbol":"{symbol}","data":{data_json},"timestamp":{ts}}}'
+    await _market_manager.broadcast_raw(channel, text)
+
+    if symbol != "ALL" and event_type in (
+        "large_trade",
+        "large_order",
+        "liquidation",
+        "liquidation_stats",
+        "funding_rate",
+    ):
+        all_channel = f"market:{exchange}:{market_type}:ALL"
+        await _market_manager.broadcast_raw(all_channel, text)
 
 
 async def broadcast_paper_event(account_id: str, event_type: str, data: dict[str, Any]) -> None:

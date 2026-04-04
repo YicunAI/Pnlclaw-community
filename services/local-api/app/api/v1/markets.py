@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/markets", tags=["markets"])
 
 _ALLOWED_EXCHANGES = {"binance", "okx"}
-_ALLOWED_MARKET_TYPES = {"spot", "futures"}
+_ALLOWED_MARKET_TYPES = {"futures"}
 
 
 def _normalize_symbol(raw: str) -> str:
@@ -56,7 +56,7 @@ def _resolve_source(
     exchange_settings = settings.get("exchange", {}) if isinstance(settings, dict) else {}
 
     resolved_exchange = (exchange or str(exchange_settings.get("provider", "binance"))).strip().lower()
-    resolved_market_type = (market_type or str(exchange_settings.get("market_type", "spot"))).strip().lower()
+    resolved_market_type = (market_type or str(exchange_settings.get("market_type", "futures"))).strip().lower()
 
     if resolved_exchange not in _ALLOWED_EXCHANGES:
         raise PnLClawError(

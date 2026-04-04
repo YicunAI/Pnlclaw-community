@@ -70,7 +70,7 @@ export function useKlineHistory(
       : null
 
   const ex = exchange ?? "binance"
-  const mt = marketType ?? "spot"
+  const mt = marketType ?? "futures"
 
   const { data, error, isLoading, mutate } = useSWR<KlineData[]>(
     cacheKey,

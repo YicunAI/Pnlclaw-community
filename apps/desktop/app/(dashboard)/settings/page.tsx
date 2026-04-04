@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   },
   exchange: {
     provider: "binance",
-    market_type: "spot",
+    market_type: "futures",
     api_key: "",
     api_secret: "",
     api_key_configured: false,
@@ -401,7 +401,6 @@ export default function SettingsPage() {
                   onChange={(e) => update("exchange", "market_type", e.target.value as Settings["exchange"]["market_type"])}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="spot">{t("markets.spot")}</option>
                   <option value="futures">{t("markets.futures")}</option>
                 </select>
               </div>

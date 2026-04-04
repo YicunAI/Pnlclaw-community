@@ -70,9 +70,7 @@ export function LargeTradeFeed() {
     wsRef.current = ws
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ action: "subscribe", symbols: ["ALL"], exchange: "binance", market_type: "spot" }))
       ws.send(JSON.stringify({ action: "subscribe", symbols: ["ALL"], exchange: "binance", market_type: "futures" }))
-      ws.send(JSON.stringify({ action: "subscribe", symbols: ["ALL"], exchange: "okx", market_type: "spot" }))
       ws.send(JSON.stringify({ action: "subscribe", symbols: ["ALL"], exchange: "okx", market_type: "futures" }))
     }
 

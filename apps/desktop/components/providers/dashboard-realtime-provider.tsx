@@ -50,7 +50,7 @@ export function DashboardRealtimeProvider({ children }: { children: React.ReactN
   const [marketSubscription, setMarketSubscriptionState] = useState<MarketSubscription>({
     symbol: "BTC/USDT",
     exchange: "binance",
-    marketType: "spot",
+    marketType: "futures",
     interval: "1h",
   })
 
