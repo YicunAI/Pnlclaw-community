@@ -164,7 +164,7 @@ export default function PaperPage() {
     loadMore: handleLoadMoreKlines,
   } = useKlineHistory(tickerSymbol, chartInterval, "okx", "futures")
 
-  const marketWS = useMarketWS({ symbol: tickerSymbol, exchange: "okx", marketType: "futures" })
+  const marketWS = useMarketWS({ symbol: tickerSymbol, exchange: "okx", marketType: "futures", interval: chartInterval })
 
   const paperWS = usePaperWS(selectedAccount || null)
 

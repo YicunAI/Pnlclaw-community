@@ -36,6 +36,7 @@ interface UseMarketWSOptions {
   symbol: string
   exchange: ExchangeProvider
   marketType: MarketType
+  interval?: string
 }
 
 function extractSequence(msg: unknown): number | null {
@@ -47,12 +48,13 @@ function extractSequence(msg: unknown): number | null {
   return typeof seq === "number" && Number.isFinite(seq) ? seq : null
 }
 
-export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions): MarketWSState {
+export function useMarketWS({ symbol, exchange, marketType, interval }: UseMarketWSOptions): MarketWSState {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const attemptRef = useRef(0)
   const intentionalCloseRef = useRef(false)
   const subRef = useRef({ symbol, exchange, marketType })
+  const intervalRef = useRef(interval || "1h")
   const lastSeqRef = useRef<number | null>(null)
 
   // --- RAF throttle buffers for high-frequency data ---
@@ -63,6 +65,9 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
 
   // --- Delayed unsubscribe ---
   const pendingUnsubRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Keep intervalRef in sync without triggering reconnects
+  useEffect(() => { intervalRef.current = interval || "1h" }, [interval])
 
   const [state, setState] = useState<MarketWSState>({
     connected: false,
@@ -207,6 +212,8 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
           scheduleRAF()
         } else if (msg.type === "kline") {
           const d = msg.data
+          const klineInterval = d.interval
+          if (klineInterval && klineInterval !== intervalRef.current) return
           pendingKlineRef.current = {
             timestamp: d.timestamp,
             open: d.open,
@@ -214,11 +221,12 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
             low: d.low,
             close: d.close,
             volume: d.volume,
-            wsInterval: d.interval,
+            wsInterval: klineInterval,
           }
           scheduleRAF()
         } else if (msg.type === "kline_snapshot") {
-          // Backend pushes cached K-lines on subscribe — bulk replace for instant rendering
+          const snapshotInterval = msg.interval
+          if (snapshotInterval && snapshotInterval !== intervalRef.current) return
           const snapshotData: WSKlineData[] = (msg.data || []).map((d: any) => ({
             timestamp: d.timestamp,
             open: d.open,
@@ -226,7 +234,7 @@ export function useMarketWS({ symbol, exchange, marketType }: UseMarketWSOptions
             low: d.low,
             close: d.close,
             volume: d.volume,
-            wsInterval: d.interval || msg.interval,
+            wsInterval: d.interval || snapshotInterval,
           }))
           if (snapshotData.length > 0) {
             const now = Date.now()
