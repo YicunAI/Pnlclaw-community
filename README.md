@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/public/pnl-white.png" alt="PnLClaw" height="60" />
+  <img src="apps/desktop/public/pnl-white.png" alt="PnLClaw" height="1080" />
   <br /><br />
   <p><strong>Chat is Quant — Local-first AI-powered crypto quantitative research</strong><br />
   Drive the entire strategy lifecycle through natural language conversation.<br />
@@ -19,6 +19,9 @@
   <a href="#quick-start">Quick Start</a> ·
   <a href="#security">Security</a> ·
   <a href="CHANGELOG.md">Changelog</a>
+
+  <br /><br />
+  <img src="apps/desktop/public/sl/首页.png" alt="PnLClaw Dashboard" width="800" />
 
 </div>
 
@@ -113,6 +116,12 @@ No cloud dependency, no subscription fees. API keys live only on your machine. L
 | **MCP Protocol** | Runtime MCP server registration · Dynamic Agent tool extension · Compatible with mainstream MCP ecosystem |
 | **Desktop App** | Next.js + Tauri native app · Candlestick charts · Live orderbook panel · Agent chat · Strategy & backtest manager |
 
+<div align="center">
+  <img src="apps/desktop/public/sl/回测报告.png" alt="Full backtest report" width="600" />
+  <br />
+  <sub>Full backtest report — K-line with trade markers, equity curve, monthly return heatmap, signal distribution, and trade records</sub>
+</div>
+
 ---
 
 ## Conversational Quant Workflow
@@ -138,6 +147,16 @@ You: Nice, deploy it to paper trading
 Agent: [calls create_paper_account → deploy_strategy] Created strategy account and deployed...
 ```
 
+<div align="center">
+  <img src="apps/desktop/public/sl/AI回测2.png" alt="AI Agent reasoning through strategy design" width="800" />
+  <br />
+  <sub>AI Agent reasoning through strategy design — analyzing market data, calling tools, and generating strategies autonomously</sub>
+  <br /><br />
+  <img src="apps/desktop/public/sl/AI回测3.png" alt="Strategy generated with backtest results" width="800" />
+  <br />
+  <sub>Strategy generated with complete backtest metrics and equity curve</sub>
+</div>
+
 ### Key Multi-Turn Capabilities
 
 - **Full Context Memory**: The Agent has complete memory of all messages in the conversation. Say "backtest the strategy above," and it automatically extracts the full config from earlier messages.
@@ -155,6 +174,12 @@ The Agent doesn't just execute your instructions — it **proactively analyzes r
 - Too few trades? Suggests relaxing entry conditions or switching to a shorter timeframe
 
 Across multi-turn dialogues, this forms a **human-AI collaborative optimization loop**: you bring trading intuition and risk preferences, the Agent brings data analysis and parameter exploration.
+
+<div align="center">
+  <img src="apps/desktop/public/sl/AI自动寻参回测.png" alt="AI auto-parameter optimization" width="800" />
+  <br />
+  <sub>Agent autonomously iterating through 5 strategy versions — comparing parameters and Sharpe ratios to find optimal combinations</sub>
+</div>
 
 ---
 
@@ -206,6 +231,22 @@ Observe → Think → Act (call tools) → Reflect → Answer
 - Built-in loop detection: same tool called 3+ times with identical arguments triggers automatic termination
 - Hallucination detection: final answers are verified by Security Gateway's Hallucination Detector
 - Token-aware: monitors context usage and proactively compresses history when approaching limits
+
+### Paper Trading & AI Deep Market Analysis
+
+<div align="center">
+  <img src="apps/desktop/public/sl/深度分析1.png" alt="Paper trading with AI deep analysis" width="800" />
+  <br />
+  <sub>Paper trading interface with real-time L2 orderbook and AI deep market analysis</sub>
+  <br /><br />
+  <img src="apps/desktop/public/sl/深度分析2.png" alt="Multi-timeframe trend analysis" width="800" />
+  <br />
+  <sub>Multi-timeframe trend analysis with key support and resistance levels</sub>
+  <br /><br />
+  <img src="apps/desktop/public/sl/深度分析3.png" alt="AI trading recommendations" width="800" />
+  <br />
+  <sub>AI-powered position management and trading recommendations for different scenarios</sub>
+</div>
 
 ---
 
@@ -490,8 +531,6 @@ Contributions are welcome. Please review the project structure and architecture 
   <img src="https://contrib.rocks/image?repo=YicunAI/Pnlclaw-community" />
 </a>
 
-<sub>Made with [contrib.rocks](https://contrib.rocks)</sub>
-
 ---
 
 ## Roadmap
@@ -563,6 +602,20 @@ PnLClaw is in **early rapid iteration** — every Star, Issue, and PR fuels our 
 - **GitHub Issues** — [open an issue](../../issues) for bug reports, feature requests, or usage feedback
 - **Pull Requests** — [open a PR](../../pulls), whether fixing a typo or contributing a new Skill — we take every contribution seriously
 - **Email** — [yicun@pnlclaw.com](mailto:yicun@pnlclaw.com) for anything else
+
+---
+
+## Star History
+
+<div align="center">
+  <a href="https://star-history.com/#YicunAI/Pnlclaw-community&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date" width="600" />
+    </picture>
+  </a>
+</div>
 
 ---
 
