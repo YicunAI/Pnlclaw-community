@@ -74,6 +74,15 @@ class SkillUpdateRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _redact_file_path(raw_path: str) -> str:
+    """Strip absolute prefix, keep only skills-relative portion."""
+    import re
+    m = re.search(r"[/\\]skills[/\\](.+)", raw_path)
+    if m:
+        return "skills/" + m.group(1).replace("\\", "/")
+    return raw_path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+
+
 def _skill_to_dict(s: Any, enabled_map: dict[str, bool] | None = None) -> dict[str, Any]:
     name = s.name
     enabled = True
@@ -87,7 +96,7 @@ def _skill_to_dict(s: Any, enabled_map: dict[str, bool] | None = None) -> dict[s
         "user_invocable": s.frontmatter.user_invocable if hasattr(s, "frontmatter") else True,
         "model_invocable": s.frontmatter.model_invocable if hasattr(s, "frontmatter") else True,
         "requires_tools": s.frontmatter.requires_tools if hasattr(s, "frontmatter") else [],
-        "file_path": s.file_path,
+        "file_path": _redact_file_path(s.file_path),
         "enabled": enabled,
     }
 
@@ -261,7 +270,7 @@ async def create_skill(
 
     return {
         "name": name,
-        "file_path": str(file_path),
+        "file_path": _redact_file_path(str(file_path)),
         "created": True,
     }
 
@@ -291,7 +300,7 @@ async def get_skill(
         "requires_env": skill.frontmatter.requires_env,
         "version": skill.frontmatter.version,
         "author": skill.frontmatter.author,
-        "file_path": skill.file_path,
+        "file_path": _redact_file_path(skill.file_path),
         "content": skill.content,
     }
 
@@ -340,7 +349,7 @@ async def update_skill(
 
     _rebuild_registry(registry, settings_svc)
 
-    return {"name": name, "file_path": str(file_path), "updated": True}
+    return {"name": name, "file_path": _redact_file_path(str(file_path)), "updated": True}
 
 
 @router.delete("/{name}")

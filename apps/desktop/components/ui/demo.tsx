@@ -15,7 +15,7 @@ export function SplineSceneBasic() {
     <div className="w-full h-screen bg-transparent relative overflow-hidden font-sans">
       <div className="absolute top-0 bottom-0 -left-[25%] w-[200%] z-0">
         <SplineScene 
-          scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+          scene="/spline/scene.splinecode"
           className="w-full h-full"
         />
       </div>

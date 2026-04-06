@@ -41,6 +41,10 @@ _ALLOWED_ORIGINS: set[str] = {
     "https://www.pnlclaw.com",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "tauri://localhost",
+    "https://tauri.localhost",
+    "http://tauri.localhost",
+    "http://tauri.localhost:8080",
 }
 
 import os as _os
@@ -432,8 +436,6 @@ async def ws_paper(ws: WebSocket) -> None:
 async def ws_trading(ws: WebSocket) -> None:
     """Unified trading WebSocket — receives order, fill, position, balance events.
 
-    Requires authentication in Pro mode via ``?token=`` query parameter.
-
     Client messages (JSON):
         ``{"action": "subscribe", "channels": ["orders", "positions", "balances"]}``
         ``{"action": "unsubscribe", "channels": ["orders"]}``
@@ -540,8 +542,6 @@ _AGENT_EVENT_MAP: dict[str, str] = {
 @router.websocket("/api/v1/ws/agent")
 async def ws_agent(ws: WebSocket) -> None:
     """Agent reasoning WebSocket — bidirectional agent interaction.
-
-    Requires authentication in Pro mode via ``?token=`` query parameter.
 
     Client messages (JSON):
         ``{"action": "chat", "message": "BTC 价格多少？", "session_id": "..."}``

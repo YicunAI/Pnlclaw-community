@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar"
 import { LocaleSwitcherCompact } from "@/components/i18n/locale-switcher"
 import { UserMenu } from "@/components/auth/user-menu"
 import { DashboardRealtimeProvider } from "@/components/providers/dashboard-realtime-provider"
+import { BackendReadyProvider } from "@/components/providers/backend-ready-provider"
 
 const AgentChat = dynamic(
   () => import("@/components/agent-chat").then((m) => ({ default: m.AgentChat })),
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   return (
+    <BackendReadyProvider>
     <DashboardRealtimeProvider>
       <div className="flex h-screen bg-background text-foreground overflow-hidden">
         <Sidebar />
@@ -33,5 +35,6 @@ export default function DashboardLayout({
         <AgentChat />
       </div>
     </DashboardRealtimeProvider>
+    </BackendReadyProvider>
   )
 }

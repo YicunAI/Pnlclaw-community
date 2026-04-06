@@ -16,20 +16,24 @@ router = APIRouter(prefix="/mcp", tags=["mcp"])
 
 
 def _user_prefix(user: AuthenticatedUser, name: str) -> str:
-    """Namespace MCP server names by user_id in Pro mode."""
-    if user.id == "local":
-        return name
-    return f"{user.id}:{name}"
+    """Namespace MCP server names by user_id when multi-user auth is enabled."""
+    # --- PRO-BEGIN ---
+    if user.id != "local":
+        return f"{user.id}:{name}"
+    # --- PRO-END ---
+    return name
 
 
 def _strip_prefix(user: AuthenticatedUser, prefixed: str) -> str | None:
     """Strip user prefix and return original name, or None if not owned."""
-    if user.id == "local":
-        return prefixed
-    prefix = f"{user.id}:"
-    if prefixed.startswith(prefix):
-        return prefixed[len(prefix) :]
-    return None
+    # --- PRO-BEGIN ---
+    if user.id != "local":
+        prefix = f"{user.id}:"
+        if prefixed.startswith(prefix):
+            return prefixed[len(prefix) :]
+        return None
+    # --- PRO-END ---
+    return prefixed
 
 
 # ---------------------------------------------------------------------------

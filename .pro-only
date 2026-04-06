@@ -5,6 +5,10 @@
 .pro-only
 .github/workflows/deploy.yml
 scripts/sync-community.sh
+scripts/commit_msg.txt
+
+# Internal AI development instructions
+CLAUDE.md
 
 # Pro admin backend & user management
 packages/pro-storage/

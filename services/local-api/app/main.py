@@ -58,8 +58,6 @@ from pnlclaw_core.diagnostics.health import HealthCheckResult, HealthRegistry
 logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-_kline_flush_task: asyncio.Task | None = None
-
 
 async def _seed_template_strategies(
     strategies: dict,
@@ -127,15 +125,11 @@ async def _seed_template_strategies(
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: startup and shutdown hooks."""
     from app.core.crypto import KeyPairManager
-    from app.core.redis import close_redis, init_redis
     from app.core.settings_service import SettingsService
     from pnlclaw_market import BinanceSource, MarketDataService, OKXSource
     from pnlclaw_security.secrets import SecretManager
 
-    # --- Redis (shared K-line cache + WS pub/sub) ---
-    await init_redis()
-
-    # --- JWT (Pro mode: verify tokens from admin-api) ---
+    # --- PRO-BEGIN ---
     jwt_secret = os.environ.get("PNLCLAW_AUTH_JWT_SECRET", "")
     if jwt_secret:
         try:
@@ -155,10 +149,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 bind_host,
             )
             raise RuntimeError(
-                "Refusing to start in Community (no-auth) mode on a public interface. "
-                "Either set PNLCLAW_AUTH_JWT_SECRET for Pro mode, or bind to 127.0.0.1."
+                "Refusing to start in no-auth mode on a public interface. "
+                "Bind to 127.0.0.1 for local use."
             )
-        logger.info("PNLCLAW_AUTH_JWT_SECRET not set, running in Community (no-auth) mode")
+        logger.info("Running in local single-user mode (no auth)")
+    # --- PRO-END ---
 
     # --- Health ---
     async def _local_api_health() -> HealthCheckResult:
@@ -225,10 +220,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # --- Market Data Service (multi-source) ---
     # Multi-interval: PNLCLAW_KLINE_INTERVALS takes priority over PNLCLAW_DEFAULT_INTERVAL
-    _intervals_raw = os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "1m,5m,15m,30m,1h,4h,1d"
+    _intervals_raw = os.environ.get("PNLCLAW_KLINE_INTERVALS") or os.environ.get("PNLCLAW_DEFAULT_INTERVAL") or "30m,1h"
     kline_intervals = [i.strip() for i in _intervals_raw.split(",") if i.strip()]
     if not kline_intervals:
-        kline_intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
+        kline_intervals = ["30m", "1h"]
     default_interval = kline_intervals[0]
     logger.info("Kline intervals: %s (primary: %s)", kline_intervals, default_interval)
 
@@ -247,12 +242,32 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     market_svc = MarketDataService()
 
+    # Binance Spot
+    market_svc.register_source(
+        BinanceSource(
+            market_type="spot",
+            ws_url=os.environ.get("PNLCLAW_BINANCE_WS_URL", None),
+            rest_url=os.environ.get("PNLCLAW_BINANCE_REST_URL", None),
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
+
     # Binance USDT-M Futures
     market_svc.register_source(
         BinanceSource(
             market_type="futures",
             ws_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_WS_URL", None),
             rest_url=os.environ.get("PNLCLAW_BINANCE_FUTURES_REST_URL", None),
+            proxy_url=proxy_url,
+            kline_intervals=kline_intervals,
+        )
+    )
+
+    # OKX Spot
+    market_svc.register_source(
+        OKXSource(
+            market_type="spot",
             proxy_url=proxy_url,
             kline_intervals=kline_intervals,
         )
@@ -281,25 +296,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # are pushed to connected WebSocket clients in real time.
         _bridge_market_events(market_svc)
 
-        # Start Redis Pub/Sub subscriber only in multi-worker mode
-        if os.environ.get("PNLCLAW_WS_PUBSUB_ENABLED", "").lower() in ("1", "true"):
-            from app.core.redis_pubsub import start_subscriber as _start_pubsub
-
-            async def _pubsub_forward(channel: str, data: dict) -> None:
-                from app.api.v1.ws import _market_manager
-                await _market_manager.broadcast(channel, data)
-
-            await _start_pubsub(_pubsub_forward)
-            logger.info("Redis Pub/Sub enabled for multi-worker broadcasting")
-        else:
-            logger.info("Redis Pub/Sub disabled (single-worker mode)")
-
         # Subscribe default symbols on ALL sources so large-trade and
         # liquidation monitors see data from every exchange.
-        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT"
+        default_symbols = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT,SOL/USDT"
         if default_symbols:
             all_sources: list[tuple[str, str]] = [
+                ("binance", "spot"),
                 ("binance", "futures"),
+                ("okx", "spot"),
                 ("okx", "futures"),
             ]
             for sym in default_symbols.split(","):
@@ -319,47 +323,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                             exc_info=True,
                         )
                     await asyncio.sleep(0.3)
-
-        # --- K-line warmup: pre-fetch common symbols x intervals into Redis ---
-        from app.core.redis import get_redis
-
-        _warmup_redis = get_redis()
-        if _warmup_redis is not None:
-            from pnlclaw_market.kline_store import KlineStore
-
-            _warmup_store = KlineStore(_warmup_redis)
-            _warmup_intervals = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
-            _warmup_symbols_str = os.environ.get("PNLCLAW_DEFAULT_SYMBOLS") or "BTC/USDT,ETH/USDT"
-            _warmup_symbols = [s.strip() for s in _warmup_symbols_str.split(",") if s.strip()]
-
-            async def _warmup_task() -> None:
-                """Background task: pre-fetch K-lines for default symbols.
-
-                Fetches high-priority intervals first (1h, 30m, 15m, 4h)
-                then fills remaining. Short delays between requests to avoid
-                hammering exchanges while still completing quickly.
-                """
-                await asyncio.sleep(3)
-                _priority_intervals = ["1h", "30m", "15m", "4h", "1m", "5m", "1d"]
-                for sym in _warmup_symbols:
-                    for ivl in _priority_intervals:
-                        for ex, mt in [("binance", "futures"), ("okx", "futures")]:
-                            try:
-                                existing = await _warmup_store.count(ex, mt, sym, ivl)
-                                if existing >= 100:
-                                    continue
-                                klines = await market_svc.fetch_klines_rest(sym, ex, mt, interval=ivl, limit=500)
-                                if klines:
-                                    await _warmup_store.put(ex, mt, sym, ivl, klines)
-                                    logger.info("Warmup: cached %d klines %s/%s %s %s", len(klines), ex, mt, sym, ivl)
-                                await asyncio.sleep(0.3)
-                            except Exception:
-                                logger.debug("Warmup skip %s/%s %s %s", ex, mt, sym, ivl, exc_info=True)
-                logger.info("K-line warmup completed")
-
-            asyncio.create_task(_warmup_task(), name="kline-warmup")
-        else:
-            logger.info("Redis not available, skipping K-line warmup")
 
         # Register market health check
         async def _market_health() -> HealthCheckResult:
@@ -728,12 +691,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.warning("Error closing database", exc_info=True)
         set_db_manager(None)
 
-        from app.core.redis_pubsub import stop_subscriber as _stop_pubsub
-
-        await _stop_pubsub()
-        if _kline_flush_task is not None:
-            _kline_flush_task.cancel()
-        await close_redis()
         logger.info("PnLClaw Local API shutdown complete")
 
 
@@ -1195,7 +1152,7 @@ def _bridge_market_events(market_svc: object) -> None:
     import asyncio
     import time as _time
 
-    from app.api.v1.ws import _market_manager, broadcast_market_event, broadcast_market_event_fast
+    from app.api.v1.ws import _market_manager, broadcast_market_event
     from pnlclaw_types.derivatives import (
         FundingRateEvent,
         LargeOrderEvent,
@@ -1242,79 +1199,28 @@ def _bridge_market_events(market_svc: object) -> None:
     def _on_ticker(event: TickerEvent) -> None:
         if _market_manager.active_count == 0:
             return
-        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
-        if not _market_manager.has_subscribers(channel):
-            return
         asyncio.ensure_future(
-            broadcast_market_event_fast(
+            broadcast_market_event(
                 event.symbol,
                 "ticker",
-                event.model_dump_json(),
-                exchange=event.exchange,
-                market_type=event.market_type,
+                event.model_dump(),
             )
         )
 
-    global _kline_flush_task
-    _kline_buffer: dict[str, KlineEvent] = {}
-    _KLINE_FLUSH_INTERVAL = 2.0
-
-    async def _flush_kline_buffer() -> None:
-        """Periodically flush buffered kline events to Redis (every 2s)."""
-        while True:
-            await asyncio.sleep(_KLINE_FLUSH_INTERVAL)
-            if not _kline_buffer:
-                continue
-            redis_client = _get_redis_lazy()
-            if redis_client is None:
-                _kline_buffer.clear()
-                continue
-            from pnlclaw_market.kline_store import KlineStore
-            store = KlineStore(redis_client)
-            batch = dict(_kline_buffer)
-            _kline_buffer.clear()
-            for _buf_key, event in batch.items():
-                try:
-                    await store.append(
-                        event.exchange, event.market_type, event.symbol, event.interval, event
-                    )
-                except Exception:
-                    logger.debug("Flush kline to Redis failed: %s", _buf_key, exc_info=True)
-
-    _kline_flush_task = asyncio.create_task(_flush_kline_buffer(), name="kline-redis-flush")
-
-    def _get_redis_lazy():  # noqa: ANN202
-        from app.core.redis import get_redis
-        return get_redis()
-
-    def _buffer_kline_for_redis(event: KlineEvent) -> None:
-        """Buffer kline event for batched Redis write (deduplicates by key)."""
-        buf_key = f"{event.exchange}:{event.market_type}:{event.symbol}:{event.interval}"
-        _kline_buffer[buf_key] = event
-
     def _on_kline(event: KlineEvent) -> None:
-        _buffer_kline_for_redis(event)
         if _market_manager.active_count == 0:
             return
-        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
-        if not _market_manager.has_subscribers(channel):
-            return
         asyncio.ensure_future(
-            broadcast_market_event_fast(
+            broadcast_market_event(
                 event.symbol,
                 "kline",
-                event.model_dump_json(),
-                exchange=event.exchange,
-                market_type=event.market_type,
+                event.model_dump(),
             )
         )
 
     def _on_orderbook(event: OrderBookL2Snapshot) -> None:
         nonlocal _ob_flush_running
         if _market_manager.active_count == 0:
-            return
-        channel = f"market:{event.exchange}:{event.market_type}:{event.symbol}"
-        if not _market_manager.has_subscribers(channel):
             return
         key = f"{event.exchange}:{event.market_type}:{event.symbol}"
         _pending_ob[key] = event
@@ -1577,21 +1483,26 @@ def create_app() -> FastAPI:
         response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
         return response
 
-    # CORS — allow desktop and admin frontends
+    # CORS — allow desktop frontend
+    _cors_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "tauri://localhost",
+        "https://tauri.localhost",
+        "http://tauri.localhost",
+    ]
+    # --- PRO-BEGIN ---
+    _cors_origins.append("http://localhost:3001")
+    # --- PRO-END ---
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "tauri://localhost"],
+        allow_origins=_cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
         expose_headers=["X-Session-ID", "X-Request-ID"],
         max_age=3600,
     )
-
-    # GZip — compress JSON responses (500 klines ~150KB -> ~20KB)
-    from fastapi.middleware.gzip import GZipMiddleware
-
-    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Error handlers (must be installed before routers for catch-all to work)
     install_error_handlers(app)

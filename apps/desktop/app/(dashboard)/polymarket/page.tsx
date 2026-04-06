@@ -332,13 +332,13 @@ function EventCard({
               src={event.icon}
               alt=""
               className="h-10 w-10 rounded-lg object-cover shrink-0 mt-0.5 cursor-pointer"
-              onClick={() => router.push(`/polymarket/${event.id}`)}
+              onClick={() => router.push(`/polymarket/placeholder?id=${event.id}`)}
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none" }}
             />
           )}
           <div
             className="flex-1 min-w-0 cursor-pointer group"
-            onClick={() => router.push(`/polymarket/${event.id}`)}
+            onClick={() => router.push(`/polymarket/placeholder?id=${event.id}`)}
           >
             <h3 className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
               {event.title_zh}

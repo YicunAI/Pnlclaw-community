@@ -1,7 +1,6 @@
 /**
  * Desktop authentication helpers.
- * Talks to admin-api for OAuth login and token management.
- * When NEXT_PUBLIC_AUTH_API_URL is not set, auth is disabled (Community mode).
+ * When NEXT_PUBLIC_AUTH_API_URL is not set, auth is disabled (local mode).
  */
 
 const AUTH_API =

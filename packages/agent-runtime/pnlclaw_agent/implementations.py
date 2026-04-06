@@ -1,8 +1,8 @@
-"""Community edition basic implementations for Protocol interfaces.
+"""Basic implementations for Protocol interfaces.
 
 These are minimal, functional implementations suitable for local
-single-user workflows. Pro edition replaces them with advanced
-implementations via the ComponentRegistry.
+single-user workflows. Advanced implementations can be substituted
+via the ComponentRegistry.
 """
 
 from __future__ import annotations
@@ -29,8 +29,10 @@ class KeywordMemoryBackend:
         matches = [e for e in self._entries if query_lower in e.content.lower()]
         return matches[:limit]
 
+    # --- PRO-BEGIN ---
     async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
-        raise NotImplementedError("Semantic recall requires PnLClaw Pro")
+        raise NotImplementedError("Semantic recall is not available in this edition")
+    # --- PRO-END ---
 
 
 class SingleAgentRunner:
@@ -39,8 +41,10 @@ class SingleAgentRunner:
     async def run(self, task: str, context: dict[str, Any]) -> str:
         return f"Task acknowledged: {task}"
 
+    # --- PRO-BEGIN ---
     async def delegate(self, request: Any) -> Any:
-        raise NotImplementedError("Multi-agent delegation requires PnLClaw Pro")
+        raise NotImplementedError("Multi-agent delegation is not available in this edition")
+    # --- PRO-END ---
 
 
 class FixedModelRouter:
@@ -52,8 +56,10 @@ class FixedModelRouter:
     def route(self, messages: list[dict[str, Any]]) -> str:
         return self._model
 
+    # --- PRO-BEGIN ---
     def select_for_task(self, task_type: Any) -> Any:
-        raise NotImplementedError("Smart model routing requires PnLClaw Pro")
+        raise NotImplementedError("Smart model routing is not available in this edition")
+    # --- PRO-END ---
 
 
 class BasicContextManager:
@@ -92,5 +98,7 @@ class RuleBasedFeedback:
                 analysis["recommendation"] = "Strategy shows acceptable risk-adjusted returns"
         return analysis
 
+    # --- PRO-BEGIN ---
     async def iterate(self, plan: Any) -> Any:
-        raise NotImplementedError("AI feedback iteration requires PnLClaw Pro")
+        raise NotImplementedError("AI feedback iteration is not available in this edition")
+    # --- PRO-END ---

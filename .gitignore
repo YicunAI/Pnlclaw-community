@@ -55,6 +55,7 @@ htmlcov/
 # IDE
 .vscode/
 .idea/
+.cursor/
 PnLClaw.code-workspace
 *.swp
 *.swo

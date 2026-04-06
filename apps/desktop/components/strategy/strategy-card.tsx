@@ -87,7 +87,7 @@ export function StrategyCard({
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmStop, setConfirmStop] = useState(false)
   const [stopping, setStopping] = useState(false)
-  const studioPath = `/strategies/${strategy.id}/studio`
+  const studioPath = `/strategies/placeholder/studio?id=${strategy.id}`
 
   const isRunning = deployment?.status === "running"
   const isStopped = deployment?.status === "stopped"

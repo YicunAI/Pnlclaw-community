@@ -22,7 +22,7 @@ from pnlclaw_types.errors import ErrorCode, PnLClawError
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# JWT Manager holder (shared secret with admin-api)
+# Authentication infrastructure
 # ---------------------------------------------------------------------------
 
 _jwt_manager: Any | None = None
@@ -35,7 +35,7 @@ _UUID_RE = re.compile(r"^[0-9a-fA-F-]{1,40}$")
 
 
 class AuthenticatedUser(BaseModel):
-    """Represents an authenticated user extracted from a valid JWT."""
+    """Represents an authenticated user."""
 
     id: str
     role: str = "user"
@@ -54,62 +54,26 @@ def get_jwt_manager() -> Any:
 async def require_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> AuthenticatedUser:
-    """Validate the Bearer JWT and return the authenticated user.
+    """Return the authenticated user.
 
-    When auth is disabled (Community mode), returns a default local user.
+    When auth is disabled, returns a default local user.
     """
-    if not _auth_enabled:
-        return AuthenticatedUser(id="local", role="admin")
+    # --- PRO-BEGIN ---
+    if _auth_enabled:
+        if creds is None or not creds.credentials:
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message="Missing or invalid Bearer token",
+            )
 
-    if creds is None or not creds.credentials:
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message="Missing or invalid Bearer token",
-        )
+        try:
+            payload = _jwt_manager.decode_access_token(creds.credentials)
+        except Exception as exc:
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message=f"Invalid token: {exc}",
+            )
 
-    try:
-        payload = _jwt_manager.decode_access_token(creds.credentials)
-    except Exception as exc:
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message=f"Invalid token: {exc}",
-        )
-
-    user_id = payload.get("sub")
-    if not user_id:
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message="Token missing user identity",
-        )
-    if not _UUID_RE.match(user_id):
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message="Invalid user ID format",
-        )
-
-    return AuthenticatedUser(id=user_id, role=payload.get("role", "user"))
-
-
-async def optional_user(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> AuthenticatedUser:
-    """Extract user from Bearer JWT.
-
-    Community mode (auth disabled): returns local/admin.
-    Pro mode (auth enabled): requires a valid Bearer token — missing or
-    invalid tokens are rejected with 401.  No silent fallback to local/admin.
-    """
-    if not _auth_enabled:
-        return AuthenticatedUser(id="local", role="admin")
-
-    if creds is None or not creds.credentials:
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message="Authentication required",
-        )
-
-    try:
-        payload = _jwt_manager.decode_access_token(creds.credentials)
         user_id = payload.get("sub")
         if not user_id:
             raise PnLClawError(
@@ -121,17 +85,50 @@ async def optional_user(
                 code=ErrorCode.AUTHENTICATION_ERROR,
                 message="Invalid user ID format",
             )
-        return AuthenticatedUser(
-            id=user_id,
-            role=payload.get("role", "user"),
-        )
-    except PnLClawError:
-        raise
-    except Exception as exc:
-        raise PnLClawError(
-            code=ErrorCode.AUTHENTICATION_ERROR,
-            message=f"Invalid token: {exc}",
-        ) from exc
+
+        return AuthenticatedUser(id=user_id, role=payload.get("role", "user"))
+    # --- PRO-END ---
+    return AuthenticatedUser(id="local", role="admin")
+
+
+async def optional_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+) -> AuthenticatedUser:
+    """Return the authenticated user, or local default when auth is disabled."""
+    # --- PRO-BEGIN ---
+    if _auth_enabled:
+        if creds is None or not creds.credentials:
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message="Authentication required",
+            )
+
+        try:
+            payload = _jwt_manager.decode_access_token(creds.credentials)
+            user_id = payload.get("sub")
+            if not user_id:
+                raise PnLClawError(
+                    code=ErrorCode.AUTHENTICATION_ERROR,
+                    message="Token missing user identity",
+                )
+            if not _UUID_RE.match(user_id):
+                raise PnLClawError(
+                    code=ErrorCode.AUTHENTICATION_ERROR,
+                    message="Invalid user ID format",
+                )
+            return AuthenticatedUser(
+                id=user_id,
+                role=payload.get("role", "user"),
+            )
+        except PnLClawError:
+            raise
+        except Exception as exc:
+            raise PnLClawError(
+                code=ErrorCode.AUTHENTICATION_ERROR,
+                message=f"Invalid token: {exc}",
+            ) from exc
+    # --- PRO-END ---
+    return AuthenticatedUser(id="local", role="admin")
 
 
 # ---------------------------------------------------------------------------

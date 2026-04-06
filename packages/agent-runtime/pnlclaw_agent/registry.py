@@ -1,9 +1,9 @@
-"""Component registry for PnLClaw Open Core architecture.
+"""Component registry for PnLClaw modular architecture.
 
-Community edition registers basic implementations at startup.
-Pro edition can replace them at runtime via ``replace()``.
+Basic implementations are registered at startup. Advanced implementations
+can be substituted at runtime via ``replace()``.
 
-Extension points for community contributors:
+Extension points:
 - ExchangeSource (exchange data adapters)
 - Indicator (technical indicators)
 - Skills (knowledge skill packs)
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class ComponentRegistry:
-    """Component registry — Community registers basics, Pro injects via replace().
+    """Component registry — register components and optionally replace them.
 
     Thread-safe singleton pattern. Components are identified by string names.
     """
@@ -55,7 +55,7 @@ class ComponentRegistry:
         return self._components[name]
 
     def replace(self, name: str, implementation: Any) -> None:
-        """Replace an existing component implementation (Pro extension entry point).
+        """Replace an existing component implementation.
 
         Raises:
             KeyError: If the component is not already registered.

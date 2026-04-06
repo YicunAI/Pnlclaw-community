@@ -3,6 +3,8 @@ export const enMessages = {
   "common.english": "English",
   "common.chinese": "中文",
   "common.loading": "Loading...",
+  "common.expand": "Details",
+  "common.collapse": "Collapse",
   "common.save": "Save",
   "common.and": "and",
   "common.more": "more",
@@ -635,7 +637,7 @@ export const enMessages = {
 
   "mcp.title": "MCP Servers",
   "mcp.subtitle": "Connect external tool servers via Model Context Protocol",
-  "mcp.noServers": "No MCP servers configured. Add servers in ~/.pnlclaw/config.yaml",
+  "mcp.noServers": "No MCP servers configured",
   "mcp.addServer": "Add Server",
   "mcp.connected": "Connected",
   "mcp.disconnected": "Disconnected",

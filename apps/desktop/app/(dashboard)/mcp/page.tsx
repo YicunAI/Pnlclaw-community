@@ -178,7 +178,6 @@ export default function McpPage() {
           <CardContent className="py-12 text-center text-muted-foreground">
             <Plug className="h-10 w-10 mx-auto mb-3 opacity-50" />
             <p>{t("mcp.noServers")}</p>
-            <p className="text-xs mt-2 font-mono opacity-70">~/.pnlclaw/config.yaml → mcp.servers</p>
           </CardContent>
         </Card>
       )}

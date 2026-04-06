@@ -403,11 +403,9 @@ async def list_strategy_deployments(
     account_id: str | None = Query(None),
     user: AuthenticatedUser = Depends(optional_user),
 ) -> APIResponse[list[dict[str, Any]]]:
-    """List strategy deployments, optionally filtered by paper account.
-
-    In Pro mode, only returns deployments for strategies owned by the user.
-    """
+    """List strategy deployments, optionally filtered by paper account."""
     deployments = await _list_deployments(account_id=account_id)
+    # --- PRO-BEGIN ---
     if user.id != "local":
         user_strategy_ids: set[str] = set()
         repo = get_strategy_repo()
@@ -423,6 +421,7 @@ async def list_strategy_deployments(
                 if _strategy_owners.get(sid) in (user.id, "local", None)
             }
         deployments = [d for d in deployments if d.strategy_id in user_strategy_ids]
+    # --- PRO-END ---
     return APIResponse(
         data=[deployment.model_dump(mode="json") for deployment in deployments],
         meta=build_response_meta(request),

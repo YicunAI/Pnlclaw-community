@@ -326,7 +326,7 @@ export default function StrategiesHubPage() {
       }
       setCreateDialogOpen(false)
       setNewStrategyName("")
-      router.push(`/strategies/${res.data.id}/studio`)
+      router.push(`/strategies/placeholder/studio?id=${res.data.id}`)
     } finally {
       setCreating(false)
     }
@@ -514,7 +514,7 @@ export default function StrategiesHubPage() {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs"
-                          onClick={() => router.push(`/strategies/${dep.strategy_id}/studio`)}
+                          onClick={() => router.push(`/strategies/placeholder/studio?id=${dep.strategy_id}`)}
                         >
                           {t("strategies.hub.openStudio")}
                           <ArrowRight className="h-3 w-3 ml-1" />
@@ -804,7 +804,7 @@ export default function StrategiesHubPage() {
                       "border-border cursor-pointer",
                       isLive && "bg-emerald-500/[0.03]",
                     )}
-                    onClick={() => router.push(`/strategies/${s.id}/studio`)}
+                    onClick={() => router.push(`/strategies/placeholder/studio?id=${s.id}`)}
                   >
                     <TableCell className="text-sm font-medium">
                       <span className="flex items-center gap-1.5">
@@ -863,7 +863,7 @@ export default function StrategiesHubPage() {
                           className="h-7 text-xs"
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/strategies/${s.id}/studio`)
+                            router.push(`/strategies/placeholder/studio?id=${s.id}`)
                           }}
                         >
                           {t("strategies.hub.openStudio")}

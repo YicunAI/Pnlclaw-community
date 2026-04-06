@@ -6,11 +6,14 @@ import type { TradingOrder, TradingPosition, TradingBalance, TradingFill } from 
 
 const WS_BASE =
   process.env.NEXT_PUBLIC_WS_URL ||
-  (process.env.NODE_ENV === "development"
+  (typeof window !== "undefined" &&
+    (window.location.protocol === "tauri:" || window.location.hostname === "tauri.localhost")
     ? "ws://127.0.0.1:8080"
-    : typeof window !== "undefined"
-      ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
-      : "ws://localhost:8080")
+    : process.env.NODE_ENV === "development"
+      ? "ws://127.0.0.1:8080"
+      : typeof window !== "undefined"
+        ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}`
+        : "ws://localhost:8080")
 const RECONNECT_MS = 3000
 const STALE_AFTER_MS = 5000
 

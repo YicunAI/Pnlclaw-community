@@ -33,11 +33,7 @@ class ToolCall(BaseModel):
 
 
 class TokenUsage(BaseModel):
-    """Token usage statistics from the LLM response.
-
-    PRO RESERVED: Community edition populates these fields but does not
-    expose a cost-tracking dashboard.
-    """
+    """Token usage statistics from the LLM response."""
 
     prompt_tokens: int = 0
     completion_tokens: int = 0
@@ -53,8 +49,8 @@ class ToolCallResult(BaseModel):
 
     tool_calls: list[ToolCall] = Field(default_factory=list)
     text: str | None = None
-    model: str = ""  # PRO RESERVED: used for cost tracking
-    usage: TokenUsage = Field(default_factory=TokenUsage)  # PRO RESERVED
+    model: str = ""
+    usage: TokenUsage = Field(default_factory=TokenUsage)
 
 
 def get_json_schema(model: type[BaseModel]) -> dict[str, Any]:

@@ -44,6 +44,12 @@ import {
   type SkillDetail,
 } from "@/lib/api-client"
 
+function safeFilePath(raw: string): string {
+  const m = raw.match(/skills[/\\](.+)/);
+  if (m) return "skills/" + m[1].replace(/\\/g, "/");
+  return raw.split(/[/\\]/).pop() || raw;
+}
+
 const sourceColors: Record<string, "default" | "secondary" | "outline" | "success"> = {
   bundled: "success",
   user: "secondary",
@@ -474,7 +480,7 @@ export default function SkillsPage() {
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                    {skill.file_path}
+                    {isExpanded ? t("common.collapse") : t("common.expand")}
                   </button>
                   {isUser && (
                     <div className="ml-auto flex gap-1">
@@ -518,7 +524,7 @@ export default function SkillsPage() {
                         </pre>
                       </div>
                     ) : (
-                      <p className="text-xs text-muted-foreground">{skill.file_path}</p>
+                      <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
                     )}
                   </div>
                 )}

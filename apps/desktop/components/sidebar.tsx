@@ -1,8 +1,7 @@
 "use client"
 
-import React from "react"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import React, { useCallback } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import {
   LayoutDashboard,
   BarChart3,
@@ -32,6 +31,48 @@ const navItems = [
   { href: "/settings", key: "nav.settings", icon: Settings },
 ] as const
 
+function NavLink({
+  href,
+  isActive,
+  icon: Icon,
+  label,
+}: {
+  href: string
+  isActive: boolean
+  icon: React.ElementType
+  label: string
+}) {
+  const router = useRouter()
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault()
+      try {
+        router.push(href)
+      } catch {
+        window.location.href = href
+      }
+    },
+    [href, router],
+  )
+
+  return (
+    <a
+      href={href}
+      onClick={handleClick}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </a>
+  )
+}
+
 export const Sidebar = React.memo(function Sidebar() {
   const pathname = usePathname()
   const { t } = useI18n()
@@ -48,21 +89,16 @@ export const Sidebar = React.memo(function Sidebar() {
         {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
+            pathname === item.href + "/" ||
             (item.href !== "/dashboard" && pathname?.startsWith(item.href))
           return (
-            <Link
+            <NavLink
               key={item.href}
               href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <item.icon className="h-4 w-4" />
-              {t(item.key)}
-            </Link>
+              isActive={isActive}
+              icon={item.icon}
+              label={t(item.key)}
+            />
           )
         })}
       </nav>

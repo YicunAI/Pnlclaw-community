@@ -9,6 +9,8 @@ export const zhCNMessages: MessageMap = {
   "common.and": "和",
   "common.more": "个",
   "common.loading": "加载中...",
+  "common.expand": "详情",
+  "common.collapse": "收起",
   "common.save": "保存",
 
   "nav.dashboard": "总览",
@@ -604,7 +606,7 @@ export const zhCNMessages: MessageMap = {
   "trading.status": "状态",
   "trading.qty": "数量",
 
-  "demo.start": "在线版本",
+  "demo.start": "开始",
   "demo.docs": "GitHub本地部署",
   "demo.scrollDown": "下滑了解更多",
   "demo.desc1": "提纯 OpenClaw 工程架构，专为加密市场与预测市场打造",
@@ -639,7 +641,7 @@ export const zhCNMessages: MessageMap = {
 
   "mcp.title": "MCP 服务",
   "mcp.subtitle": "通过 Model Context Protocol 连接外部工具服务器",
-  "mcp.noServers": "尚未配置 MCP 服务器。请在 ~/.pnlclaw/config.yaml 中添加",
+  "mcp.noServers": "尚未配置 MCP 服务器",
   "mcp.addServer": "添加服务",
   "mcp.connected": "已连接",
   "mcp.disconnected": "未连接",

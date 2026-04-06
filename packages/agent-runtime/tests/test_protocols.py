@@ -1,7 +1,7 @@
-"""Tests for Protocol interfaces, ComponentRegistry, and Community implementations.
+"""Tests for Protocol interfaces, ComponentRegistry, and implementations.
 
-Sprint 3.1 — Validates Protocol definitions, registry CRUD, Pro extension
-replacement, and community basic implementations.
+Sprint 3.1 — Validates Protocol definitions, registry CRUD,
+replacement, and basic implementations.
 """
 
 from __future__ import annotations
@@ -127,35 +127,37 @@ class TestRegistryListRegistered:
 
 
 # ---------------------------------------------------------------------------
-# Test 6: PRO RESERVED methods raise NotImplementedError
+# Test 6: Advanced feature methods raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 
-class TestProReservedMethods:
+# --- PRO-BEGIN ---
+class TestAdvancedFeatureMethods:
     @pytest.mark.asyncio
     async def test_memory_semantic_recall_raises(self) -> None:
         backend = KeywordMemoryBackend()
-        with pytest.raises(NotImplementedError, match="PnLClaw Pro"):
+        with pytest.raises(NotImplementedError, match="not available"):
             await backend.semantic_recall("test")
 
     @pytest.mark.asyncio
     async def test_orchestrator_delegate_raises(self) -> None:
         runner = SingleAgentRunner()
-        with pytest.raises(NotImplementedError, match="PnLClaw Pro"):
+        with pytest.raises(NotImplementedError, match="not available"):
             await runner.delegate(DelegationRequest(task="test"))
 
     def test_model_router_select_for_task_raises(self) -> None:
         router = FixedModelRouter()
-        with pytest.raises(NotImplementedError, match="PnLClaw Pro"):
+        with pytest.raises(NotImplementedError, match="not available"):
             router.select_for_task("analysis")
 
     @pytest.mark.asyncio
     async def test_feedback_iterate_raises(self) -> None:
         feedback = RuleBasedFeedback()
-        with pytest.raises(NotImplementedError, match="PnLClaw Pro"):
+        with pytest.raises(NotImplementedError, match="not available"):
             from pnlclaw_agent.protocols import IterationPlan
 
             await feedback.iterate(IterationPlan(strategy_id="test"))
+# --- PRO-END ---
 
 
 # ---------------------------------------------------------------------------

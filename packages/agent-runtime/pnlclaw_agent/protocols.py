@@ -1,10 +1,8 @@
-"""Protocol interfaces for PnLClaw Open Core architecture.
+"""Protocol interfaces for PnLClaw component architecture.
 
-Defines six Protocol interfaces that serve as the Community/Pro boundary.
-Community edition registers basic implementations; Pro edition replaces
-them with advanced implementations via ``ComponentRegistry.replace()``.
-
-Architecture: AGPL Community (this file) + closed-source Pro extension.
+Defines six Protocol interfaces for modular component registration.
+Basic implementations are registered at startup; advanced implementations
+can be substituted via ``ComponentRegistry.replace()``.
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class MemoryBackend(Protocol):
-    """Memory backend — Community: keyword matching; Pro: vector semantic search."""
+    """Memory backend for storing and recalling entries."""
 
     async def store(self, entry: MemoryEntry) -> None:
         """Store a memory entry."""
@@ -29,40 +27,46 @@ class MemoryBackend(Protocol):
         """Recall memory entries matching the query."""
         ...
 
+    # --- PRO-BEGIN ---
     async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
-        """PRO RESERVED: Semantic vector similarity search."""
-        raise NotImplementedError("Semantic recall requires PnLClaw Pro")
+        """Semantic vector similarity search (advanced feature)."""
+        raise NotImplementedError("Semantic recall is not available in this edition")
+    # --- PRO-END ---
 
 
 @runtime_checkable
 class AgentOrchestrator(Protocol):
-    """Agent orchestration — Community: single agent; Pro: multi-agent collaboration."""
+    """Agent orchestration for running tasks."""
 
     async def run(self, task: str, context: dict[str, Any]) -> str:
         """Run a task with a single agent."""
         ...
 
+    # --- PRO-BEGIN ---
     async def delegate(self, request: DelegationRequest) -> ConsensusResult:
-        """PRO RESERVED: Delegate task to multiple agents for consensus."""
-        raise NotImplementedError("Multi-agent delegation requires PnLClaw Pro")
+        """Delegate task to multiple agents for consensus (advanced feature)."""
+        raise NotImplementedError("Multi-agent delegation is not available in this edition")
+    # --- PRO-END ---
 
 
 @runtime_checkable
 class ModelRouter(Protocol):
-    """Model routing — Community: fixed single model; Pro: smart dynamic selection."""
+    """Model routing for selecting LLM models."""
 
     def route(self, messages: list[dict[str, Any]]) -> str:
         """Return the model identifier to use for the given messages."""
         ...
 
+    # --- PRO-BEGIN ---
     def select_for_task(self, task_type: TaskType) -> ModelProfile:
-        """PRO RESERVED: Select optimal model based on task type."""
-        raise NotImplementedError("Smart model routing requires PnLClaw Pro")
+        """Select optimal model based on task type (advanced feature)."""
+        raise NotImplementedError("Smart model routing is not available in this edition")
+    # --- PRO-END ---
 
 
 @runtime_checkable
 class ContextEngine(Protocol):
-    """Context engine — Community: basic management; Pro: advanced pluggable engine."""
+    """Context engine for managing conversation context."""
 
     async def bootstrap(self, config: dict[str, Any]) -> None:
         """Initialize the context engine with configuration."""
@@ -83,32 +87,32 @@ class ContextEngine(Protocol):
 
 @runtime_checkable
 class FeedbackEngine(Protocol):
-    """Feedback engine — Community: rule-based detection; Pro: AI auto-iteration."""
+    """Feedback engine for analyzing strategy results."""
 
     async def analyze(self, result: dict[str, Any]) -> dict[str, Any]:
         """Analyze a strategy/backtest result."""
         ...
 
+    # --- PRO-BEGIN ---
     async def iterate(self, plan: IterationPlan) -> OptimizationResult:
-        """PRO RESERVED: AI-driven iterative optimization."""
-        raise NotImplementedError("AI feedback iteration requires PnLClaw Pro")
+        """AI-driven iterative optimization (advanced feature)."""
+        raise NotImplementedError("AI feedback iteration is not available in this edition")
+    # --- PRO-END ---
 
 
+# --- PRO-BEGIN ---
 @runtime_checkable
 class MarketScanner(Protocol):
-    """Market scanner — Community: disabled; Pro: 7x24 automated scanning.
-
-    This entire Protocol is PRO RESERVED. Community edition does not
-    register an implementation.
-    """
+    """Market scanner — 7x24 automated scanning (advanced feature)."""
 
     async def scan(self, symbols: list[str]) -> list[ScanResult]:
-        """PRO RESERVED: Scan markets for anomalies."""
-        raise NotImplementedError("Market scanning requires PnLClaw Pro")
+        """Scan markets for anomalies."""
+        raise NotImplementedError("Market scanning is not available in this edition")
+# --- PRO-END ---
 
 
 # ---------------------------------------------------------------------------
-# PRO RESERVED data structures (defined but not implemented)
+# Data structures for advanced features
 # ---------------------------------------------------------------------------
 
 
