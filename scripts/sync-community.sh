@@ -54,7 +54,7 @@ while IFS= read -r line; do
 done < "$PRO_ONLY_FILE"
 
 echo "4. Stripping PRO-BEGIN/PRO-END blocks from Python files..."
-find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./node_modules/*" | while read -r pyfile; do
+find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./node_modules/*" -not -path "*/target/*" -not -path "*/out_build/*" -not -path "*/out_fresh/*" -not -path "*/.next/*" -not -path "*/gen/*" | while read -r pyfile; do
   if grep -q "# --- PRO-BEGIN ---" "$pyfile" 2>/dev/null; then
     sed -i '/# --- PRO-BEGIN ---/,/# --- PRO-END ---/d' "$pyfile"
     echo "   Stripped PRO blocks: $pyfile"
@@ -62,7 +62,7 @@ find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./n
 done
 
 echo "5. Stripping PRO-BEGIN/PRO-END blocks from TypeScript files..."
-find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "./.git/*" -not -path "./node_modules/*" | while read -r tsfile; do
+find . \( -name "*.ts" -o -name "*.tsx" \) -not -path "./.git/*" -not -path "./node_modules/*" -not -path "*/target/*" -not -path "*/out_build/*" -not -path "*/out_fresh/*" -not -path "*/.next/*" -not -path "*/gen/*" | while read -r tsfile; do
   if grep -q "// --- PRO-BEGIN ---" "$tsfile" 2>/dev/null; then
     sed -i '/\/\/ --- PRO-BEGIN ---/,/\/\/ --- PRO-END ---/d' "$tsfile"
     echo "   Stripped PRO blocks: $tsfile"
@@ -142,7 +142,7 @@ if [ -f "scripts/pyinstaller/pnlclaw-server.spec" ]; then
 fi
 
 echo "8. Cleaning up empty lines left by block stripping..."
-find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./node_modules/*" | while read -r pyfile; do
+find . -name "*.py" -not -path "./.git/*" -not -path "./.venv/*" -not -path "./node_modules/*" -not -path "*/target/*" -not -path "*/out_build/*" -not -path "*/out_fresh/*" -not -path "*/.next/*" -not -path "*/gen/*" | while read -r pyfile; do
   # Collapse 3+ consecutive blank lines into 2
   sed -i '/^$/N;/^\n$/N;/^\n\n$/d' "$pyfile" 2>/dev/null || true
 done
