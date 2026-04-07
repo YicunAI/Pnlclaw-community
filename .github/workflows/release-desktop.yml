@@ -1,0 +1,84 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-13
+            target: x86_64-apple-darwin
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python packages
+        run: |
+          pip install pyinstaller
+          pip install -e packages/shared-types \
+                      -e packages/core \
+                      -e packages/exchange-sdk \
+                      -e packages/market-data \
+                      -e packages/security-gateway \
+                      -e packages/strategy-engine \
+                      -e packages/backtest-engine \
+                      -e packages/paper-engine \
+                      -e packages/risk-engine \
+                      -e packages/agent-runtime \
+                      -e packages/llm-adapter \
+                      -e packages/storage \
+                      -e packages/openclaw-compat \
+                      -e services/local-api
+
+      - name: Build Python sidecar
+        run: pyinstaller scripts/pyinstaller/pnlclaw-server.spec --noconfirm
+
+      - name: Copy sidecar to Tauri resources
+        shell: bash
+        run: |
+          mkdir -p apps/desktop/src-tauri/sidecar
+          cp -r dist/pnlclaw-server apps/desktop/src-tauri/sidecar/
+
+      - name: Install frontend dependencies
+        working-directory: apps/desktop
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: "PnLClaw ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install."
+          releaseDraft: true
+          prerelease: false

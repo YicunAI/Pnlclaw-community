@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="apps/desktop/public/pnl-white.png" alt="PnLClaw" height="1080" />
+  <img src="apps/desktop/public/pnl-white.png" alt="PnLClaw" height="840" />
   <br /><br />
   <p><strong>对话即量化 —— 本地优先的 AI 量化研究平台</strong><br />
   用自然语言对话驱动策略设计、回测、模拟交易的完整闭环。<br />
