@@ -3,8 +3,24 @@
 ## Project Identity
 
 **PnLClaw Community** is an independently developed, local-first crypto
-quantitative research and paper-trading platform. It is licensed under the
-**GNU Affero General Public License v3.0** (AGPL-3.0-only).
+quantitative research and paper-trading platform.
+
+## Dual Licensing
+
+PnLClaw Community is available under a **dual license**:
+
+1. **Open-Source License (AGPLv3):** The source code is licensed under the
+   [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You are
+   free to use, modify, and distribute PnLClaw, provided that all derivative
+   works are also distributed under AGPLv3 with full source code disclosure.
+
+2. **Commercial License:** For use cases that cannot comply with AGPLv3 —
+   including proprietary products, closed-source distribution, and commercial
+   SaaS offerings — a separate commercial license is required. Contact
+   **yicun@pnlclaw.com** for commercial licensing inquiries.
+
+The copyright holder reserves the right to offer the software under
+alternative licensing terms.
 
 ## Relationship to OpenClaw
 
@@ -78,6 +94,14 @@ Key dependencies include:
 
 ## Contributor License
 
-By contributing to this repository, you agree that your contributions are
-licensed under the AGPL-3.0-only license, consistent with the project's
-`LICENSE` file.
+By contributing to this repository, you agree that:
+
+1. Your contributions are licensed under the AGPL-3.0-only license, consistent
+   with the project's `LICENSE` file.
+2. You grant PnLClaw Contributors a perpetual, worldwide, non-exclusive,
+   royalty-free license to use, reproduce, modify, and distribute your
+   contributions under any license terms, including commercial licenses.
+
+This Contributor License Agreement (CLA) ensures that the project maintainers
+can continue to offer dual licensing while keeping the open-source version
+free under AGPLv3.
