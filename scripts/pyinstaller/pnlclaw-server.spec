@@ -124,7 +124,6 @@ a = Analysis(
     runtime_hooks=[],
     excludes=[
         "tkinter", "unittest", "test", "tests",
-        "pnlclaw_pro_auth", "pnlclaw_pro_storage",
         "matplotlib", "scipy", "sklearn", "torch", "tensorflow",
         "onnxruntime", "cupy", "pygame", "IPython", "notebook",
         "jupyter", "PIL", "cv2", "gevent",
