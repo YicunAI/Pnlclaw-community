@@ -26,14 +26,6 @@ class MemoryBackend(Protocol):
     async def recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
         """Recall memory entries matching the query."""
         ...
-
-    # --- PRO-BEGIN ---
-    async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
-        """Semantic vector similarity search (advanced feature)."""
-        raise NotImplementedError("Semantic recall is not available in this edition")
-    # --- PRO-END ---
-
-
 @runtime_checkable
 class AgentOrchestrator(Protocol):
     """Agent orchestration for running tasks."""
@@ -41,14 +33,6 @@ class AgentOrchestrator(Protocol):
     async def run(self, task: str, context: dict[str, Any]) -> str:
         """Run a task with a single agent."""
         ...
-
-    # --- PRO-BEGIN ---
-    async def delegate(self, request: DelegationRequest) -> ConsensusResult:
-        """Delegate task to multiple agents for consensus (advanced feature)."""
-        raise NotImplementedError("Multi-agent delegation is not available in this edition")
-    # --- PRO-END ---
-
-
 @runtime_checkable
 class ModelRouter(Protocol):
     """Model routing for selecting LLM models."""
@@ -56,14 +40,6 @@ class ModelRouter(Protocol):
     def route(self, messages: list[dict[str, Any]]) -> str:
         """Return the model identifier to use for the given messages."""
         ...
-
-    # --- PRO-BEGIN ---
-    def select_for_task(self, task_type: TaskType) -> ModelProfile:
-        """Select optimal model based on task type (advanced feature)."""
-        raise NotImplementedError("Smart model routing is not available in this edition")
-    # --- PRO-END ---
-
-
 @runtime_checkable
 class ContextEngine(Protocol):
     """Context engine for managing conversation context."""
@@ -92,23 +68,6 @@ class FeedbackEngine(Protocol):
     async def analyze(self, result: dict[str, Any]) -> dict[str, Any]:
         """Analyze a strategy/backtest result."""
         ...
-
-    # --- PRO-BEGIN ---
-    async def iterate(self, plan: IterationPlan) -> OptimizationResult:
-        """AI-driven iterative optimization (advanced feature)."""
-        raise NotImplementedError("AI feedback iteration is not available in this edition")
-    # --- PRO-END ---
-
-
-# --- PRO-BEGIN ---
-@runtime_checkable
-class MarketScanner(Protocol):
-    """Market scanner — 7x24 automated scanning (advanced feature)."""
-
-    async def scan(self, symbols: list[str]) -> list[ScanResult]:
-        """Scan markets for anomalies."""
-        raise NotImplementedError("Market scanning is not available in this edition")
-# --- PRO-END ---
 
 
 # ---------------------------------------------------------------------------

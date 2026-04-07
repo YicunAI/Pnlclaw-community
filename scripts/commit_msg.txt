@@ -1,9 +1,0 @@
-feat: comprehensive multi-user data isolation + admin panel + frontend fixes
-
-- Settings isolation: per-user config path and keyring namespacing
-- Fix admin-api DetachedInstanceError with selectinload for user queries
-- Per-user AgentRuntime cache with LRU eviction
-- Desktop login: Suspense boundary for useSearchParams
-- Admin frontend: fix TypeScript nullable types and SWR types
-- New Pro modules: admin dashboard, pro-auth, pro-storage, admin-api
-- Full data isolation: backtests, strategies, paper, chat, MCP, skills, WS

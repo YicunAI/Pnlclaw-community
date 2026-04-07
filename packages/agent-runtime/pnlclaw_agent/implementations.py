@@ -28,25 +28,11 @@ class KeywordMemoryBackend:
         query_lower = query.lower()
         matches = [e for e in self._entries if query_lower in e.content.lower()]
         return matches[:limit]
-
-    # --- PRO-BEGIN ---
-    async def semantic_recall(self, query: str, limit: int = 10) -> list[MemoryEntry]:
-        raise NotImplementedError("Semantic recall is not available in this edition")
-    # --- PRO-END ---
-
-
 class SingleAgentRunner:
     """Community orchestrator that runs a single agent (no delegation)."""
 
     async def run(self, task: str, context: dict[str, Any]) -> str:
         return f"Task acknowledged: {task}"
-
-    # --- PRO-BEGIN ---
-    async def delegate(self, request: Any) -> Any:
-        raise NotImplementedError("Multi-agent delegation is not available in this edition")
-    # --- PRO-END ---
-
-
 class FixedModelRouter:
     """Community model router that returns a fixed model identifier."""
 
@@ -55,13 +41,6 @@ class FixedModelRouter:
 
     def route(self, messages: list[dict[str, Any]]) -> str:
         return self._model
-
-    # --- PRO-BEGIN ---
-    def select_for_task(self, task_type: Any) -> Any:
-        raise NotImplementedError("Smart model routing is not available in this edition")
-    # --- PRO-END ---
-
-
 class BasicContextManager:
     """Community context engine with basic FIFO management."""
 
@@ -98,7 +77,3 @@ class RuleBasedFeedback:
                 analysis["recommendation"] = "Strategy shows acceptable risk-adjusted returns"
         return analysis
 
-    # --- PRO-BEGIN ---
-    async def iterate(self, plan: Any) -> Any:
-        raise NotImplementedError("AI feedback iteration is not available in this edition")
-    # --- PRO-END ---

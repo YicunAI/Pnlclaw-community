@@ -130,36 +130,6 @@ class TestRegistryListRegistered:
 # Test 6: Advanced feature methods raise NotImplementedError
 # ---------------------------------------------------------------------------
 
-
-# --- PRO-BEGIN ---
-class TestAdvancedFeatureMethods:
-    @pytest.mark.asyncio
-    async def test_memory_semantic_recall_raises(self) -> None:
-        backend = KeywordMemoryBackend()
-        with pytest.raises(NotImplementedError, match="not available"):
-            await backend.semantic_recall("test")
-
-    @pytest.mark.asyncio
-    async def test_orchestrator_delegate_raises(self) -> None:
-        runner = SingleAgentRunner()
-        with pytest.raises(NotImplementedError, match="not available"):
-            await runner.delegate(DelegationRequest(task="test"))
-
-    def test_model_router_select_for_task_raises(self) -> None:
-        router = FixedModelRouter()
-        with pytest.raises(NotImplementedError, match="not available"):
-            router.select_for_task("analysis")
-
-    @pytest.mark.asyncio
-    async def test_feedback_iterate_raises(self) -> None:
-        feedback = RuleBasedFeedback()
-        with pytest.raises(NotImplementedError, match="not available"):
-            from pnlclaw_agent.protocols import IterationPlan
-
-            await feedback.iterate(IterationPlan(strategy_id="test"))
-# --- PRO-END ---
-
-
 # ---------------------------------------------------------------------------
 # Test 7: Community implementations functional tests
 # ---------------------------------------------------------------------------

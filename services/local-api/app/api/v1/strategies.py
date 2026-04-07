@@ -405,23 +405,6 @@ async def list_strategy_deployments(
 ) -> APIResponse[list[dict[str, Any]]]:
     """List strategy deployments, optionally filtered by paper account."""
     deployments = await _list_deployments(account_id=account_id)
-    # --- PRO-BEGIN ---
-    if user.id != "local":
-        user_strategy_ids: set[str] = set()
-        repo = get_strategy_repo()
-        if repo is not None:
-            try:
-                configs = await repo.list(limit=10000, offset=0, user_id=user.id)
-                user_strategy_ids = {c.id for c in configs}
-            except Exception:
-                pass
-        if not user_strategy_ids:
-            user_strategy_ids = {
-                sid for sid in _strategies
-                if _strategy_owners.get(sid) in (user.id, "local", None)
-            }
-        deployments = [d for d in deployments if d.strategy_id in user_strategy_ids]
-    # --- PRO-END ---
     return APIResponse(
         data=[deployment.model_dump(mode="json") for deployment in deployments],
         meta=build_response_meta(request),

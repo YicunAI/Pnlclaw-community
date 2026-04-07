@@ -129,31 +129,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     from pnlclaw_market import BinanceSource, MarketDataService, OKXSource
     from pnlclaw_security.secrets import SecretManager
 
-    # --- PRO-BEGIN ---
-    jwt_secret = os.environ.get("PNLCLAW_AUTH_JWT_SECRET", "")
-    if jwt_secret:
-        try:
-            from pnlclaw_pro_auth.jwt_manager import JWTManager
-
-            jwt_mgr = JWTManager(secret_key=jwt_secret)
-            set_jwt_manager(jwt_mgr)
-            logger.info("JWT auth enabled — local-api will verify admin-api tokens")
-        except ImportError:
-            logger.info("pnlclaw_pro_auth not available, JWT auth disabled")
-    else:
-        bind_host = os.environ.get("UVICORN_HOST", os.environ.get("HOST", "127.0.0.1"))
-        if bind_host in ("0.0.0.0", "::"):
-            logger.critical(
-                "FATAL: Community (no-auth) mode on public interface %s is unsafe! "
-                "Set PNLCLAW_AUTH_JWT_SECRET or bind to 127.0.0.1.",
-                bind_host,
-            )
-            raise RuntimeError(
-                "Refusing to start in no-auth mode on a public interface. "
-                "Bind to 127.0.0.1 for local use."
-            )
-        logger.info("Running in local single-user mode (no auth)")
-    # --- PRO-END ---
 
     # --- Health ---
     async def _local_api_health() -> HealthCheckResult:
@@ -1491,9 +1466,6 @@ def create_app() -> FastAPI:
         "https://tauri.localhost",
         "http://tauri.localhost",
     ]
-    # --- PRO-BEGIN ---
-    _cors_origins.append("http://localhost:3001")
-    # --- PRO-END ---
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins,
