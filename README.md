@@ -21,6 +21,15 @@
   <a href="CHANGELOG.md">Changelog</a>
 
   <br /><br />
+
+  <a href="https://github.com/YicunAI/Pnlclaw-community/releases/latest">
+    <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_Download-Windows_Desktop_App-28a745?style=for-the-badge&logo=windows&logoColor=white" alt="Download" />
+  </a>
+
+  <br />
+  <sub>No setup required — download, install, and start trading in minutes.</sub>
+
+  <br /><br />
   <img src="apps/desktop/public/sl/首页.png" alt="PnLClaw Dashboard" width="800" />
 
 </div>
@@ -290,6 +299,21 @@ Desktop UI → Local API (FastAPI:8080) → Exchange SDK (native WS)
 ---
 
 ## Quick Start
+
+### Option A: Download Desktop App (Recommended for most users)
+
+Download the latest installer from [**GitHub Releases**](https://github.com/YicunAI/Pnlclaw-community/releases/latest) — no Python, Node.js, or Rust required.
+
+1. Download `PnLClaw_0.1.0_x64-setup.exe`
+2. Run the installer
+3. Launch PnLClaw from the Start menu
+4. Configure your LLM endpoint and exchange API keys in Settings
+
+> The desktop app bundles the full backend — just install and go.
+
+---
+
+### Option B: Run from Source (For developers)
 
 ### Prerequisites
 

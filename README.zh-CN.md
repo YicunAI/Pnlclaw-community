@@ -21,6 +21,15 @@
   <a href="CHANGELOG.md">更新日志</a>
 
   <br /><br />
+
+  <a href="https://github.com/YicunAI/Pnlclaw-community/releases/latest">
+    <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F_%E4%B8%8B%E8%BD%BD-Windows_%E6%A1%8C%E9%9D%A2%E5%BA%94%E7%94%A8-28a745?style=for-the-badge&logo=windows&logoColor=white" alt="下载" />
+  </a>
+
+  <br />
+  <sub>无需配置环境 —— 下载安装即可使用，几分钟内开始量化研究。</sub>
+
+  <br /><br />
   <img src="apps/desktop/public/sl/首页.png" alt="PnLClaw 总览面板" width="800" />
 
 </div>
@@ -291,6 +300,21 @@ PnLClaw Community
 <a id="quick-start"></a>
 
 ## 快速开始
+
+### 方式 A：下载桌面应用（推荐大多数用户使用）
+
+从 [**GitHub Releases**](https://github.com/YicunAI/Pnlclaw-community/releases/latest) 下载最新安装包 —— 无需安装 Python、Node.js 或 Rust。
+
+1. 下载 `PnLClaw_0.1.0_x64-setup.exe`
+2. 运行安装程序
+3. 从开始菜单启动 PnLClaw
+4. 在设置中配置你的 LLM 端点和交易所 API 密钥
+
+> 桌面应用内置了完整后端 —— 安装即用。
+
+---
+
+### 方式 B：从源码运行（面向开发者）
 
 ### 环境要求
 
