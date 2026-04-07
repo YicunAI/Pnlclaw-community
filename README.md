@@ -628,10 +628,24 @@ PnLClaw is in **early rapid iteration** — every Star, Issue, and PR fuels our 
 
 ## License
 
-GNU Affero General Public License v3.0 — see [LICENSE](LICENSE).
+PnLClaw Community is dual-licensed:
+
+| Use Case | License | Cost |
+|----------|---------|------|
+| Personal use, research, education, non-commercial projects | **AGPLv3** | Free |
+| Internal use within organizations (no external distribution) | **AGPLv3** | Free |
+| Derivative works (must open-source under AGPLv3) | **AGPLv3** | Free |
+| Commercial SaaS, proprietary products, or closed-source distribution | **Commercial License** | [Contact us](mailto:yicun@pnlclaw.com) |
+
+**Open-source license:** The full source code is available under [AGPLv3](LICENSE). You are free to use, modify, and distribute PnLClaw as long as all derivative works remain open-source under AGPLv3.
+
+**Commercial license:** If you wish to use PnLClaw in a proprietary product, embed it in a commercial SaaS, or distribute it without open-sourcing your modifications, you must obtain a commercial license from PnLClaw. Contact **yicun@pnlclaw.com** for licensing inquiries.
+
+> **Copyright © 2025–2026 PnLClaw Contributors. All rights reserved.**
+> As the sole copyright holder, PnLClaw reserves the right to offer the software under alternative licensing terms.
 
 ---
 
 <div align="center">
-  <sub>Built with care for the quant community · AGPLv3 · Community v0.1</sub>
+  <sub>Built with care for the quant community · AGPLv3 + Commercial · Community v0.1</sub>
 </div>

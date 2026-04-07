@@ -631,10 +631,24 @@ PnLClaw 目前处于**早期快速迭代阶段**，每一个 Star、Issue 和 PR
 
 ## 许可证
 
-GNU Affero General Public License v3.0 — 参见 [LICENSE](LICENSE)。
+PnLClaw Community 采用**双重授权**模式：
+
+| 使用场景 | 许可证 | 费用 |
+|----------|--------|------|
+| 个人使用、学术研究、教育、非商业项目 | **AGPLv3** | 免费 |
+| 组织内部使用（不对外分发） | **AGPLv3** | 免费 |
+| 衍生作品（必须以 AGPLv3 开源） | **AGPLv3** | 免费 |
+| 商业 SaaS、闭源产品、或不开源的商业分发 | **商业许可证** | [联系我们](mailto:yicun@pnlclaw.com) |
+
+**开源许可：** 完整源代码以 [AGPLv3](LICENSE) 发布。你可以自由使用、修改和分发 PnLClaw，前提是所有衍生作品必须以 AGPLv3 保持开源。
+
+**商业许可：** 如果你希望将 PnLClaw 用于闭源产品、商业 SaaS、或在不开源修改代码的情况下进行商业分发，必须获得 PnLClaw 的商业许可证。请联系 **yicun@pnlclaw.com** 咨询授权事宜。
+
+> **Copyright © 2025–2026 PnLClaw Contributors. All rights reserved.**
+> 作为唯一版权持有者，PnLClaw 保留以其他许可条款提供本软件的权利。
 
 ---
 
 <div align="center">
-  <sub>为量化社区用心构建 · AGPLv3 · Community v0.1</sub>
+  <sub>为量化社区用心构建 · AGPLv3 + Commercial · Community v0.1</sub>
 </div>
