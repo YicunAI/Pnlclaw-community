@@ -634,9 +634,9 @@ PnLClaw is in **early rapid iteration** — every Star, Issue, and PR fuels our 
 <div align="center">
   <a href="https://star-history.com/#YicunAI/Pnlclaw-community&Date">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date" width="600" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&theme=dark&v=20260407" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&v=20260407" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&v=20260407" width="600" />
     </picture>
   </a>
 </div>
