@@ -73,8 +73,15 @@ Thumbs.db
 next-env.d.ts
 
 # Tauri / Desktop
-src-tauri/target/
-src-tauri/gen/
+**/src-tauri/target/
+**/src-tauri/gen/
+**/src-tauri/sidecar/
+out_build/
+out_fresh/
+
+# Temp debug scripts
+scripts/check_*.py
+scripts/debug_*.py
 
 # Local data
 data/
