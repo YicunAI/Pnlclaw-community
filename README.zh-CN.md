@@ -636,11 +636,7 @@ PnLClaw 目前处于**早期快速迭代阶段**，每一个 Star、Issue 和 PR
 
 <div align="center">
   <a href="https://star-history.com/#YicunAI/Pnlclaw-community&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&theme=dark&v=20260407" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&v=20260407" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date&v=20260407" width="600" />
-    </picture>
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=YicunAI/Pnlclaw-community&type=Date" width="600" />
   </a>
 </div>
 

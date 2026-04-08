@@ -2,25 +2,15 @@ name: Refresh Star History Chart
 
 on:
   schedule:
-    - cron: "0 2 * * *"  # daily at 02:00 UTC
+    - cron: "0 2 * * *"
+  push:
+    branches: [main]
+    paths: ["README.md", "README.zh-CN.md"]
   workflow_dispatch:
 
 jobs:
-  refresh:
+  purge-cache:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Update cache-bust parameter
-        run: |
-          TODAY=$(date +%Y%m%d)
-          sed -i "s/&v=[0-9]\{8\}/\&v=$TODAY/g" README.md README.zh-CN.md
-
-      - name: Commit and push if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git diff --quiet && exit 0
-          git add README.md README.zh-CN.md
-          git commit -m "chore: refresh Star History chart [skip ci]"
-          git push
+      - uses: kevincobain2000/action-camo-purge@v1
